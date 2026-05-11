@@ -1,0 +1,125 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  STOCK_OPERATOR
+  MODEL_3D
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum VariantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Model3DStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+  OPTIMIZED
+}
+
+enum Model3DFormat {
+  GLB
+  GLTF
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  phone        String?
+  role         UserRole   @default(CUSTOMER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id                       String           @id @default(cuid())
+  name                     String
+  slug                     String           @unique
+  description              String?
+  brand                    String?
+  basePrice                Decimal          @db.Decimal(10, 2)
+  promotionalPrice         Decimal?         @db.Decimal(10, 2)
+  status                   ProductStatus    @default(DRAFT)
+  has3DModel               Boolean          @default(false)
+  availableForVirtualTryOn Boolean          @default(false)
+  categoryId               String
+  category                 Category         @relation(fields: [categoryId], references: [id])
+  variants                 ProductVariant[]
+  images                   ProductImage[]
+  model3D                  Model3D?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+}
+
+model ProductVariant {
+  id            String        @id @default(cuid())
+  productId     String
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku           String        @unique
+  color         String
+  size          String
+  price         Decimal?      @db.Decimal(10, 2)
+  stockQuantity Int           @default(0)
+  status        VariantStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Model3D {
+  id         String        @id @default(cuid())
+  productId  String        @unique
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fileUrl    String
+  format     Model3DFormat @default(GLB)
+  textureUrl String?
+  version    Int           @default(1)
+  fileSizeMb Float?
+  status     Model3DStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
