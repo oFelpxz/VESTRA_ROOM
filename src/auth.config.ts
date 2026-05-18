@@ -13,6 +13,11 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const path = nextUrl.pathname;
 
+      // Já logado não deve ver login/cadastro.
+      if (isLoggedIn && (path === "/login" || path === "/cadastro")) {
+        return Response.redirect(new URL("/perfil", nextUrl));
+      }
+
       const isAdminArea = path.startsWith("/admin");
       const isProfileArea = path.startsWith("/perfil");
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Tag } from "@/components/ui/tag";
-import { Viewer3D } from "@/components/viewer-3d/viewer";
+import { ProductViewer } from "@/components/viewer-3d/product-viewer";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
 import { getProductDetail } from "@/lib/products";
 
@@ -53,7 +53,7 @@ export default async function ProdutoPage({
                 <span className="inline-block size-1.5 rounded-full bg-acid" />
                 VESTRA FIT · 3D
               </span>
-              <Viewer3D modelUrl={product.modelUrl} />
+              <ProductViewer modelUrl={product.modelUrl} />
             </div>
           ) : (
             <div className="relative aspect-square overflow-hidden rounded-sm bg-secondary">

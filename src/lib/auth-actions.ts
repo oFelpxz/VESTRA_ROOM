@@ -57,18 +57,13 @@ export async function loginAction(
     return { error: "Preencha e-mail e senha." };
   }
 
-  // Define o destino conforme o papel (admin vai pro painel).
-  const existing = await prisma.user.findUnique({
-    where: { email },
-    select: { role: true },
-  });
-  const redirectTo = existing?.role === "ADMIN" ? "/admin" : "/perfil";
-
+  // Todos vão para /perfil. O acesso ao /admin é feito apenas pelo
+  // item "Admin" do menu, visível só para administradores logados.
   try {
     await signIn("credentials", {
       email,
       password,
-      redirectTo,
+      redirectTo: "/perfil",
     });
   } catch (error) {
     if (error instanceof AuthError) {

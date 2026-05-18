@@ -32,10 +32,10 @@ export function HeaderClient({
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-all duration-300 ${
+      className={`sticky top-0 z-50 bg-background transition-all duration-300 ${
         scrolled
-          ? "border-b border-border/60 bg-background/80 backdrop-blur"
-          : "border-b border-transparent bg-transparent"
+          ? "border-b border-border/60 shadow-sm"
+          : "border-b border-transparent"
       }`}
     >
       <div

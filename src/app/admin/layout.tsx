@@ -1,12 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-
-const adminNav = [
-  { label: "Painel", href: "/admin" },
-  { label: "Categorias", href: "/admin/categorias" },
-  { label: "Tabela de medidas", href: "/admin/medidas" },
-];
+import { AdminNav } from "@/components/admin/admin-nav";
 
 export default async function AdminLayout({
   children,
@@ -15,29 +9,39 @@ export default async function AdminLayout({
 }) {
   const session = await auth();
 
-  // Defesa extra além do proxy.ts.
   if (session?.user?.role !== "ADMIN") {
     redirect("/login");
   }
 
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-      <p className="text-xs font-medium uppercase tracking-[0.25em] text-acid">
-        VESTRA ROOM · Admin
-      </p>
-      <nav className="mt-4 flex flex-wrap gap-2 border-b border-border pb-6">
-        {adminNav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="rounded-sm border border-foreground/15 px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-foreground/70 transition-colors hover:border-foreground hover:text-foreground"
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+  const user = session.user;
 
-      <div className="mt-8">{children}</div>
+  return (
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      {/* sidebar unificada */}
+      <aside className="flex shrink-0 flex-col gap-8 bg-foreground px-6 py-7 text-background lg:sticky lg:top-0 lg:h-screen lg:w-64">
+        <div>
+          <p className="font-heading text-base font-bold uppercase tracking-[0.2em]">
+            VESTRA ROOM
+          </p>
+          <p className="mt-1 inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.3em] text-acid">
+            <span className="inline-block size-1 rounded-full bg-acid" />
+            Admin
+          </p>
+        </div>
+
+        <div className="border-y border-background/15 py-4">
+          <p className="text-sm font-medium">{user.name}</p>
+          <p className="mt-0.5 text-xs text-background/50">{user.email}</p>
+          <span className="mt-2 inline-block rounded-sm bg-background/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-background/70">
+            {user.role}
+          </span>
+        </div>
+
+        <AdminNav />
+      </aside>
+
+      {/* conteúdo */}
+      <main className="flex-1 px-5 py-8 md:px-10 md:py-12">{children}</main>
     </div>
   );
 }
