@@ -9,6 +9,8 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations precisam de conexão DIRETA (porta 5432).
+    // O pooler do Supabase (6543) não suporta DDL/advisory locks.
+    url: process.env["DIRECT_URL"],
   },
 });

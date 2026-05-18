@@ -45,16 +45,41 @@ enum Model3DFormat {
   GLTF
 }
 
+enum FitPreference {
+  SLIM
+  REGULAR
+  OVERSIZED
+}
+
 model User {
-  id           String     @id @default(cuid())
-  name         String
-  email        String     @unique
-  passwordHash String
-  phone        String?
-  role         UserRole   @default(CUSTOMER)
-  status       UserStatus @default(ACTIVE)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                 String              @id @default(cuid())
+  name               String
+  email              String              @unique
+  passwordHash       String
+  phone              String?
+  role               UserRole            @default(CUSTOMER)
+  status             UserStatus          @default(ACTIVE)
+  measurementProfile MeasurementProfile?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model MeasurementProfile {
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heightCm      Float?
+  weightKg      Float?
+  chestCm       Float?
+  waistCm       Float?
+  hipCm         Float?
+  shoulderCm    Float?
+  armLengthCm   Float?
+  legLengthCm   Float?
+  fitPreference FitPreference @default(REGULAR)
+  acceptedTerms Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model Category {
@@ -82,6 +107,7 @@ model Product {
   variants                 ProductVariant[]
   images                   ProductImage[]
   model3D                  Model3D?
+  sizeChart                SizeChart?
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 }
@@ -122,4 +148,30 @@ model Model3D {
   status     Model3DStatus @default(PENDING)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+}
+
+model SizeChart {
+  id        String             @id @default(cuid())
+  productId String             @unique
+  product   Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  measures  SizeChartMeasure[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model SizeChartMeasure {
+  id          String    @id @default(cuid())
+  sizeChartId String
+  sizeChart   SizeChart @relation(fields: [sizeChartId], references: [id], onDelete: Cascade)
+  size        String
+  chestMinCm  Float?
+  chestMaxCm  Float?
+  waistMinCm  Float?
+  waistMaxCm  Float?
+  hipMinCm    Float?
+  hipMaxCm    Float?
+  heightMinCm Float?
+  heightMaxCm Float?
+  createdAt   DateTime  @default(now())
 }
