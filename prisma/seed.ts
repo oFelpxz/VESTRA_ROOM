@@ -119,10 +119,10 @@ async function main() {
     if (p.has3D) {
       await prisma.model3D.upsert({
         where: { productId: product.id },
-        update: { fileUrl: "/models/Duck.glb", status: "VALIDATED" },
+        update: { fileUrl: "/models/hoodie_black.glb", status: "VALIDATED" },
         create: {
           productId: product.id,
-          fileUrl: "/models/Duck.glb",
+          fileUrl: "/models/hoodie_black.glb",
           format: "GLB",
           status: "VALIDATED",
         },

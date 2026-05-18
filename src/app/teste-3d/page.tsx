@@ -15,8 +15,8 @@ export default function Teste3DPage() {
         ângulos.
       </p>
 
-      <div className="relative mt-10 h-[600px] w-full overflow-hidden rounded-sm border border-border bg-foreground">
-        <span className="absolute left-4 top-4 z-10 text-[10px] font-medium uppercase tracking-[0.2em] text-background/50">
+      <div className="relative mt-10 h-[600px] w-full overflow-hidden rounded-sm border border-border bg-muted">
+        <span className="absolute left-4 top-4 z-10 text-[10px] font-medium uppercase tracking-[0.2em] text-foreground/50">
           VESTRA ROOM · 3D
         </span>
         <Viewer3D />

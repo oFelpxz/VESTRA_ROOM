@@ -16,9 +16,21 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "VESTRA ROOM — Vista antes de comprar",
+  metadataBase: new URL("https://vestra-room.vercel.app"),
+  title: {
+    default: "VESTRA ROOM — Vista antes de comprar",
+    template: "%s | VESTRA ROOM",
+  },
   description:
     "Loja de roupas com provador virtual 3D. Visualize peças em 3D, veja o caimento estimado e escolha seu tamanho com mais segurança com o VESTRA FIT.",
+  openGraph: {
+    title: "VESTRA ROOM — Vista antes de comprar",
+    description:
+      "Moda digital com peças em 3D, medidas inteligentes e provador virtual VESTRA FIT.",
+    type: "website",
+    locale: "pt_BR",
+    siteName: "VESTRA ROOM",
+  },
 };
 
 export default function RootLayout({
