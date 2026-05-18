@@ -13,6 +13,7 @@ export type CatalogProduct = {
   slug: string;
   name: string;
   price: string;
+  previewUrl: string;
   tags: string[];
 };
 
@@ -75,6 +76,14 @@ export async function getProducts(
   const range = filters.preco ? PRICE_RANGES[filters.preco] : undefined;
 
   const products = await prisma.product.findMany({
+  include: {
+    images: {
+      orderBy: {
+        position: "asc",
+      },
+      take: 1,
+    },
+  },
     where: {
       status: "ACTIVE",
       ...(filters.categoria
@@ -102,18 +111,22 @@ export async function getProducts(
     orderBy: { createdAt: "desc" },
   });
 
+  console.log("IMAGENS DO PRIMEIRO PRODUTO:");
+console.log(JSON.stringify(products[0]?.images, null, 2));
+
   return products.map((p) => {
     const tags: string[] = [];
     if (p.has3DModel) tags.push("3D DISPONÍVEL");
     if (p.availableForVirtualTryOn) tags.push("VESTRA FIT");
 
     return {
-      id: p.id,
-      slug: p.slug,
-      name: p.name,
-      price: formatBRL(Number(p.basePrice)),
-      tags,
-    };
+  id: p.id,
+  slug: p.slug,
+  name: p.name,
+  price: formatBRL(Number(p.basePrice)),
+  previewUrl: p.images[0]?.url || "/fallback.png",
+  tags,
+};
   });
 }
 

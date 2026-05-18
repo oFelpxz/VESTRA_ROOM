@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Tag } from "@/components/ui/tag";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
+import Image from "next/image";
 
 type ProductCardProps = {
   id: string;
   slug?: string;
   name: string;
   price: string;
+  previewUrl: string;
   tags?: string[];
 };
 
@@ -15,6 +17,7 @@ export function ProductCard({
   slug,
   name,
   price,
+  previewUrl,
   tags = [],
 }: ProductCardProps) {
   const href = `/produto/${slug ?? id}`;
@@ -25,7 +28,11 @@ export function ProductCard({
     <Link href={href} className="group block">
       <div className="relative aspect-[3/4] overflow-hidden rounded-sm bg-secondary">
         <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-105">
-          <ProductPlaceholder />
+        <Image
+          src={previewUrl}
+          alt={name}
+          fill
+          className="object-cover"/>
         </div>
         <div className="absolute inset-0 flex items-end p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           <span className="inline-flex items-center gap-2 rounded-sm bg-foreground px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-background">
