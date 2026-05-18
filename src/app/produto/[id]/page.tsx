@@ -1,8 +1,28 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Tag } from "@/components/ui/tag";
 import { Viewer3D } from "@/components/viewer-3d/viewer";
+import { ProductPlaceholder } from "@/components/product/product-placeholder";
 import { getProductDetail } from "@/lib/products";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const product = await getProductDetail(id);
+  if (!product) {
+    return { title: "Produto não encontrado | VESTRA ROOM" };
+  }
+  return {
+    title: `${product.name} | VESTRA ROOM`,
+    description:
+      product.description ??
+      "Peça VESTRA ROOM com visualização 3D e provador virtual VESTRA FIT.",
+  };
+}
 
 function range(min: number | null, max: number | null) {
   if (min == null && max == null) return "—";
@@ -28,8 +48,8 @@ export default async function ProdutoPage({
         {/* Visual: 3D quando disponível, senão placeholder */}
         <div>
           {product.has3D && product.modelUrl ? (
-            <div className="relative aspect-square overflow-hidden rounded-sm border border-border bg-foreground">
-              <span className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.2em] text-background/60">
+            <div className="relative aspect-square overflow-hidden rounded-sm border border-border bg-muted">
+              <span className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.2em] text-foreground/60">
                 <span className="inline-block size-1.5 rounded-full bg-acid" />
                 VESTRA FIT · 3D
               </span>
@@ -37,9 +57,7 @@ export default async function ProdutoPage({
             </div>
           ) : (
             <div className="relative aspect-square overflow-hidden rounded-sm bg-secondary">
-              <div className="absolute inset-0 flex items-center justify-center text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
-                VESTRA ROOM
-              </div>
+              <ProductPlaceholder />
             </div>
           )}
           {product.has3D && (

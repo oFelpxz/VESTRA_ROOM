@@ -151,3 +151,63 @@
     @apply font-heading;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   VESTRA ROOM — detalhes de marca
+--------------------------------------------------------------------------- */
+
+/* seleção de texto em verde ácido */
+::selection {
+  background: #b6ff4d;
+  color: #0b0b0b;
+}
+
+/* scrollbar minimalista */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #8a8a8a transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #c9c3b6;
+  border-radius: 0;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #8a8a8a;
+}
+
+/* marquee infinito */
+@keyframes vestra-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.animate-marquee {
+  animation: vestra-marquee 30s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* grão de filme sutil sobre toda a página */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}
