@@ -17,9 +17,11 @@ const navItems = [
 export function HeaderClient({
   isLoggedIn,
   isAdmin,
+  cartCount,
 }: {
   isLoggedIn: boolean;
   isAdmin: boolean;
+  cartCount: number;
 }) {
   const [scrolled, setScrolled] = useState(false);
 
@@ -86,13 +88,18 @@ export function HeaderClient({
             </form>
           )}
 
-          <button
-            type="button"
-            aria-label="Sacola"
-            className="text-foreground/80 transition-colors hover:text-foreground"
+          <Link
+            href="/carrinho"
+            aria-label={`Sacola (${cartCount} ${cartCount === 1 ? "item" : "itens"})`}
+            className="relative text-foreground/80 transition-colors hover:text-foreground"
           >
             <ShoppingBag className="size-5" strokeWidth={1.5} />
-          </button>
+            {cartCount > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-acid px-1 text-[10px] font-semibold leading-none text-foreground">
+                {cartCount}
+              </span>
+            )}
+          </Link>
 
           <MobileMenu
             navItems={navItems}

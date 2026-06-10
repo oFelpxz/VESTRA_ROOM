@@ -21,10 +21,14 @@ export default async function PerfilPage() {
 
   const user = session.user;
 
-  const profile = await prisma.measurementProfile.findUnique({
-    where: { userId: user.id },
-    select: { id: true },
-  });
+  const [profile, ordersCount, addressesCount] = await Promise.all([
+    prisma.measurementProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    }),
+    prisma.order.count({ where: { userId: user.id } }),
+    prisma.address.count({ where: { userId: user.id } }),
+  ]);
   const hasMeasurements = Boolean(profile);
 
   return (
@@ -85,19 +89,35 @@ export default async function PerfilPage() {
             <CardDescription>Endereços de entrega</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Em breve (Semana 3).
+            {addressesCount > 0 ? (
+              <span className="font-medium text-foreground">
+                {addressesCount}{" "}
+                {addressesCount === 1 ? "endereço cadastrado" : "endereços cadastrados"}
+              </span>
+            ) : (
+              <span>Nenhum endereço cadastrado ainda.</span>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pedidos</CardTitle>
-            <CardDescription>Histórico de compras</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Em breve (Semana 3).
-          </CardContent>
-        </Card>
+        <Link href="/perfil/pedidos" className="block">
+          <Card className="h-full transition-shadow hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Pedidos</CardTitle>
+              <CardDescription>Histórico de compras</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {ordersCount > 0 ? (
+                <span className="font-medium text-foreground">
+                  {ordersCount}{" "}
+                  {ordersCount === 1 ? "pedido" : "pedidos"} — ver todos →
+                </span>
+              ) : (
+                <span>Nenhum pedido ainda.</span>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </section>
   );

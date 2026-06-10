@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { Tag } from "@/components/ui/tag";
 import { ProductViewer } from "@/components/viewer-3d/product-viewer";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
+import { ProductPurchase } from "@/components/product/product-purchase";
 import { getProductDetail } from "@/lib/products";
 
 export async function generateMetadata({
@@ -36,11 +38,16 @@ export default async function ProdutoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = await getProductDetail(id);
+  const [product, session] = await Promise.all([
+    getProductDetail(id),
+    auth(),
+  ]);
 
   if (!product) {
     notFound();
   }
+
+  const isLoggedIn = !!session?.user;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
@@ -105,59 +112,25 @@ export default async function ProdutoPage({
             </p>
           )}
 
-          {/* Cores */}
-          {product.colors.length > 0 && (
-            <div className="mt-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Cor
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {product.colors.map((c) => (
-                  <span
-                    key={c}
-                    className="rounded-sm border border-foreground/20 px-3 py-1.5 text-sm transition-colors hover:border-foreground"
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Compra: seleção cor + tamanho + adicionar à sacola */}
+          <div className="mt-8">
+            <ProductPurchase
+              variants={product.variants}
+              colors={product.colors}
+              sizes={product.sizes}
+              isLoggedIn={isLoggedIn}
+            />
+          </div>
 
-          {/* Tamanhos */}
-          {product.sizes.length > 0 && (
-            <div className="mt-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Tamanho
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {product.sizes.map((s) => (
-                  <span
-                    key={s}
-                    className="flex h-11 min-w-11 items-center justify-center rounded-sm border border-foreground/20 px-3 text-sm transition-colors hover:border-foreground"
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Ações */}
-          <div className="mt-10 flex flex-col gap-3">
-            <button
-              type="button"
-              className="inline-flex h-12 items-center justify-center rounded-sm bg-foreground px-8 text-xs font-semibold uppercase tracking-[0.15em] text-background transition-opacity hover:opacity-90"
-            >
-              Adicionar à sacola
-            </button>
+          {product.has3D && product.modelUrl && (
             <Link
-              href="/teste-3d"
-              className="inline-flex h-12 items-center justify-center rounded-sm border border-foreground/20 px-8 text-xs font-semibold uppercase tracking-[0.15em] transition-colors hover:bg-secondary"
+              href={`/produto/${product.slug}/provador`}
+              className="mt-3 inline-flex h-12 items-center justify-center gap-2 rounded-sm border border-foreground/20 px-8 text-xs font-semibold uppercase tracking-[0.15em] transition-colors hover:bg-secondary"
             >
+              <span className="inline-block size-1.5 rounded-full bg-acid" />
               Experimentar no VESTRA FIT
             </Link>
-          </div>
+          )}
 
           {/* Tabela de medidas */}
           {product.sizeChart && product.sizeChart.rows.length > 0 && (

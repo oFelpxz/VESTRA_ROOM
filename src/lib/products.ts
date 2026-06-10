@@ -37,6 +37,12 @@ export type ProductDetail = {
   promotionalPrice: string | null;
   colors: string[];
   sizes: string[];
+  variants: {
+    id: string;
+    color: string;
+    size: string;
+    stockQuantity: number;
+  }[];
   tags: string[];
   has3D: boolean;
   modelUrl: string | null;
@@ -156,6 +162,12 @@ export async function getProductDetail(
       : null,
     colors,
     sizes,
+    variants: product.variants.map((v) => ({
+      id: v.id,
+      color: v.color,
+      size: v.size,
+      stockQuantity: v.stockQuantity,
+    })),
     tags,
     has3D: product.has3DModel,
     modelUrl: product.model3D?.fileUrl ?? null,

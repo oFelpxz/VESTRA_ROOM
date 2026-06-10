@@ -9,11 +9,12 @@ export default async function AdminLayout({
 }) {
   const session = await auth();
 
-  if (session?.user?.role !== "ADMIN") {
+  const role = session?.user?.role;
+  if (role !== "ADMIN" && role !== "MODEL_3D" && role !== "STOCK_OPERATOR") {
     redirect("/login");
   }
 
-  const user = session.user;
+  const user = session!.user!;
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
@@ -37,7 +38,7 @@ export default async function AdminLayout({
           </span>
         </div>
 
-        <AdminNav />
+        <AdminNav role={role as "ADMIN" | "STOCK_OPERATOR" | "MODEL_3D"} />
       </aside>
 
       {/* conteúdo */}

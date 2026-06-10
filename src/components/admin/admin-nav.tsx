@@ -4,14 +4,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/auth-actions";
 
-const items = [
-  { label: "Painel", href: "/admin", index: "01" },
-  { label: "Categorias", href: "/admin/categorias", index: "02" },
-  { label: "Tabela de medidas", href: "/admin/medidas", index: "03" },
+type Role = "ADMIN" | "STOCK_OPERATOR" | "MODEL_3D" | "CUSTOMER";
+
+type Item = {
+  label: string;
+  href: string;
+  index: string;
+  roles: Role[];
+};
+
+const ALL_ITEMS: Item[] = [
+  { label: "Painel", href: "/admin", index: "01", roles: ["ADMIN", "STOCK_OPERATOR", "MODEL_3D"] },
+  { label: "Categorias", href: "/admin/categorias", index: "02", roles: ["ADMIN"] },
+  { label: "Produtos", href: "/admin/produtos", index: "03", roles: ["ADMIN"] },
+  { label: "Modelos 3D", href: "/admin/modelos-3d", index: "04", roles: ["ADMIN", "MODEL_3D"] },
+  { label: "Pedidos", href: "/admin/pedidos", index: "05", roles: ["ADMIN", "STOCK_OPERATOR"] },
+  { label: "Estoque", href: "/admin/estoque", index: "06", roles: ["ADMIN", "STOCK_OPERATOR"] },
+  { label: "Tabela de medidas", href: "/admin/medidas", index: "07", roles: ["ADMIN"] },
 ];
 
-export function AdminNav() {
+export function AdminNav({ role }: { role: Role }) {
   const pathname = usePathname();
+  const items = ALL_ITEMS.filter((it) => it.roles.includes(role));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -32,9 +46,7 @@ export function AdminNav() {
               }`}
             >
               <span
-                className={
-                  active ? "text-acid" : "text-background/30"
-                }
+                className={active ? "text-acid" : "text-background/30"}
               >
                 |{it.index}|
               </span>
