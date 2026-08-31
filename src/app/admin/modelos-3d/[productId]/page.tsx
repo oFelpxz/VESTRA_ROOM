@@ -9,6 +9,7 @@ import {
 } from "@/lib/model-3d-actions";
 import { Model3DUploader } from "@/components/admin/model-3d-uploader";
 import { Model3DValidator } from "@/components/admin/model-3d-validator";
+import { isCloudObject, resolveModelUrl } from "@/lib/storage";
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: "bg-muted text-muted-foreground",
@@ -38,6 +39,7 @@ export default async function Modelo3DRevisaoPage({
   if (!product) notFound();
 
   const model = product.model3D;
+  const previewUrl = model ? await resolveModelUrl(model.fileUrl) : null;
 
   return (
     <div className="flex flex-col gap-10">
@@ -93,11 +95,15 @@ export default async function Modelo3DRevisaoPage({
             {model ? "Pré-visualização" : "Nenhum modelo associado"}
           </p>
           <div className="mt-4">
-            {model ? (
+            {model && previewUrl ? (
               <Model3DValidator
-                url={model.fileUrl}
+                url={previewUrl}
                 fileSizeMb={model.fileSizeMb}
               />
+            ) : model ? (
+              <div className="flex aspect-[4/3] items-center justify-center rounded-sm border border-dashed border-border bg-muted text-sm text-muted-foreground">
+                Não foi possível gerar a pré-visualização do modelo.
+              </div>
             ) : (
               <div className="flex aspect-[4/3] items-center justify-center rounded-sm border border-dashed border-border bg-muted text-sm text-muted-foreground">
                 Envie um arquivo .glb para pré-visualizar.
@@ -191,9 +197,17 @@ export default async function Modelo3DRevisaoPage({
                   }
                 />
                 <Meta
+                  label="Armazenamento"
+                  value={
+                    isCloudObject(model.fileUrl)
+                      ? "Supabase Storage (privado)"
+                      : "Local (public/models)"
+                  }
+                />
+                <Meta
                   label="Caminho"
                   value={
-                    <code className="font-mono text-[11px]">
+                    <code className="font-mono text-[11px] break-all">
                       {model.fileUrl}
                     </code>
                   }

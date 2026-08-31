@@ -55,12 +55,17 @@ O `.env` **não vai para o Git** (contém credenciais). Crie-o na raiz copiando 
 cp .env.example .env
 ```
 
-Preencha as 3 variáveis (detalhes na seção [Variáveis de ambiente](#variáveis-de-ambiente)):
+Preencha as variáveis (detalhes na seção [Variáveis de ambiente](#variáveis-de-ambiente)):
 
 ```env
 DATABASE_URL="postgresql://postgres.SEU_REF:SUA_SENHA@aws-1-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://postgres.SEU_REF:SUA_SENHA@aws-1-us-east-1.pooler.supabase.com:5432/postgres"
 AUTH_SECRET="um-segredo-aleatorio"
+
+# Storage dos modelos 3D (item 26). Sem estas, o upload cai no filesystem local.
+SUPABASE_URL="https://SEU_REF.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."      # Project Settings → API (chave secreta)
+SUPABASE_MODELS_BUCKET="models-3d"              # bucket privado
 ```
 
 > Use **os mesmos valores** da máquina principal (mesmo banco Supabase). Se não tiver o `AUTH_SECRET`, gere um novo com `npx auth secret` — só invalida sessões antigas, nada quebra.
@@ -94,8 +99,13 @@ Abra **http://localhost:3000**.
 | `DATABASE_URL` | Conexão do app em runtime (pooler, porta **6543**, com `?pgbouncer=true`) | Supabase → Project Settings → Database → Connection string → **Transaction** |
 | `DIRECT_URL` | Conexão direta para migrations (porta **5432**) | Supabase → mesma tela → **Session** / direct |
 | `AUTH_SECRET` | Assina o JWT da sessão (Auth.js) | Gere: `npx auth secret` ou `openssl rand -base64 32` |
+| `SUPABASE_URL` | Base do projeto para o Storage 3D | Supabase → Project Settings → API → **Project URL** |
+| `SUPABASE_SERVICE_ROLE_KEY` | Acesso de servidor ao Storage (upload/assinatura). **Secreta.** | Supabase → Project Settings → API → chave `service_role` / `sb_secret_…` |
+| `SUPABASE_MODELS_BUCKET` | Nome do bucket **privado** dos modelos (default `models-3d`) | Supabase → Storage → criar bucket |
 
 > A senha do banco fica em Supabase → Project Settings → Database → **Reset database password** (use só letras e números para evitar problemas de URL).
+>
+> **Sem as variáveis `SUPABASE_*`** o upload de modelos 3D continua funcionando, mas grava em `public/models/` (fallback local) em vez do Storage em nuvem.
 
 ---
 
@@ -161,7 +171,8 @@ src/
 - **Prisma 7**: usa driver adapter (`@prisma/adapter-pg`). Em runtime conecta pelo pooler do Supabase; migrations usam `DIRECT_URL`.
 - **Next.js 16**: o antigo `middleware.ts` foi renomeado para `proxy.ts`.
 - **3D**: `Viewer3D` é model-agnostic (auto-centraliza e enquadra qualquer `.glb`). O modelo vem do banco (`Model3D.fileUrl`) por produto.
-- **Deploy (Vercel)**: configurar `DATABASE_URL`, `DIRECT_URL` e `AUTH_SECRET` em Settings → Environment Variables. O `postinstall` cuida do `prisma generate` no build.
+- **Deploy (Vercel)**: configurar `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` e as `SUPABASE_*` em Settings → Environment Variables. O `postinstall` cuida do `prisma generate` no build.
+- **Modelos 3D**: upload em `/admin/modelos-3d` já **otimiza o `.glb` automaticamente** (dedup, weld, quantize) e envia para o **Supabase Storage** (bucket privado, servido por signed URL de 2h). Modelos antigos em `public/models/*.glb` continuam funcionando.
 
 ---
 

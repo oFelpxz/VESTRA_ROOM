@@ -27,10 +27,8 @@ function Loader() {
   );
 }
 
-useGLTF.preload("/models/hoodie_black.glb");
-
 export function Viewer3D({
-  modelUrl = "/models/hoodie_black.glb",
+  modelUrl,
   interactive = true,
   autoRotate = false,
 }: {
@@ -38,6 +36,14 @@ export function Viewer3D({
   interactive?: boolean;
   autoRotate?: boolean;
 }) {
+  if (!modelUrl) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-[#e7e2da] text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/50">
+        Modelo indisponível
+      </div>
+    );
+  }
+
   return (
     <Canvas camera={{ position: [3, 2, 5], fov: 50 }}>
       {/* fundo de estúdio claro próprio (independente do CSS) */}

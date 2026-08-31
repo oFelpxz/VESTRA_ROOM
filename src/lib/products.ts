@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { formatBRL } from "@/lib/format";
+import { resolveModelUrl } from "@/lib/storage";
 
 export type ProductFilters = {
   categoria?: string;
@@ -118,21 +119,25 @@ export async function getProducts(
     orderBy: { createdAt: "desc" },
   });
 
-  return products.map((p) => {
-    const tags: string[] = [];
-    if (p.has3DModel) tags.push("3D DISPONÍVEL");
-    if (p.availableForVirtualTryOn) tags.push("VESTRA FIT");
+  return Promise.all(
+    products.map(async (p) => {
+      const tags: string[] = [];
+      if (p.has3DModel) tags.push("3D DISPONÍVEL");
+      if (p.availableForVirtualTryOn) tags.push("VESTRA FIT");
 
-    return {
-      id: p.id,
-      slug: p.slug,
-      name: p.name,
-      price: formatBRL(Number(p.basePrice)),
-      tags,
-      imageUrl: p.images[0]?.url ?? null,
-      modelUrl: p.has3DModel ? (p.model3D?.fileUrl ?? null) : null,
-    };
-  });
+      return {
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        price: formatBRL(Number(p.basePrice)),
+        tags,
+        imageUrl: p.images[0]?.url ?? null,
+        modelUrl: p.has3DModel
+          ? await resolveModelUrl(p.model3D?.fileUrl ?? null)
+          : null,
+      };
+    }),
+  );
 }
 
 export async function getProductDetail(
@@ -182,7 +187,7 @@ export async function getProductDetail(
     })),
     tags,
     has3D: product.has3DModel,
-    modelUrl: product.model3D?.fileUrl ?? null,
+    modelUrl: await resolveModelUrl(product.model3D?.fileUrl ?? null),
     sizeChart: product.sizeChart
       ? {
           name: product.sizeChart.name,

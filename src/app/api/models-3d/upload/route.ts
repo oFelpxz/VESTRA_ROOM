@@ -3,6 +3,12 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { optimizeGlb } from "@/lib/model-optimizer";
+import {
+  MODELS_BUCKET,
+  storageConfigured,
+  uploadModelObject,
+} from "@/lib/storage";
 
 const MAX_SIZE_MB = 25;
 const ALLOWED_EXT = [".glb", ".gltf"] as const;
@@ -48,8 +54,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const sizeMb = file.size / (1024 * 1024);
-  if (sizeMb > MAX_SIZE_MB) {
+  const uploadSizeMb = file.size / (1024 * 1024);
+  if (uploadSizeMb > MAX_SIZE_MB) {
     return NextResponse.json(
       { error: `Arquivo excede ${MAX_SIZE_MB}MB.` },
       { status: 400 },
@@ -67,34 +73,80 @@ export async function POST(request: Request) {
     );
   }
 
-  // Define a versão: incrementa se já existir modelo
+  // Versão: incrementa se já existir modelo
   const existing = await prisma.model3D.findUnique({
     where: { productId },
     select: { version: true },
   });
   const nextVersion = (existing?.version ?? 0) + 1;
+  const format = ext === ".gltf" ? "GLTF" : "GLB";
 
-  const fileName = `${product.slug}-v${nextVersion}${ext}`;
-  const dir = path.join(process.cwd(), "public", "models");
-  const absolute = path.join(dir, fileName);
-  const relative = `/models/${fileName}`;
+  // --- Compressão automática (item 3D-01) ---
+  // Só .glb (binário). .gltf externo passa direto.
+  const rawBytes = Buffer.from(await file.arrayBuffer());
+  let bytes: Buffer = rawBytes;
+  let originalBytes = rawBytes.byteLength;
+  let optimizedPct = 0;
+  let wasOptimized = false;
 
-  try {
-    await mkdir(dir, { recursive: true });
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(absolute, buffer);
-  } catch (e) {
-    console.error("Erro ao gravar modelo 3D:", e);
-    return NextResponse.json(
-      { error: "Falha ao salvar arquivo no servidor." },
-      { status: 500 },
-    );
+  if (ext === ".glb") {
+    const result = await optimizeGlb(rawBytes);
+    bytes = Buffer.from(result.data);
+    originalBytes = result.originalBytes;
+    optimizedPct = Math.round(result.ratio * 100);
+    wasOptimized = result.optimized;
+  }
+
+  const finalSizeMb = Number((bytes.byteLength / (1024 * 1024)).toFixed(2));
+  const originalSizeMb = Number((originalBytes / (1024 * 1024)).toFixed(2));
+
+  // --- Armazenamento (item 26) ---
+  // Preferência: Supabase Storage (bucket privado). Fallback: public/models.
+  const objectName = `${product.slug}/v${nextVersion}${ext}`;
+  const contentType =
+    ext === ".gltf" ? "model/gltf+json" : "model/gltf-binary";
+
+  let fileUrl: string;
+  let storage: "cloud" | "local";
+
+  if (storageConfigured()) {
+    try {
+      await uploadModelObject(objectName, bytes, contentType);
+      fileUrl = objectName; // caminho do objeto — sem "/" inicial
+      storage = "cloud";
+    } catch (e) {
+      console.error("Erro no upload para o Storage:", e);
+      return NextResponse.json(
+        { error: "Falha ao enviar o modelo para o Storage." },
+        { status: 502 },
+      );
+    }
+  } else {
+    try {
+      const fileName = `${product.slug}-v${nextVersion}${ext}`;
+      const dir = path.join(process.cwd(), "public", "models");
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, fileName), bytes);
+      fileUrl = `/models/${fileName}`;
+      storage = "local";
+    } catch (e) {
+      console.error("Erro ao gravar modelo 3D local:", e);
+      return NextResponse.json(
+        { error: "Falha ao salvar arquivo no servidor." },
+        { status: 500 },
+      );
+    }
   }
 
   return NextResponse.json({
-    fileUrl: relative,
-    fileSizeMb: Number(sizeMb.toFixed(2)),
-    format: ext === ".gltf" ? "GLTF" : "GLB",
+    fileUrl,
+    fileSizeMb: finalSizeMb,
+    originalSizeMb,
+    optimizedPct,
+    wasOptimized,
+    format,
+    storage,
+    bucket: storage === "cloud" ? MODELS_BUCKET : null,
   });
 }
 
