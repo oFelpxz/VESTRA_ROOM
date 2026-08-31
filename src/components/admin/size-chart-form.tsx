@@ -52,6 +52,10 @@ export function SizeChartForm({ products }: { products: ProductOption[] }) {
               <th className="p-2">Cintura máx</th>
               <th className="p-2">Quadril mín</th>
               <th className="p-2">Quadril máx</th>
+              <th className="p-2">Braço mín</th>
+              <th className="p-2">Braço máx</th>
+              <th className="p-2">Perna mín</th>
+              <th className="p-2">Perna máx</th>
             </tr>
           </thead>
           <tbody>
@@ -65,6 +69,10 @@ export function SizeChartForm({ products }: { products: ProductOption[] }) {
                   "waistMax",
                   "hipMin",
                   "hipMax",
+                  "armLengthMin",
+                  "armLengthMax",
+                  "legLengthMin",
+                  "legLengthMax",
                 ].map((field) => (
                   <td key={field} className="p-1">
                     <input

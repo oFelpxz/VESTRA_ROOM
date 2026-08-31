@@ -145,7 +145,9 @@ export default async function ProdutoPage({
                       <th className="py-2 pr-4 font-medium">Tamanho</th>
                       <th className="py-2 pr-4 font-medium">Tórax (cm)</th>
                       <th className="py-2 pr-4 font-medium">Cintura (cm)</th>
-                      <th className="py-2 font-medium">Quadril (cm)</th>
+                      <th className="py-2 pr-4 font-medium">Quadril (cm)</th>
+                      <th className="py-2 pr-4 font-medium">Braço (cm)</th>
+                      <th className="py-2 font-medium">Perna (cm)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -158,8 +160,14 @@ export default async function ProdutoPage({
                         <td className="py-2 pr-4 text-muted-foreground">
                           {range(r.waistMinCm, r.waistMaxCm)}
                         </td>
-                        <td className="py-2 text-muted-foreground">
+                        <td className="py-2 pr-4 text-muted-foreground">
                           {range(r.hipMinCm, r.hipMaxCm)}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {range(r.armLengthMinCm, r.armLengthMaxCm)}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {range(r.legLengthMinCm, r.legLengthMaxCm)}
                         </td>
                       </tr>
                     ))}
