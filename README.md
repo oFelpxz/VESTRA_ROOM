@@ -102,10 +102,13 @@ Abra **http://localhost:3000**.
 | `SUPABASE_URL` | Base do projeto para o Storage 3D | Supabase → Project Settings → API → **Project URL** |
 | `SUPABASE_SERVICE_ROLE_KEY` | Acesso de servidor ao Storage (upload/assinatura). **Secreta.** | Supabase → Project Settings → API → chave `service_role` / `sb_secret_…` |
 | `SUPABASE_MODELS_BUCKET` | Nome do bucket **privado** dos modelos (default `models-3d`) | Supabase → Storage → criar bucket |
+| `NEXT_PUBLIC_AVATAR_MODEL_URL` | *(opcional)* Caminho de um `.glb` de corpo humano com morph targets para o VESTRA FIT. Sem ela, o avatar é montado com primitivas. | Ex.: `/models/avatar_base.glb` |
 
 > A senha do banco fica em Supabase → Project Settings → Database → **Reset database password** (use só letras e números para evitar problemas de URL).
 >
 > **Sem as variáveis `SUPABASE_*`** o upload de modelos 3D continua funcionando, mas grava em `public/models/` (fallback local) em vez do Storage em nuvem.
+>
+> **Avatar 3D**: para trocar o avatar de primitivas por um modelo realista, exporte um `.glb` (MakeHuman, MB-Lab, Blender) na proporção ~1,70 m com shape keys nomeadas `height`, `weight`, `chest`, `waist`, `hip`, `shoulder`, `armLength`, `legLength`, coloque em `public/models/` e aponte `NEXT_PUBLIC_AVATAR_MODEL_URL` para ele. Se o arquivo faltar ou falhar, o app volta sozinho para o avatar de primitivas.
 
 ---
 
