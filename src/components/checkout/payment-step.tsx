@@ -26,12 +26,32 @@ const OPTIONS: { value: Method; label: string; desc: string }[] = [
   },
 ];
 
-export function PaymentStep({ addressId }: { addressId: string }) {
+type SavedMethod = {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  holderName: string;
+  isDefault: boolean;
+};
+
+export function PaymentStep({
+  addressId,
+  savedMethods = [],
+}: {
+  addressId: string;
+  savedMethods?: SavedMethod[];
+}) {
   const [state, formAction, pending] = useActionState(
     createOrderFromCartAction,
     initial,
   );
   const [method, setMethod] = useState<Method>("PIX");
+  const defaultSaved = savedMethods.find((m) => m.isDefault) ?? savedMethods[0];
+  const [selectedCardId, setSelectedCardId] = useState<string | "new" | null>(
+    defaultSaved?.id ?? (savedMethods.length === 0 ? "new" : null),
+  );
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -92,35 +112,88 @@ export function PaymentStep({ addressId }: { addressId: string }) {
       )}
 
       {method === "CREDIT_CARD" && (
-        <div className="grid gap-3 rounded-sm border border-dashed border-border p-6 md:grid-cols-2">
-          <div className="flex flex-col gap-2 md:col-span-2">
-            <label className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-              Número do cartão
-            </label>
-            <input
-              placeholder="4111 1111 1111 1111"
-              className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-              Validade
-            </label>
-            <input
-              placeholder="MM/AA"
-              className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-              CVV
-            </label>
-            <input
-              placeholder="123"
-              className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
-            />
-          </div>
-          <p className="text-[11px] text-muted-foreground md:col-span-2">
+        <div className="rounded-sm border border-dashed border-border p-6">
+          {savedMethods.length > 0 && (
+            <div className="mb-4 flex flex-col gap-2">
+              <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                Cartões salvos
+              </p>
+              <div className="flex flex-col gap-2">
+                {savedMethods.map((m) => (
+                  <label
+                    key={m.id}
+                    className={`flex cursor-pointer items-center gap-3 rounded-sm border p-3 text-sm transition-colors ${
+                      selectedCardId === m.id
+                        ? "border-foreground bg-secondary/50"
+                        : "border-border hover:border-foreground/40"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="saved-card-radio"
+                      checked={selectedCardId === m.id}
+                      onChange={() => setSelectedCardId(m.id)}
+                      className="size-4 accent-foreground"
+                    />
+                    <span>
+                      {m.brand} •••• {m.last4} — {m.holderName} (val.{" "}
+                      {String(m.expMonth).padStart(2, "0")}/{m.expYear})
+                    </span>
+                  </label>
+                ))}
+                <label
+                  className={`flex cursor-pointer items-center gap-3 rounded-sm border p-3 text-sm transition-colors ${
+                    selectedCardId === "new"
+                      ? "border-foreground bg-secondary/50"
+                      : "border-border hover:border-foreground/40"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="saved-card-radio"
+                    checked={selectedCardId === "new"}
+                    onChange={() => setSelectedCardId("new")}
+                    className="size-4 accent-foreground"
+                  />
+                  <span>Usar outro cartão</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {selectedCardId === "new" && (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <label className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                  Número do cartão
+                </label>
+                <input
+                  placeholder="4111 1111 1111 1111"
+                  className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                  Validade
+                </label>
+                <input
+                  placeholder="MM/AA"
+                  className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
+                  CVV
+                </label>
+                <input
+                  placeholder="123"
+                  className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
+                />
+              </div>
+            </div>
+          )}
+
+          <p className="mt-3 text-[11px] text-muted-foreground">
             Os dados não são processados — pagamento é simulado para o MVP.
           </p>
         </div>

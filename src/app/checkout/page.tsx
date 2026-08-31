@@ -4,8 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
 import { calculateShipping } from "@/lib/shipping";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, formatCep } from "@/lib/format";
 import { deleteAddressAction } from "@/lib/address-actions";
+import { listMySavedPaymentMethods } from "@/lib/payment-method-actions";
 import { CheckoutStepper } from "@/components/checkout/checkout-stepper";
 import { OrderSummary } from "@/components/checkout/order-summary";
 import { AddressForm } from "@/components/checkout/address-form";
@@ -33,13 +34,15 @@ export default async function CheckoutPage({
 
   const sp = await searchParams;
   const requestedStep = (sp.step as Step) || "address";
-  const addressId = sp.addressId;
 
-  // Endereços do usuário
+  // Endereços do usuário — o padrão vem primeiro e é reaproveitado
+  // automaticamente quando nenhum endereço foi escolhido explicitamente.
   const addresses = await prisma.address.findMany({
     where: { userId },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
   });
+  const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0];
+  const addressId = sp.addressId ?? defaultAddress?.id;
 
   // Determina o step efetivo (não permite pular sem endereço)
   let step: Step = requestedStep;
@@ -50,6 +53,19 @@ export default async function CheckoutPage({
     ? addresses.find((a) => a.id === addressId)
     : undefined;
   if (step !== "address" && !selectedAddress) step = "address";
+
+  const savedMethods =
+    step === "payment"
+      ? (await listMySavedPaymentMethods()).map((m) => ({
+          id: m.id,
+          brand: m.brand,
+          last4: m.last4,
+          expMonth: m.expMonth,
+          expYear: m.expYear,
+          holderName: m.holderName,
+          isDefault: m.isDefault,
+        }))
+      : [];
 
   // Totais (para resumo)
   const subtotal = items.reduce(
@@ -110,7 +126,7 @@ export default async function CheckoutPage({
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                 Método de pagamento
               </p>
-              <PaymentStep addressId={selectedAddress.id} />
+              <PaymentStep addressId={selectedAddress.id} savedMethods={savedMethods} />
             </div>
           )}
         </div>
@@ -164,15 +180,22 @@ function AddressStepBlock({
             {addresses.map((a) => {
               const selected = selectedId === a.id;
               return (
-                <li key={a.id}>
+                <li
+                  key={a.id}
+                  className={`relative flex h-full flex-col gap-1 rounded-sm border p-4 transition-colors ${
+                    selected
+                      ? "border-foreground bg-secondary/50"
+                      : "border-border hover:border-foreground/40"
+                  }`}
+                >
+                  {/* Área clicável de seleção — link cobre o card */}
                   <Link
                     href={`/checkout?step=review&addressId=${a.id}`}
-                    className={`flex h-full flex-col gap-1 rounded-sm border p-4 transition-colors ${
-                      selected
-                        ? "border-foreground bg-secondary/50"
-                        : "border-border hover:border-foreground/40"
-                    }`}
-                  >
+                    aria-label={`Selecionar endereço de ${a.recipient}`}
+                    className="absolute inset-0 z-0"
+                  />
+
+                  <div className="pointer-events-none relative z-10 flex flex-col gap-1">
                     <p className="text-sm font-medium">{a.recipient}</p>
                     <p className="text-xs text-muted-foreground">
                       {a.line1}
@@ -181,23 +204,22 @@ function AddressStepBlock({
                     <p className="text-xs text-muted-foreground">
                       {a.city} · {a.state} · CEP {formatCep(a.postalCode)}
                     </p>
+                  </div>
 
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-acid-foreground/0 text-foreground/70">
-                        {selected ? "Selecionado" : "Selecionar"}
-                      </span>
-                      <form action={deleteAddressAction}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <button
-                          type="submit"
-                          onClick={(e) => e.stopPropagation()}
-                          className="rounded-sm border border-foreground/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-foreground/60 transition-colors hover:border-destructive hover:text-destructive"
-                        >
-                          Remover
-                        </button>
-                      </form>
-                    </div>
-                  </Link>
+                  <div className="relative z-10 mt-3 flex items-center justify-between">
+                    <span className="pointer-events-none text-[11px] font-semibold uppercase tracking-[0.15em] text-foreground/70">
+                      {selected ? "Selecionado" : "Selecionar"}
+                    </span>
+                    <form action={deleteAddressAction}>
+                      <input type="hidden" name="id" value={a.id} />
+                      <button
+                        type="submit"
+                        className="relative z-10 rounded-sm border border-foreground/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-foreground/60 transition-colors hover:border-destructive hover:text-destructive"
+                      >
+                        Remover
+                      </button>
+                    </form>
+                  </div>
                 </li>
               );
             })}
@@ -298,10 +320,4 @@ function ReviewStepBlock({
       </Link>
     </div>
   );
-}
-
-function formatCep(cep: string) {
-  const clean = cep.replace(/\D/g, "");
-  if (clean.length !== 8) return cep;
-  return `${clean.slice(0, 5)}-${clean.slice(5)}`;
 }
