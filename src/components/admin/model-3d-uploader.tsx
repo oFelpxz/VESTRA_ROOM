@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import { registerModel3DAction } from "@/lib/model-3d-actions";
 import { Button } from "@/components/ui/button";
 
+type UploadInfo = {
+  fileSizeMb: number;
+  originalSizeMb: number;
+  optimizedPct: number;
+  wasOptimized: boolean;
+  storage: "cloud" | "local";
+};
+
 export function Model3DUploader({
   productId,
   hasExisting,
@@ -16,11 +24,13 @@ export function Model3DUploader({
   const [dragging, setDragging] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<UploadInfo | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
   async function upload(file: File) {
     setError(null);
+    setInfo(null);
     setProgress(0);
 
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
@@ -40,7 +50,15 @@ export function Model3DUploader({
     // Upload via XHR para ter progresso
     const result = await new Promise<{
       ok: boolean;
-      data?: { fileUrl: string; fileSizeMb: number; format: string };
+      data?: {
+        fileUrl: string;
+        fileSizeMb: number;
+        originalSizeMb: number;
+        optimizedPct: number;
+        wasOptimized: boolean;
+        storage: "cloud" | "local";
+        format: string;
+      };
       error?: string;
     }>((resolve) => {
       const xhr = new XMLHttpRequest();
@@ -91,6 +109,13 @@ export function Model3DUploader({
         return;
       }
       setProgress(100);
+      setInfo({
+        fileSizeMb: result.data!.fileSizeMb,
+        originalSizeMb: result.data!.originalSizeMb,
+        optimizedPct: result.data!.optimizedPct,
+        wasOptimized: result.data!.wasOptimized,
+        storage: result.data!.storage,
+      });
       router.refresh();
     });
   }
@@ -170,6 +195,30 @@ export function Model3DUploader({
         <p className="rounded-sm bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </p>
+      )}
+
+      {info && (
+        <div className="rounded-sm border border-border bg-muted/40 px-3 py-2.5 text-xs">
+          <p className="font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            {info.storage === "cloud"
+              ? "Enviado ao Supabase Storage"
+              : "Salvo localmente"}
+          </p>
+          <p className="mt-1.5 text-foreground/80">
+            {info.wasOptimized ? (
+              <>
+                Otimizado automaticamente: {info.originalSizeMb} MB →{" "}
+                <strong>{info.fileSizeMb} MB</strong>{" "}
+                <span className="text-acid">(−{info.optimizedPct}%)</span>
+              </>
+            ) : (
+              <>
+                Sem ganho na otimização — mantido em{" "}
+                <strong>{info.fileSizeMb} MB</strong>
+              </>
+            )}
+          </p>
+        </div>
       )}
     </div>
   );

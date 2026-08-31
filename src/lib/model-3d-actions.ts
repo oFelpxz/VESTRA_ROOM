@@ -5,6 +5,7 @@ import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteModelObject, isCloudObject } from "@/lib/storage";
 
 export type Model3DFormState = { error?: string; success?: boolean };
 
@@ -164,8 +165,15 @@ export async function deleteModel3DAction(formData: FormData) {
     data: { has3DModel: false },
   });
 
-  // Remove arquivo físico se for local em public/models
-  if (model.fileUrl.startsWith("/models/")) {
+  // Remove o arquivo: objeto no Storage ou arquivo local em public/models
+  if (isCloudObject(model.fileUrl)) {
+    try {
+      await deleteModelObject(model.fileUrl);
+    } catch (e) {
+      // não bloqueia a exclusão do registro
+      console.error("Falha ao remover objeto do Storage:", e);
+    }
+  } else if (model.fileUrl.startsWith("/models/")) {
     try {
       const absolute = path.join(
         process.cwd(),
