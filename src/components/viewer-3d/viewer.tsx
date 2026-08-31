@@ -8,11 +8,12 @@ import {
   Center,
   Bounds,
 } from "@react-three/drei";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 
 function Model({ url }: { url: string }) {
   const { scene } = useGLTF(url);
-  return <primitive object={scene} />;
+  const model = useMemo(() => scene.clone(true), [scene]);
+  return <primitive object={model} />;
 }
 
 function Loader() {
@@ -30,8 +31,12 @@ useGLTF.preload("/models/hoodie_black.glb");
 
 export function Viewer3D({
   modelUrl = "/models/hoodie_black.glb",
+  interactive = true,
+  autoRotate = false,
 }: {
   modelUrl?: string;
+  interactive?: boolean;
+  autoRotate?: boolean;
 }) {
   return (
     <Canvas camera={{ position: [3, 2, 5], fov: 50 }}>
@@ -52,7 +57,14 @@ export function Viewer3D({
         </Bounds>
       </Suspense>
 
-      <OrbitControls makeDefault />
+      <OrbitControls
+        makeDefault
+        autoRotate={autoRotate}
+        autoRotateSpeed={1.1}
+        enablePan={interactive}
+        enableRotate={interactive}
+        enableZoom={interactive}
+      />
     </Canvas>
   );
 }

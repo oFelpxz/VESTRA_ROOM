@@ -144,12 +144,11 @@ export async function publishProductAction(formData: FormData) {
     where: { id },
     include: {
       variants: { where: { status: "ACTIVE" }, select: { id: true } },
-      images: { select: { id: true } },
     },
   });
   if (!product) return;
-  if (product.variants.length === 0 || product.images.length === 0) {
-    // sem variantes ou imagens — não publica
+  if (product.variants.length === 0) {
+    // sem variantes ativas — não publica
     return;
   }
 

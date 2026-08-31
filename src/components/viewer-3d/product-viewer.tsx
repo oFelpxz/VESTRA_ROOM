@@ -25,10 +25,22 @@ class ViewerErrorBoundary extends React.Component<
   }
 }
 
-export function ProductViewer({ modelUrl }: { modelUrl?: string }) {
+export function ProductViewer({
+  modelUrl,
+  interactive,
+  autoRotate,
+}: {
+  modelUrl?: string;
+  interactive?: boolean;
+  autoRotate?: boolean;
+}) {
   return (
     <ViewerErrorBoundary>
-      <Viewer3D modelUrl={modelUrl} />
+      <Viewer3D
+        modelUrl={modelUrl}
+        interactive={interactive}
+        autoRotate={autoRotate}
+      />
     </ViewerErrorBoundary>
   );
 }

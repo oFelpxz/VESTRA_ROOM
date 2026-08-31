@@ -14,6 +14,8 @@ export type CatalogProduct = {
   name: string;
   price: string;
   tags: string[];
+  imageUrl: string | null;
+  modelUrl: string | null;
 };
 
 export type SizeChartRow = {
@@ -24,6 +26,10 @@ export type SizeChartRow = {
   waistMaxCm: number | null;
   hipMinCm: number | null;
   hipMaxCm: number | null;
+  armLengthMinCm: number | null;
+  armLengthMaxCm: number | null;
+  legLengthMinCm: number | null;
+  legLengthMaxCm: number | null;
 };
 
 export type ProductDetail = {
@@ -105,6 +111,10 @@ export async function getProducts(
           }
         : {}),
     },
+    include: {
+      images: { orderBy: { position: "asc" }, take: 1 },
+      model3D: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -119,6 +129,8 @@ export async function getProducts(
       name: p.name,
       price: formatBRL(Number(p.basePrice)),
       tags,
+      imageUrl: p.images[0]?.url ?? null,
+      modelUrl: p.has3DModel ? (p.model3D?.fileUrl ?? null) : null,
     };
   });
 }
@@ -182,6 +194,10 @@ export async function getProductDetail(
             waistMaxCm: m.waistMaxCm,
             hipMinCm: m.hipMinCm,
             hipMaxCm: m.hipMaxCm,
+            armLengthMinCm: m.armLengthMinCm,
+            armLengthMaxCm: m.armLengthMaxCm,
+            legLengthMinCm: m.legLengthMinCm,
+            legLengthMaxCm: m.legLengthMaxCm,
           })),
         }
       : null,

@@ -28,6 +28,10 @@ type SizeRow = {
   waistMaxCm: number | null;
   hipMinCm: number | null;
   hipMaxCm: number | null;
+  armLengthMinCm: number | null;
+  armLengthMaxCm: number | null;
+  legLengthMinCm: number | null;
+  legLengthMaxCm: number | null;
 };
 
 type UserProfile = {
@@ -133,6 +137,8 @@ export function TryOnExperience({
         chestCm: profile.chestCm,
         waistCm: profile.waistCm,
         hipCm: profile.hipCm,
+        armLengthCm: profile.armLengthCm,
+        legLengthCm: profile.legLengthCm,
       },
       currentSizeRow,
       preference,

@@ -2,21 +2,20 @@
  * Cálculo de caimento (fit) — cruzando as medidas do usuário com a tabela
  * de medidas do produto.
  *
- * Para cada eixo (peito, cintura, quadril), compara a medida do usuário com
- * o intervalo [min..max] da tabela. A preferência de caimento desloca o
- * "centro ideal" do intervalo para mais justo (SLIM) ou mais folgado (OVERSIZED).
+ * Para cada eixo (peito, cintura, quadril, braço, perna), compara a medida
+ * do usuário com o intervalo [min..max] da tabela. A preferência de caimento
+ * desloca o "centro ideal" do intervalo para mais justo (SLIM) ou mais folgado
+ * (OVERSIZED).
  *
- * Saída:
- *   - label: rótulo geral ("Justo" / "Ideal" / "Folgado" / "Não serve")
- *   - score: distância normalizada (0 = perfeito, 1 = limite)
- *   - details: explicação por eixo
+ * Eixos de comprimento (braço/perna) têm tolerância maior porque o impacto
+ * visual de 2 cm a mais/menos numa manga é menor que numa cintura.
  */
 
 export type FitPreference = "SLIM" | "REGULAR" | "OVERSIZED";
 
 export type FitLabel = "JUSTO" | "IDEAL" | "FOLGADO" | "NAO_SERVE";
 
-export type FitAxis = "chest" | "waist" | "hip";
+export type FitAxis = "chest" | "waist" | "hip" | "armLength" | "legLength";
 
 export type FitDetail = {
   axis: FitAxis;
@@ -38,6 +37,8 @@ type UserMeasures = {
   chestCm: number | null;
   waistCm: number | null;
   hipCm: number | null;
+  armLengthCm: number | null;
+  legLengthCm: number | null;
 };
 
 type SizeMeasures = {
@@ -47,24 +48,42 @@ type SizeMeasures = {
   waistMaxCm: number | null;
   hipMinCm: number | null;
   hipMaxCm: number | null;
+  armLengthMinCm: number | null;
+  armLengthMaxCm: number | null;
+  legLengthMinCm: number | null;
+  legLengthMaxCm: number | null;
 };
 
 const AXIS_LABEL: Record<FitAxis, string> = {
   chest: "Peito",
   waist: "Cintura",
   hip: "Quadril",
+  armLength: "Braço",
+  legLength: "Perna",
 };
 
 // Quanto o intervalo "ideal" é deslocado do centro pela preferência.
 // Valor em fração [0..1] do range total.
+// Preferência só afeta eixos de circunferência — braço/perna sempre ideal no centro.
 const PREFERENCE_SHIFT: Record<FitPreference, number> = {
-  SLIM: -0.25, // ideal puxado pro lado justo (menor)
+  SLIM: -0.25,
   REGULAR: 0,
   OVERSIZED: 0.25,
 };
 
+const LENGTH_AXES: ReadonlySet<FitAxis> = new Set(["armLength", "legLength"]);
+
 // Tolerância antes de considerar "não serve" — em cm absolutos.
-const MAX_TOLERANCE_CM = 6;
+const MAX_TOLERANCE_GIRTH_CM = 6;
+const MAX_TOLERANCE_LENGTH_CM = 8;
+
+const AXES: { axis: FitAxis; userKey: keyof UserMeasures; minKey: keyof SizeMeasures; maxKey: keyof SizeMeasures }[] = [
+  { axis: "chest", userKey: "chestCm", minKey: "chestMinCm", maxKey: "chestMaxCm" },
+  { axis: "waist", userKey: "waistCm", minKey: "waistMinCm", maxKey: "waistMaxCm" },
+  { axis: "hip", userKey: "hipCm", minKey: "hipMinCm", maxKey: "hipMaxCm" },
+  { axis: "armLength", userKey: "armLengthCm", minKey: "armLengthMinCm", maxKey: "armLengthMaxCm" },
+  { axis: "legLength", userKey: "legLengthCm", minKey: "legLengthMinCm", maxKey: "legLengthMaxCm" },
+];
 
 export function calculateFit(
   user: UserMeasures,
@@ -77,29 +96,35 @@ export function calculateFit(
   let anyOutOfRange = false;
   let totalAbove = 0;
   let totalBelow = 0;
+  let worstLengthDelta = 0;
+  let worstGirthDelta = 0;
 
-  for (const axis of ["chest", "waist", "hip"] as FitAxis[]) {
-    const userValue = user[`${axis}Cm` as const];
-    const min = size[`${axis}MinCm` as const];
-    const max = size[`${axis}MaxCm` as const];
+  for (const { axis, userKey, minKey, maxKey } of AXES) {
+    const userValue = user[userKey];
+    const min = size[minKey];
+    const max = size[maxKey];
 
     if (userValue == null || min == null || max == null) continue;
 
     const range = max - min;
     if (range <= 0) continue;
 
-    // Ideal shift: REGULAR = meio do intervalo
-    const idealCenter = (min + max) / 2 + range * PREFERENCE_SHIFT[preference];
+    const isLength = LENGTH_AXES.has(axis);
+
+    // Comprimentos não são afetados pela preferência de caimento
+    const idealCenter = isLength
+      ? (min + max) / 2
+      : (min + max) / 2 + range * PREFERENCE_SHIFT[preference];
 
     let status: FitDetail["status"];
     let deltaCm: number;
 
     if (userValue < min) {
-      status = "below"; // usuário menor → roupa fica folgada nessa medida
+      status = "below";
       deltaCm = min - userValue;
       totalBelow += deltaCm;
     } else if (userValue > max) {
-      status = "above"; // usuário maior → roupa fica justa
+      status = "above";
       deltaCm = userValue - max;
       totalAbove += deltaCm;
     } else {
@@ -107,7 +132,14 @@ export function calculateFit(
       deltaCm = 0;
     }
 
-    if (status !== "ok") anyOutOfRange = true;
+    if (status !== "ok") {
+      anyOutOfRange = true;
+      if (isLength) {
+        worstLengthDelta = Math.max(worstLengthDelta, deltaCm);
+      } else {
+        worstGirthDelta = Math.max(worstGirthDelta, deltaCm);
+      }
+    }
 
     // Score: distância do ideal normalizada por (range/2)
     const distFromIdeal = Math.abs(userValue - idealCenter);
@@ -127,30 +159,25 @@ export function calculateFit(
   }
 
   if (axesCounted === 0) {
-    return {
-      label: "IDEAL",
-      score: 0,
-      details: [],
-    };
+    return { label: "IDEAL", score: 0, details: [] };
   }
 
   const avgScore = totalScore / axesCounted;
 
-  // Não serve se qualquer eixo extrapola muito
-  const worstDelta = Math.max(totalAbove, totalBelow);
-  if (worstDelta > MAX_TOLERANCE_CM) {
+  // Não serve se algum eixo extrapola muito (tolerância maior para comprimento)
+  if (
+    worstGirthDelta > MAX_TOLERANCE_GIRTH_CM ||
+    worstLengthDelta > MAX_TOLERANCE_LENGTH_CM
+  ) {
     return { label: "NAO_SERVE", score: avgScore, details };
   }
 
-  // Heurística do label final baseada na predominância
   let label: FitLabel;
   if (!anyOutOfRange) {
     label = "IDEAL";
   } else if (totalAbove > totalBelow) {
-    // usuário maior que o range → fica JUSTO
     label = "JUSTO";
   } else {
-    // usuário menor que o range → fica FOLGADO
     label = "FOLGADO";
   }
 
@@ -177,11 +204,7 @@ export function fitLabelColor(label: FitLabel): {
 } {
   switch (label) {
     case "IDEAL":
-      return {
-        bg: "bg-acid/30",
-        text: "text-foreground",
-        dot: "bg-acid",
-      };
+      return { bg: "bg-acid/30", text: "text-foreground", dot: "bg-acid" };
     case "JUSTO":
       return {
         bg: "bg-secondary",
