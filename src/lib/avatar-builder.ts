@@ -41,6 +41,25 @@ export type AvatarParams = {
   ratioArm: number; // comprimento do braço relativo à altura
   ratioLeg: number; // comprimento da perna relativo à altura
 
+  /**
+   * Pesos de morph target para um GLB paramétrico (`avatar_base.glb`).
+   * Cada valor vai de -1 (abaixo da referência) a +1 (acima), com 0 = corpo
+   * de referência (1,70 m / 70 kg). O componente <Avatar /> aplica esses
+   * valores em `mesh.morphTargetInfluences`, casando pelo nome da shape key.
+   * Nomes esperados no GLB (aceita variações: `arm_length`, `armLength`, `arm`):
+   * height · weight · chest · waist · hip · shoulder · armLength · legLength
+   */
+  morphs: {
+    height: number;
+    weight: number;
+    chest: number;
+    waist: number;
+    hip: number;
+    shoulder: number;
+    armLength: number;
+    legLength: number;
+  };
+
   // Ancoragens (em unidades do avatar) — onde a roupa "encaixa"
   // Y vertical, origem no chão.
   anchors: {
@@ -96,6 +115,21 @@ export function buildAvatarParams(m: MeasurementInput): AvatarParams {
   const ratioArm = armLen / height;
   const ratioLeg = legLen / height;
 
+  // Morph targets: desvio da referência normalizado para [-1, 1].
+  // O "meio-alcance" define quantos cm/kg equivalem a um peso de 1.0.
+  const dev = (value: number, ref: number, halfRange: number) =>
+    clamp((value - ref) / halfRange, -1, 1);
+  const morphs = {
+    height: dev(height, REF.heightCm, 25),
+    weight: dev(weight, REF.weightKg, 35),
+    chest: dev(chest, REF.chestCm, 22),
+    waist: dev(waist, REF.waistCm, 28),
+    hip: dev(hip, REF.hipCm, 22),
+    shoulder: dev(shoulder, REF.shoulderCm, 12),
+    armLength: dev(armLen, REF.armLengthCm, 12),
+    legLength: dev(legLen, REF.legLengthCm, 15),
+  };
+
   // Avatar total: 1 unidade ≈ 1 metro
   const totalHeight = (height / 100) * 1.0; // metros
 
@@ -120,6 +154,7 @@ export function buildAvatarParams(m: MeasurementInput): AvatarParams {
     scaleShoulder,
     ratioArm,
     ratioLeg,
+    morphs,
     totalHeight,
     anchors: {
       head: { y: yHead },

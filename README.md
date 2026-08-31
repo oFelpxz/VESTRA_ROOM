@@ -94,8 +94,11 @@ Abra **http://localhost:3000**.
 | `DATABASE_URL` | Conexão do app em runtime (pooler, porta **6543**, com `?pgbouncer=true`) | Supabase → Project Settings → Database → Connection string → **Transaction** |
 | `DIRECT_URL` | Conexão direta para migrations (porta **5432**) | Supabase → mesma tela → **Session** / direct |
 | `AUTH_SECRET` | Assina o JWT da sessão (Auth.js) | Gere: `npx auth secret` ou `openssl rand -base64 32` |
+| `NEXT_PUBLIC_AVATAR_MODEL_URL` | *(opcional)* Caminho de um `.glb` de corpo humano com morph targets para o VESTRA FIT. Sem ela, o avatar é montado com primitivas. | Ex.: `/models/avatar_base.glb` |
 
 > A senha do banco fica em Supabase → Project Settings → Database → **Reset database password** (use só letras e números para evitar problemas de URL).
+>
+> **Avatar 3D**: para trocar o avatar de primitivas por um modelo realista, exporte um `.glb` (MakeHuman, MB-Lab, Blender) na proporção ~1,70 m com shape keys nomeadas `height`, `weight`, `chest`, `waist`, `hip`, `shoulder`, `armLength`, `legLength`, coloque em `public/models/` e aponte `NEXT_PUBLIC_AVATAR_MODEL_URL` para ele. Se o arquivo faltar ou falhar, o app volta sozinho para o avatar de primitivas.
 
 ---
 
