@@ -26,6 +26,12 @@ durante a implementação.
 - **Quando**: assim que confirmar que o banco voltou
 - **Origem**: schema atual depende das migrations existentes em `prisma/migrations`
 
+### [ ] Rodar migration nova (campos arm/leg no SizeChart)
+- **Ação**: `npx prisma migrate dev --name add_arm_leg_to_size_chart`
+- **Quando**: depois de restaurar Supabase
+- **Origem**: campos `armLengthMin/Max` e `legLengthMin/Max` adicionados ao `SizeChartMeasure`
+- **Impacto**: tabelas de medida existentes vão ter os novos campos como NULL — preencher via `/admin/medidas` para que o caimento de braço/perna entre no cálculo
+
 ### [ ] Rodar seed
 - **Ação**: `npm run db:seed`
 - **Quando**: após migrations rodarem

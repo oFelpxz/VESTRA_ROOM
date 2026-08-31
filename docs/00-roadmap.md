@@ -19,6 +19,10 @@ Pendente:
 - **S5**: Apresentação final
 
 > **Tarefas manuais** (config, dados, assets): ver [TAREFAS-MANUAIS.md](./TAREFAS-MANUAIS.md)
+>
+> **Roteiro de testes para apresentação**: ver [ROADMAP-TESTES.md](./ROADMAP-TESTES.md)
+>
+> **Checklist enxuto de funcionalidades**: ver [CHECKLIST-FUNCIONALIDADES.md](./CHECKLIST-FUNCIONALIDADES.md)
 
 ## Ordem de desenvolvimento
 
