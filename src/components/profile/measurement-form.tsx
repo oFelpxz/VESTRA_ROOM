@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   saveMeasurementsAction,
+  deleteMeasurementsAction,
   type MeasurementFormState,
 } from "@/lib/measurement-actions";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,7 @@ export function MeasurementForm({
   );
 
   return (
+    <>
     <form action={formAction} className="mt-8 flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {fields.map((f) => (
@@ -112,5 +115,55 @@ export function MeasurementForm({
         {pending ? "Salvando..." : "Salvar medidas"}
       </Button>
     </form>
+    {initial && <DeleteMeasurementsButton />}
+    </>
+  );
+}
+
+function DeleteMeasurementsButton() {
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(
+    deleteMeasurementsAction,
+    initialState,
+  );
+
+  useEffect(() => {
+    if (state.success) router.refresh();
+  }, [state.success, router]);
+
+  return (
+    <div className="mt-2 border-t border-border pt-6">
+      <p className="text-xs text-muted-foreground">
+        Isso apaga permanentemente suas medidas e faz o VESTRA FIT voltar a
+        usar o avatar de referência genérico.
+      </p>
+      <form
+        action={formAction}
+        onSubmit={(e) => {
+          if (
+            !confirm(
+              "Excluir suas medidas corporais? Essa ação não pode ser desfeita.",
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
+        className="mt-3"
+      >
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={pending}
+          className="w-fit border-destructive/40 text-destructive hover:bg-destructive/10"
+        >
+          {pending ? "Excluindo..." : "Excluir minhas medidas"}
+        </Button>
+      </form>
+      {state.error && (
+        <p className="mt-2 rounded-sm bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {state.error}
+        </p>
+      )}
+    </div>
   );
 }

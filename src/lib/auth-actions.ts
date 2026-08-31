@@ -1,7 +1,9 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { signIn, signOut } from "@/auth";
 
@@ -78,4 +80,50 @@ export async function loginAction(
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/" });
+}
+
+/**
+ * Exclui a conta: anonimiza os dados pessoais do usuário (nome, e-mail,
+ * telefone, senha) e apaga medidas/endereços/carrinho — mas mantém a linha
+ * de User e o histórico de Pedidos intactos (registro fiscal). Pedidos
+ * antigos perdem apenas o endereço de entrega vinculado (dado pessoal),
+ * via onDelete: SetNull.
+ */
+export async function deleteAccountAction(
+  _prevState: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.email) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  const confirmEmail = String(formData.get("confirmEmail") ?? "")
+    .trim()
+    .toLowerCase();
+  if (confirmEmail !== session.user.email.toLowerCase()) {
+    return { error: "Digite seu e-mail exatamente como cadastrado para confirmar." };
+  }
+
+  const userId = session.user.id;
+  const anonymizedPasswordHash = await bcrypt.hash(randomUUID(), 10);
+
+  await prisma.$transaction([
+    prisma.measurementProfile.deleteMany({ where: { userId } }),
+    prisma.address.deleteMany({ where: { userId } }),
+    prisma.cart.deleteMany({ where: { userId } }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: "Usuário removido",
+        email: `deleted-${userId}@vestra.room`,
+        phone: null,
+        passwordHash: anonymizedPasswordHash,
+        status: "INACTIVE",
+      },
+    }),
+  ]);
+
+  await signOut({ redirectTo: "/" });
+  return {};
 }
