@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { isStaffRole } from "@/lib/admin-access";
 
 export default async function AdminLayout({
   children,
@@ -10,7 +11,7 @@ export default async function AdminLayout({
   const session = await auth();
 
   const role = session?.user?.role;
-  if (role !== "ADMIN" && role !== "MODEL_3D" && role !== "STOCK_OPERATOR") {
+  if (!isStaffRole(role)) {
     redirect("/login");
   }
 
@@ -38,7 +39,7 @@ export default async function AdminLayout({
           </span>
         </div>
 
-        <AdminNav role={role as "ADMIN" | "STOCK_OPERATOR" | "MODEL_3D"} />
+        <AdminNav role={role} />
       </aside>
 
       {/* conteúdo */}

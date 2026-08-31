@@ -104,9 +104,17 @@ Abra **http://localhost:3000**.
 | Papel | E-mail | Senha |
 |---|---|---|
 | Admin | `admin@vestra.room` | `vestra123` |
+| Operador de Estoque | `estoque@vestra.room` | `estoque123` |
+| Modelador 3D | `modelador@vestra.room` | `modelo123` |
 | Cliente | `cliente@vestra.room` | `cliente123` |
 
-O admin tem acesso a `/admin` (categorias e tabela de medidas) e é redirecionado para lá ao logar.
+Todos os três perfis de staff acessam `/admin`, mas cada um só enxerga (e só consegue abrir) as sub-rotas do seu escopo — controlado em [`src/lib/admin-access.ts`](src/lib/admin-access.ts), a fonte única usada tanto pelo middleware (`src/auth.config.ts`) quanto pela navegação (`src/components/admin/admin-nav.tsx`):
+
+| Perfil | Painel | Categorias | Produtos | Modelos 3D | Pedidos | Estoque | Tabela de medidas |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Admin | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Operador de Estoque | ✅ | – | – | – | ✅ | ✅ | – |
+| Modelador 3D | ✅ | – | – | ✅ | – | – | – |
 
 ---
 

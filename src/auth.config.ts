@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { isStaffRole, rolesForAdminPath } from "@/lib/admin-access";
 
 // Config base — SEM Prisma e SEM bcrypt.
 // É segura para rodar no edge (usada pelo middleware).
@@ -22,7 +23,16 @@ export const authConfig = {
       const isProfileArea = path.startsWith("/perfil");
 
       if (isAdminArea) {
-        return isLoggedIn && auth?.user?.role === "ADMIN";
+        const role = auth?.user?.role;
+        if (!isLoggedIn || !isStaffRole(role)) return false;
+        const allowed = rolesForAdminPath(path);
+        const hasAccess = allowed.includes(role);
+        // Staff autenticado mas sem acesso a esta sub-rota específica:
+        // manda para o painel raiz (que ele pode ver) em vez de /login.
+        if (!hasAccess && path !== "/admin") {
+          return Response.redirect(new URL("/admin", nextUrl));
+        }
+        return hasAccess;
       }
       if (isProfileArea) {
         return isLoggedIn;

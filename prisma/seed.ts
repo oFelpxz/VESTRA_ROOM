@@ -26,17 +26,29 @@ type SeedProduct = {
   colors: string[];
   sizes: string[];
   has3D?: boolean;
+  modelUrl?: string;
+  description?: string;
 };
 
 const products: SeedProduct[] = [
   { name: "Boxy Tee 01", slug: "boxy-tee-01", categorySlug: "camisetas", basePrice: 189, colors: ["Preto", "Off-white"], sizes: ["P", "M", "G", "GG"], has3D: true },
-  { name: "Cargo Pant 02", slug: "cargo-pant-02", categorySlug: "calcas", basePrice: 349, colors: ["Preto", "Areia"], sizes: ["38", "40", "42", "44"] },
-  { name: "Hoodie Core", slug: "hoodie-core", categorySlug: "moletons", basePrice: 299, colors: ["Preto", "Cinza"], sizes: ["P", "M", "G", "GG"], has3D: true },
+  { name: "Cargo Pant 02", slug: "cargo-pant-02", categorySlug: "calcas", basePrice: 349, colors: ["Preto", "Bege"], sizes: ["38", "40", "42", "44"] },
+  {
+    name: "Hoodie Core",
+    slug: "hoodie-core",
+    categorySlug: "moletons",
+    basePrice: 299,
+    colors: ["Preto", "Cinza", "Branco"],
+    sizes: ["P", "M", "G", "GG"],
+    has3D: true,
+    description:
+      "Moletom com capuz em algodão pesado, caimento boxy e bolso canguru duplo. Peça-âncora do provador VESTRA FIT — vista no seu avatar em 3D antes de comprar.",
+  },
   { name: "Oversized Shirt", slug: "oversized-shirt", categorySlug: "camisetas", basePrice: 229, colors: ["Off-white"], sizes: ["P", "M", "G"] },
-  { name: "Track Jacket", slug: "track-jacket", categorySlug: "jaquetas", basePrice: 399, colors: ["Preto"], sizes: ["P", "M", "G", "GG"], has3D: true },
+  { name: "Track Jacket", slug: "track-jacket", categorySlug: "jaquetas", basePrice: 399, colors: ["Preto"], sizes: ["P", "M", "G", "GG"], has3D: true, modelUrl: "/models/track_jacket.glb" },
   { name: "Knit Beanie", slug: "knit-beanie", categorySlug: "acessorios", basePrice: 89, colors: ["Preto", "Cinza"], sizes: ["Único"] },
   { name: "Wide Denim", slug: "wide-denim", categorySlug: "calcas", basePrice: 329, colors: ["Azul"], sizes: ["38", "40", "42"] },
-  { name: "Tech Vest", slug: "tech-vest", categorySlug: "jaquetas", basePrice: 279, colors: ["Preto", "Verde"], sizes: ["P", "M", "G"], has3D: true },
+  { name: "Tech Vest", slug: "tech-vest", categorySlug: "jaquetas", basePrice: 279, colors: ["Preto", "Verde"], sizes: ["P", "M", "G"], has3D: true, modelUrl: "/models/tech_vest.glb" },
 ];
 
 async function main() {
@@ -69,6 +81,7 @@ async function main() {
         name: p.name,
         slug: p.slug,
         description:
+          p.description ??
           "Peça VESTRA ROOM. Roupas criadas para serem vistas em todos os ângulos.",
         brand: "VESTRA ROOM",
         basePrice: p.basePrice,
@@ -108,7 +121,12 @@ async function main() {
       await prisma.productImage.create({
         data: {
           productId: product.id,
-          url: "/models/placeholder.png",
+          // SVG inline como placeholder — sem precisar de arquivo físico
+          url:
+            "data:image/svg+xml;utf8," +
+            encodeURIComponent(
+              `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500"><rect width="400" height="500" fill="#E7E2DA"/><text x="200" y="250" text-anchor="middle" font-family="monospace" font-size="14" fill="#8A8A8A" letter-spacing="4">VESTRA ROOM</text></svg>`,
+            ),
           altText: p.name,
           position: 0,
         },
@@ -117,12 +135,14 @@ async function main() {
 
     // Modelo 3D + tabela de medidas para os produtos com 3D
     if (p.has3D) {
+      const modelUrl = p.modelUrl ?? "/models/hoodie_black.glb";
+
       await prisma.model3D.upsert({
         where: { productId: product.id },
-        update: { fileUrl: "/models/hoodie_black.glb", status: "VALIDATED" },
+        update: { fileUrl: modelUrl, status: "VALIDATED" },
         create: {
           productId: product.id,
-          fileUrl: "/models/hoodie_black.glb",
+          fileUrl: modelUrl,
           format: "GLB",
           status: "VALIDATED",
         },
@@ -138,10 +158,10 @@ async function main() {
             name: `Tabela de medidas — ${p.name}`,
             measures: {
               create: [
-                { size: "P", chestMinCm: 86, chestMaxCm: 90, waistMinCm: 70, waistMaxCm: 76 },
-                { size: "M", chestMinCm: 91, chestMaxCm: 98, waistMinCm: 77, waistMaxCm: 84 },
-                { size: "G", chestMinCm: 99, chestMaxCm: 106, waistMinCm: 85, waistMaxCm: 92 },
-                { size: "GG", chestMinCm: 107, chestMaxCm: 114, waistMinCm: 93, waistMaxCm: 100 },
+                { size: "P", chestMinCm: 86, chestMaxCm: 90, waistMinCm: 70, waistMaxCm: 76, hipMinCm: 88, hipMaxCm: 94, armLengthMinCm: 56, armLengthMaxCm: 60, legLengthMinCm: 74, legLengthMaxCm: 78 },
+                { size: "M", chestMinCm: 91, chestMaxCm: 98, waistMinCm: 77, waistMaxCm: 84, hipMinCm: 95, hipMaxCm: 100, armLengthMinCm: 60, armLengthMaxCm: 64, legLengthMinCm: 78, legLengthMaxCm: 82 },
+                { size: "G", chestMinCm: 99, chestMaxCm: 106, waistMinCm: 85, waistMaxCm: 92, hipMinCm: 101, hipMaxCm: 106, armLengthMinCm: 63, armLengthMaxCm: 67, legLengthMinCm: 81, legLengthMaxCm: 85 },
+                { size: "GG", chestMinCm: 107, chestMaxCm: 114, waistMinCm: 93, waistMaxCm: 100, hipMinCm: 107, hipMaxCm: 113, armLengthMinCm: 66, armLengthMaxCm: 70, legLengthMinCm: 84, legLengthMaxCm: 88 },
               ],
             },
           },
@@ -150,7 +170,7 @@ async function main() {
     }
   }
 
-  // 3. Usuários de teste (admin + cliente)
+  // 3. Usuários de teste (admin, operador de estoque, modelador 3D, cliente)
   const adminPassword = await bcrypt.hash("vestra123", 10);
   await prisma.user.upsert({
     where: { email: "admin@vestra.room" },
@@ -163,8 +183,32 @@ async function main() {
     },
   });
 
-  const customerPassword = await bcrypt.hash("cliente123", 10);
+  const operatorPassword = await bcrypt.hash("estoque123", 10);
   await prisma.user.upsert({
+    where: { email: "estoque@vestra.room" },
+    update: { role: "STOCK_OPERATOR" },
+    create: {
+      name: "Operador de Estoque",
+      email: "estoque@vestra.room",
+      passwordHash: operatorPassword,
+      role: "STOCK_OPERATOR",
+    },
+  });
+
+  const modelerPassword = await bcrypt.hash("modelo123", 10);
+  await prisma.user.upsert({
+    where: { email: "modelador@vestra.room" },
+    update: { role: "MODEL_3D" },
+    create: {
+      name: "Modelador 3D",
+      email: "modelador@vestra.room",
+      passwordHash: modelerPassword,
+      role: "MODEL_3D",
+    },
+  });
+
+  const customerPassword = await bcrypt.hash("cliente123", 10);
+  const customer = await prisma.user.upsert({
     where: { email: "cliente@vestra.room" },
     update: {},
     create: {
@@ -172,6 +216,25 @@ async function main() {
       email: "cliente@vestra.room",
       passwordHash: customerPassword,
       role: "CUSTOMER",
+    },
+  });
+
+  // Perfil de medidas do cliente demo — pronto para entrar no provador
+  await prisma.measurementProfile.upsert({
+    where: { userId: customer.id },
+    update: {},
+    create: {
+      userId: customer.id,
+      heightCm: 175,
+      weightKg: 72,
+      chestCm: 96,
+      waistCm: 82,
+      hipCm: 96,
+      shoulderCm: 46,
+      armLengthCm: 62,
+      legLengthCm: 80,
+      fitPreference: "REGULAR",
+      acceptedTerms: true,
     },
   });
 
