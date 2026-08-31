@@ -8,7 +8,6 @@ import {
 } from "@/lib/product-actions";
 import { ProductForm } from "@/components/admin/product-form";
 import { VariantManager } from "@/components/admin/variant-manager";
-import { ProductImageManager } from "@/components/admin/product-image-manager";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Rascunho",
@@ -34,7 +33,6 @@ export default async function EditarProdutoPage({
       where: { id },
       include: {
         variants: { orderBy: [{ size: "asc" }, { color: "asc" }] },
-        images: { orderBy: { position: "asc" } },
         model3D: true,
       },
     }),
@@ -48,8 +46,7 @@ export default async function EditarProdutoPage({
 
   const canPublish =
     product.status !== "ACTIVE" &&
-    product.variants.some((v) => v.status === "ACTIVE") &&
-    product.images.length > 0;
+    product.variants.some((v) => v.status === "ACTIVE");
 
   return (
     <div className="flex flex-col gap-12">
@@ -105,7 +102,7 @@ export default async function EditarProdutoPage({
                   title={
                     canPublish
                       ? "Publicar produto"
-                      : "Precisa de ao menos 1 variante ativa e 1 imagem"
+                      : "Precisa de ao menos 1 variante ativa"
                   }
                   className="inline-flex items-center gap-2 rounded-sm bg-foreground px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-background transition-colors hover:bg-foreground/85 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -170,28 +167,9 @@ export default async function EditarProdutoPage({
         />
       </Section>
 
-      {/* Seção: Imagens */}
-      <Section
-        index="03"
-        title="Imagens"
-        subtitle={`${product.images.length} ${
-          product.images.length === 1 ? "imagem" : "imagens"
-        }`}
-      >
-        <ProductImageManager
-          productId={product.id}
-          images={product.images.map((i) => ({
-            id: i.id,
-            url: i.url,
-            altText: i.altText,
-            position: i.position,
-          }))}
-        />
-      </Section>
-
       {/* Seção: Modelo 3D */}
       <Section
-        index="04"
+        index="03"
         title="Modelo 3D"
         subtitle={
           product.model3D

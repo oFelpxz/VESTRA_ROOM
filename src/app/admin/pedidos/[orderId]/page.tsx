@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderById } from "@/lib/order-actions";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, formatCep } from "@/lib/format";
 import { OrderTimeline } from "@/components/profile/order-timeline";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
 
@@ -247,10 +247,4 @@ export default async function AdminPedidoDetalhePage({
       </div>
     </div>
   );
-}
-
-function formatCep(cep: string) {
-  const clean = cep.replace(/\D/g, "");
-  if (clean.length !== 8) return cep;
-  return `${clean.slice(0, 5)}-${clean.slice(5)}`;
 }

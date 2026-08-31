@@ -5,3 +5,9 @@ export function formatBRL(value: number | string): string {
     currency: "BRL",
   });
 }
+
+export function formatCep(cep: string): string {
+  const clean = cep.replace(/\D/g, "");
+  if (clean.length !== 8) return cep;
+  return `${clean.slice(0, 5)}-${clean.slice(5)}`;
+}

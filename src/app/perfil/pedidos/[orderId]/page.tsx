@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getOrderById, cancelOrderAction } from "@/lib/order-actions";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, formatCep } from "@/lib/format";
 import { OrderTimeline } from "@/components/profile/order-timeline";
 import { OrderRefresh } from "@/components/profile/order-refresh";
 
@@ -221,10 +221,4 @@ export default async function PedidoDetalhePage({
       </div>
     </section>
   );
-}
-
-function formatCep(cep: string) {
-  const clean = cep.replace(/\D/g, "");
-  if (clean.length !== 8) return cep;
-  return `${clean.slice(0, 5)}-${clean.slice(5)}`;
 }
