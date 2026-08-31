@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "SizeChartMeasure" ADD COLUMN     "armLengthMaxCm" DOUBLE PRECISION,
+ADD COLUMN     "armLengthMinCm" DOUBLE PRECISION,
+ADD COLUMN     "legLengthMaxCm" DOUBLE PRECISION,
+ADD COLUMN     "legLengthMinCm" DOUBLE PRECISION;

@@ -106,6 +106,7 @@ model User {
   status             UserStatus          @default(ACTIVE)
   measurementProfile MeasurementProfile?
   addresses          Address[]
+  savedPaymentMethods SavedPaymentMethod[]
   carts              Cart[]
   orders             Order[]
   createdAt          DateTime            @default(now())
@@ -215,19 +216,23 @@ model SizeChart {
 }
 
 model SizeChartMeasure {
-  id          String    @id @default(cuid())
-  sizeChartId String
-  sizeChart   SizeChart @relation(fields: [sizeChartId], references: [id], onDelete: Cascade)
-  size        String
-  chestMinCm  Float?
-  chestMaxCm  Float?
-  waistMinCm  Float?
-  waistMaxCm  Float?
-  hipMinCm    Float?
-  hipMaxCm    Float?
-  heightMinCm Float?
-  heightMaxCm Float?
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  sizeChartId     String
+  sizeChart       SizeChart @relation(fields: [sizeChartId], references: [id], onDelete: Cascade)
+  size            String
+  chestMinCm      Float?
+  chestMaxCm      Float?
+  waistMinCm      Float?
+  waistMaxCm      Float?
+  hipMinCm        Float?
+  hipMaxCm        Float?
+  heightMinCm     Float?
+  heightMaxCm     Float?
+  armLengthMinCm  Float?
+  armLengthMaxCm  Float?
+  legLengthMinCm  Float?
+  legLengthMaxCm  Float?
+  createdAt       DateTime  @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -246,9 +251,28 @@ model Address {
   postalCode String
   country    String   @default("BR")
   phone      String?
+  isDefault  Boolean  @default(false)
   orders     Order[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// Cartão salvo pelo cliente. Nunca armazenamos o número completo nem o
+// código de segurança — só metadados de exibição (bandeira, 4 últimos
+// dígitos, validade) e um token opaco simulado. Em produção esse token
+// viria do gateway real (Mercado Pago/Stripe/Pagar.me — item 16).
+model SavedPaymentMethod {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand      String
+  last4      String
+  expMonth   Int
+  expYear    Int
+  holderName String
+  token      String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
 }
 
 // ---------------------------------------------------------------------------
