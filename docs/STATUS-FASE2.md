@@ -197,18 +197,43 @@ consolidado aqui pra sobreviver à troca de chat. 32 itens, 6 categorias.
 
 ---
 
+## Onda 1 (crítico, solo) — ✅ concluída em 2026-09-14
+
+Feita no branch `feat/solo-fixes-wave1` (off `Felipe`), commits `4071306`
+(A1), `16cc169` (B1), `c6915c9` (C1). `npm run build` limpo (30 rotas) depois
+das três. **Ainda não mergeada em `Felipe`/`main` nem pushada.**
+
+- **A1** — `<Avatar />` agora é renderizado dentro do `TryOnScene`
+  (`src/components/viewer-3d/tryon-scene.tsx`) — antes só a roupa aparecia,
+  flutuando, porque `avatarParams` só era usado pras âncoras/câmera. Verificado
+  no navegador em Hoodie Core e Tech Vest (corpo real MakeHuman/MPFB por baixo
+  da roupa, sem warning de morph target no console).
+  - **Achado à parte, não corrigido**: o modelo de **Boxy Tee 01** renderiza
+    desproporcional (cobre da cabeça ao joelho) — parece problema no próprio
+    asset `.glb`, não no código do fit (Tech Vest e Hoodie Core encaixam
+    certinho). Vale investigar separadamente.
+- **B1** — `scripts/recompress-model.ts` (novo, reutilizável) rodou o
+  `model-optimizer.ts` existente nos dois `.glb` que nunca tinham passado por
+  ele (foram seedados direto em `public/models/`, não via upload):
+  `tech_vest.glb` 36,73→20,00 MB (−45,5%), `hoodie_core.glb` 52,95→49,57 MB
+  (−6,4%, dominado por textura — pipeline atual não comprime textura, ver B3).
+  Verificado visualmente, geometria/materiais idênticos.
+- **C1** — `/api/payments/simulate` (POST) aceitava qualquer requisição com um
+  `orderId` e marcava como pago, sem autenticação — corrigido com assinatura
+  HMAC-SHA256 (`src/lib/webhook-signature.ts`, env `PAYMENT_WEBHOOK_SECRET`,
+  fallback inseguro só em dev, obrigatória em produção). De brinde: o GET de
+  polling de status também não checava dono do pedido — agora exige sessão +
+  ownership (mesma regra de `getOrderById`). Verificado: checkout real ainda
+  confirma pagamento sozinho; POST forjado com assinatura errada → 401.
+
 ## Próximos passos sugeridos
 
-1. **Onda 1 (crítico, solo)**: A1 (avatar no provador) → B1 (reprocessar
-   modelos gigantes) → C1 (assinar webhook). Branch já criado:
-   `feat/solo-fixes-wave1`, sincronizado com `main`/`Felipe` — **nenhum
-   código dessa onda foi escrito ainda**, a sessão foi interrompida antes de
-   começar A1.
-2. Depois: continuar a lista ✅ Solo por categoria ou por severidade — a
-   decidir com o usuário.
-3. **Sprint 3 ainda não começou** (11–14, 23, 3D-04) — checkpoint 23/09.
-4. Lembrar de dar `git push origin main Felipe` em algum momento (precisa do
-   usuário logado).
+1. Continuar a lista ✅ Solo (ver overreview abaixo) por categoria ou por
+   severidade — a decidir com o usuário. Braço já quente em
+   `feat/solo-fixes-wave1`.
+2. **Sprint 3 ainda não começou** (11–14, 23, 3D-04) — checkpoint 23/09.
+3. Lembrar de dar `git push origin main Felipe` em algum momento (precisa do
+   usuário logado) — e depois mergear/pushar `feat/solo-fixes-wave1` também.
 
 ## Referências rápidas
 
