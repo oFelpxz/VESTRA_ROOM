@@ -183,3 +183,30 @@ export async function adjustStockAction(
   revalidatePath(`/admin/produtos/${variant.productId}`);
   return { success: true };
 }
+
+/**
+ * Define o limite mínimo de estoque (item 10) que dispara o destaque
+ * "Baixo" no painel do Operador de Estoque, por variante.
+ */
+export async function setLowStockThresholdAction(
+  _prev: LogisticsState,
+  formData: FormData,
+): Promise<LogisticsState> {
+  await requireOperator();
+
+  const variantId = str(formData.get("variantId"));
+  const threshold = int(formData.get("threshold"));
+
+  if (!variantId) return { error: "Variante inválida." };
+  if (threshold < 0) return { error: "Limite inválido." };
+
+  const variant = await prisma.productVariant.update({
+    where: { id: variantId },
+    data: { lowStockThreshold: threshold },
+    select: { productId: true },
+  });
+
+  revalidatePath("/admin/estoque");
+  revalidatePath(`/admin/produtos/${variant.productId}`);
+  return { success: true };
+}

@@ -29,10 +29,12 @@ export function ProductViewer({
   modelUrl,
   interactive,
   autoRotate,
+  controls,
 }: {
   modelUrl?: string;
   interactive?: boolean;
   autoRotate?: boolean;
+  controls?: boolean;
 }) {
   return (
     <ViewerErrorBoundary>
@@ -40,6 +42,7 @@ export function ProductViewer({
         modelUrl={modelUrl}
         interactive={interactive}
         autoRotate={autoRotate}
+        controls={controls}
       />
     </ViewerErrorBoundary>
   );

@@ -7,6 +7,7 @@ import {
   getCategories,
   getFilterOptions,
   PRICE_OPTIONS,
+  GENDER_LABEL,
   type ProductFilters as Filters,
 } from "@/lib/products";
 
@@ -75,10 +76,14 @@ export default async function CatalogoPage({
     tamanho: typeof sp.tamanho === "string" ? sp.tamanho : undefined,
     cor: typeof sp.cor === "string" ? sp.cor : undefined,
     preco: typeof sp.preco === "string" ? sp.preco : undefined,
+    genero: typeof sp.genero === "string" ? sp.genero : undefined,
+    colecao: typeof sp.colecao === "string" ? sp.colecao : undefined,
+    material: typeof sp.material === "string" ? sp.material : undefined,
+    provador: typeof sp.provador === "string" ? sp.provador : undefined,
   };
-  const filters: Filters = current;
+  const filters: Filters = { ...current, provador: current.provador === "1" };
 
-  const [session, products, categories, { sizes, colors }] =
+  const [session, products, categories, { sizes, colors, genders, collections, materials }] =
     await Promise.all([
       auth(),
       getProducts(filters),
@@ -209,6 +214,57 @@ export default async function CatalogoPage({
                   {p.label}
                 </NavLink>
               ))}
+            </Section>
+
+            {genders.length > 0 && (
+              <Section index="05" title="Gênero">
+                {genders.map((g) => (
+                  <NavLink
+                    key={g}
+                    href={hrefWith(current, "genero", g)}
+                    active={current.genero === g}
+                  >
+                    {GENDER_LABEL[g] ?? g}
+                  </NavLink>
+                ))}
+              </Section>
+            )}
+
+            {collections.length > 0 && (
+              <Section index="06" title="Coleção">
+                {collections.map((c) => (
+                  <NavLink
+                    key={c}
+                    href={hrefWith(current, "colecao", c)}
+                    active={current.colecao === c}
+                  >
+                    {c}
+                  </NavLink>
+                ))}
+              </Section>
+            )}
+
+            {materials.length > 0 && (
+              <Section index="07" title="Material">
+                {materials.map((m) => (
+                  <NavLink
+                    key={m}
+                    href={hrefWith(current, "material", m)}
+                    active={current.material === m}
+                  >
+                    {m}
+                  </NavLink>
+                ))}
+              </Section>
+            )}
+
+            <Section index="08" title="VESTRA FIT">
+              <NavLink
+                href={hrefWith(current, "provador", "1")}
+                active={current.provador === "1"}
+              >
+                Disponível no provador
+              </NavLink>
             </Section>
           </div>
         </aside>
