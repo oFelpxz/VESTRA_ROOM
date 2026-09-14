@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { calculateShipping } from "@/lib/shipping";
+import { signWebhookPayload } from "@/lib/webhook-signature";
 
 export type CheckoutState = {
   error?: string;
@@ -159,10 +160,14 @@ export async function createOrderFromCartAction(
   try {
     const base =
       process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+    const payload = JSON.stringify({ orderId: order.id });
     fetch(`${base}/api/payments/simulate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: order.id }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-webhook-signature": signWebhookPayload(payload),
+      },
+      body: payload,
     }).catch(() => {
       // ignora — usuário verá status PENDING e pode atualizar
     });

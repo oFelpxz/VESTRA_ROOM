@@ -103,6 +103,7 @@ Abra **http://localhost:3000**.
 | `SUPABASE_SERVICE_ROLE_KEY` | Acesso de servidor ao Storage (upload/assinatura). **Secreta.** | Supabase → Project Settings → API → chave `service_role` / `sb_secret_…` |
 | `SUPABASE_MODELS_BUCKET` | Nome do bucket **privado** dos modelos (default `models-3d`) | Supabase → Storage → criar bucket |
 | `NEXT_PUBLIC_AVATAR_MODEL_URL` | *(opcional)* Caminho de um `.glb` de corpo humano com morph targets para o VESTRA FIT. Sem ela, o avatar é montado com primitivas. | Ex.: `/models/avatar_base.glb` |
+| `PAYMENT_WEBHOOK_SECRET` | Assina (HMAC-SHA256) o webhook simulado de pagamento — sem ela, qualquer POST marcaria um pedido como pago. Obrigatória em produção. | Gere: `openssl rand -hex 32` |
 
 > A senha do banco fica em Supabase → Project Settings → Database → **Reset database password** (use só letras e números para evitar problemas de URL).
 >
