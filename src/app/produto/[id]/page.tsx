@@ -6,7 +6,10 @@ import { Tag } from "@/components/ui/tag";
 import { ProductViewer } from "@/components/viewer-3d/product-viewer";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
 import { ProductPurchase } from "@/components/product/product-purchase";
-import { getProductDetail } from "@/lib/products";
+import { ReviewForm } from "@/components/product/review-form";
+import { getProductDetail, GENDER_LABEL } from "@/lib/products";
+import { getReviewEligibility } from "@/lib/review-actions";
+import { formatBRL } from "@/lib/format";
 
 export async function generateMetadata({
   params,
@@ -48,6 +51,18 @@ export default async function ProdutoPage({
   }
 
   const isLoggedIn = !!session?.user;
+  const eligibility = await getReviewEligibility(product.id);
+
+  const installments = product.maxInstallments && product.maxInstallments > 1
+    ? {
+        n: product.maxInstallments,
+        value: (product.promotionalPriceNumber ?? product.priceNumber) / product.maxInstallments,
+      }
+    : null;
+
+  const hasTechSheet = Boolean(
+    product.composition || product.careInstructions || product.returnPolicy || product.gender || product.collection,
+  );
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
@@ -60,7 +75,7 @@ export default async function ProdutoPage({
                 <span className="inline-block size-1.5 rounded-full bg-acid" />
                 VESTRA FIT · 3D
               </span>
-              <ProductViewer modelUrl={product.modelUrl} />
+              <ProductViewer modelUrl={product.modelUrl} controls />
             </div>
           ) : (
             <div className="relative aspect-square overflow-hidden rounded-sm bg-secondary">
@@ -70,6 +85,12 @@ export default async function ProdutoPage({
           {product.has3D && (
             <p className="mt-3 text-xs text-muted-foreground">
               Arraste para girar · scroll para zoom
+            </p>
+          )}
+          {product.has3D && product.model3DAvailableSizes.length > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Simulação 3D disponível nos tamanhos:{" "}
+              {product.model3DAvailableSizes.join(", ")}
             </p>
           )}
         </div>
@@ -95,6 +116,11 @@ export default async function ProdutoPage({
               <span className="text-2xl">{product.price}</span>
             )}
           </div>
+          {installments && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              ou {installments.n}x de {formatBRL(installments.value)} sem juros
+            </p>
+          )}
 
           {product.tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-1.5">
@@ -176,6 +202,111 @@ export default async function ProdutoPage({
               </div>
             </div>
           )}
+
+          {/* Ficha técnica */}
+          {hasTechSheet && (
+            <div className="mt-12 border-t border-border pt-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Ficha técnica
+              </p>
+              <dl className="mt-4 divide-y divide-border/60 text-sm">
+                {product.gender && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Gênero</dt>
+                    <dd>{GENDER_LABEL[product.gender] ?? product.gender}</dd>
+                  </div>
+                )}
+                {product.collection && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Coleção</dt>
+                    <dd>{product.collection}</dd>
+                  </div>
+                )}
+                {product.composition && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Composição</dt>
+                    <dd className="text-right">{product.composition}</dd>
+                  </div>
+                )}
+                {product.careInstructions && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Cuidados</dt>
+                    <dd className="text-right">{product.careInstructions}</dd>
+                  </div>
+                )}
+                {product.returnPolicy && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Trocas e devoluções</dt>
+                    <dd className="text-right">{product.returnPolicy}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+
+          {/* Avaliações */}
+          <div className="mt-12 border-t border-border pt-8">
+            <div className="flex items-baseline justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Avaliações
+              </p>
+              {product.reviews.average != null && (
+                <p className="text-sm">
+                  <span className="text-acid">★</span>{" "}
+                  {product.reviews.average.toFixed(1)}{" "}
+                  <span className="text-muted-foreground">
+                    ({product.reviews.count})
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {product.reviews.items.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Ainda não há avaliações para esta peça.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-4">
+                {product.reviews.items.map((r) => (
+                  <li key={r.id} className="border-b border-border/60 pb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-acid">{"★".repeat(r.rating)}</span>
+                      <span className="text-muted-foreground/40">
+                        {"★".repeat(5 - r.rating)}
+                      </span>
+                      <span className="font-medium">{r.authorName}</span>
+                    </div>
+                    {r.comment && (
+                      <p className="mt-1.5 text-sm text-muted-foreground">
+                        {r.comment}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="mt-6">
+              {eligibility.canReview ? (
+                <ReviewForm productId={product.id} productSlug={product.slug} />
+              ) : eligibility.reason === "already-reviewed" ? (
+                <p className="text-sm text-muted-foreground">
+                  Você já avaliou esta peça — obrigado!
+                </p>
+              ) : eligibility.reason === "not-purchased" ? (
+                <p className="text-sm text-muted-foreground">
+                  Só clientes que compraram esta peça podem avaliar.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  <Link href="/login" className="underline underline-offset-2">
+                    Entre na sua conta
+                  </Link>{" "}
+                  para avaliar esta peça.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </section>

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import {
   adjustStockAction,
+  setLowStockThresholdAction,
   type LogisticsState,
 } from "@/lib/logistics-actions";
 
@@ -14,6 +15,7 @@ type Variant = {
   color: string;
   size: string;
   stockQuantity: number;
+  lowStockThreshold: number;
   productName: string;
 };
 
@@ -34,8 +36,12 @@ export function StockEditor({ variants }: { variants: Variant[] }) {
 
 function StockRow({ variant }: { variant: Variant }) {
   const [state, formAction, pending] = useActionState(adjustStockAction, initial);
+  const [thresholdState, thresholdAction, thresholdPending] = useActionState(
+    setLowStockThresholdAction,
+    initial,
+  );
   const [open, setOpen] = useState(false);
-  const lowStock = variant.stockQuantity < 5;
+  const lowStock = variant.stockQuantity < variant.lowStockThreshold;
 
   return (
     <li className="py-3">
@@ -55,6 +61,31 @@ function StockRow({ variant }: { variant: Variant }) {
           </p>
         </div>
 
+        <form
+          action={thresholdAction}
+          className="flex items-center gap-1.5"
+          title="Limite mínimo antes de marcar como estoque baixo"
+        >
+          <input type="hidden" name="variantId" value={variant.id} />
+          <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Limite
+          </label>
+          <input
+            type="number"
+            name="threshold"
+            min="0"
+            defaultValue={variant.lowStockThreshold}
+            className="h-8 w-16 rounded-sm border border-input bg-background px-2 text-xs outline-none focus-visible:border-ring"
+          />
+          <button
+            type="submit"
+            disabled={thresholdPending}
+            className="rounded-sm border border-foreground/15 px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wide text-foreground/70 transition-colors hover:border-foreground hover:text-foreground disabled:opacity-50"
+          >
+            Salvar
+          </button>
+        </form>
+
         <div className="flex items-center gap-3">
           <p className="font-heading text-lg font-bold">
             {variant.stockQuantity}
@@ -67,6 +98,11 @@ function StockRow({ variant }: { variant: Variant }) {
           </button>
         </div>
       </div>
+      {thresholdState.error && (
+        <p className="mt-2 rounded-sm bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {thresholdState.error}
+        </p>
+      )}
 
       {open && (
         <form

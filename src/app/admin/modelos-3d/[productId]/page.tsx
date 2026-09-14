@@ -6,9 +6,12 @@ import {
   rejectModel3DAction,
   markOptimizedAction,
   deleteModel3DAction,
+  restoreModel3DVersionAction,
+  setAvailableSizesAction,
 } from "@/lib/model-3d-actions";
 import { Model3DUploader } from "@/components/admin/model-3d-uploader";
 import { Model3DValidator } from "@/components/admin/model-3d-validator";
+import { TextureUploader } from "@/components/admin/texture-uploader";
 import { isCloudObject, resolveModelUrl } from "@/lib/storage";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -34,12 +37,17 @@ export default async function Modelo3DRevisaoPage({
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    include: { model3D: true },
+    include: {
+      model3D: { include: { versions: { orderBy: { version: "desc" } } } },
+      variants: { where: { status: "ACTIVE" }, select: { size: true } },
+    },
   });
   if (!product) notFound();
 
   const model = product.model3D;
   const previewUrl = model ? await resolveModelUrl(model.fileUrl) : null;
+  const productSizes = [...new Set(product.variants.map((v) => v.size))];
+  const availableSizes = new Set(model?.availableSizes ?? []);
 
   return (
     <div className="flex flex-col gap-10">
@@ -216,6 +224,94 @@ export default async function Modelo3DRevisaoPage({
                   label="Atualizado"
                   value={model.updatedAt.toLocaleString("pt-BR")}
                 />
+                <Meta
+                  label="Textura"
+                  value={
+                    model.textureUrl ? (
+                      <code className="font-mono text-[11px] break-all">
+                        {model.textureUrl}
+                      </code>
+                    ) : (
+                      "—"
+                    )
+                  }
+                />
+              </ul>
+              <div className="mt-3">
+                <TextureUploader productId={product.id} />
+              </div>
+            </div>
+          )}
+
+          {/* Tamanhos com simulação 3D (item 3D-02) */}
+          {model && productSizes.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Tamanhos com simulação 3D
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Vazio = disponível para todos os tamanhos.
+              </p>
+              <form action={setAvailableSizesAction} className="mt-3 flex flex-col gap-3">
+                <input type="hidden" name="productId" value={product.id} />
+                <div className="flex flex-wrap gap-2">
+                  {productSizes.map((size) => (
+                    <label
+                      key={size}
+                      className="flex items-center gap-1.5 rounded-sm border border-border px-2.5 py-1.5 text-xs has-[:checked]:border-foreground has-[:checked]:bg-foreground has-[:checked]:text-background"
+                    >
+                      <input
+                        type="checkbox"
+                        name="sizes"
+                        value={size}
+                        defaultChecked={availableSizes.has(size)}
+                        className="sr-only"
+                      />
+                      {size}
+                    </label>
+                  ))}
+                </div>
+                <button
+                  type="submit"
+                  className="w-fit rounded-sm border border-foreground/15 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-foreground/70 transition-colors hover:border-foreground hover:text-foreground"
+                >
+                  Salvar tamanhos
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Histórico de versões (item 3D-02) */}
+          {model && model.versions.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Histórico de versões
+              </p>
+              <ul className="mt-3 flex flex-col gap-2">
+                {model.versions.map((v) => (
+                  <li
+                    key={v.id}
+                    className="flex items-center justify-between gap-3 rounded-sm border border-border px-3 py-2 text-xs"
+                  >
+                    <div>
+                      <span className="font-semibold">v{v.version}</span>{" "}
+                      <span className="text-muted-foreground">
+                        · {v.format}
+                        {v.fileSizeMb ? ` · ${v.fileSizeMb} MB` : ""} ·{" "}
+                        {v.createdAt.toLocaleDateString("pt-BR")}
+                      </span>
+                    </div>
+                    <form action={restoreModel3DVersionAction}>
+                      <input type="hidden" name="versionId" value={v.id} />
+                      <button
+                        type="submit"
+                        className="rounded-sm border border-foreground/15 px-2.5 py-1 font-medium uppercase tracking-wide text-foreground/70 transition-colors hover:border-foreground hover:text-foreground"
+                      >
+                        Restaurar
+                      </button>
+                    </form>
+                  </li>
+                ))}
               </ul>
             </div>
           )}

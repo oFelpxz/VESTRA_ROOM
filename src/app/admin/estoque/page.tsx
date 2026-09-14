@@ -12,42 +12,48 @@ export default async function AdminEstoquePage({
   const onlyLow = sp.baixo === "1";
   const productId = sp.produto;
 
-  const [variants, categories, products] = await Promise.all([
-    prisma.productVariant.findMany({
-      where: {
-        ...(categoryId
-          ? { product: { categoryId } }
-          : {}),
-        ...(productId ? { productId } : {}),
-        ...(onlyLow ? { stockQuantity: { lt: 5 } } : {}),
-        status: "ACTIVE",
-      },
-      include: {
-        product: {
-          select: { id: true, name: true, categoryId: true },
+  const [allVariants, categories, products, allActiveForCount] =
+    await Promise.all([
+      // stockQuantity vs. lowStockThreshold compara duas colunas — filtra em JS.
+      prisma.productVariant.findMany({
+        where: {
+          ...(categoryId ? { product: { categoryId } } : {}),
+          ...(productId ? { productId } : {}),
+          status: "ACTIVE",
         },
-      },
-      orderBy: [
-        { stockQuantity: "asc" },
-        { product: { name: "asc" } },
-      ],
-      take: 200,
-    }),
-    prisma.category.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    prisma.product.findMany({
-      where: { status: { not: "INACTIVE" } },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      take: 200,
-    }),
-  ]);
+        include: {
+          product: {
+            select: { id: true, name: true, categoryId: true },
+          },
+        },
+        orderBy: [
+          { stockQuantity: "asc" },
+          { product: { name: "asc" } },
+        ],
+        take: 500,
+      }),
+      prisma.category.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      prisma.product.findMany({
+        where: { status: { not: "INACTIVE" } },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+        take: 200,
+      }),
+      prisma.productVariant.findMany({
+        where: { status: "ACTIVE" },
+        select: { stockQuantity: true, lowStockThreshold: true },
+      }),
+    ]);
 
-  const lowStockCount = await prisma.productVariant.count({
-    where: { stockQuantity: { lt: 5 }, status: "ACTIVE" },
-  });
+  const lowStockCount = allActiveForCount.filter(
+    (v) => v.stockQuantity < v.lowStockThreshold,
+  ).length;
+  const variants = onlyLow
+    ? allVariants.filter((v) => v.stockQuantity < v.lowStockThreshold)
+    : allVariants.slice(0, 200);
 
   return (
     <div>
@@ -146,6 +152,7 @@ export default async function AdminEstoquePage({
               color: v.color,
               size: v.size,
               stockQuantity: v.stockQuantity,
+              lowStockThreshold: v.lowStockThreshold,
               productName: v.product.name,
             }))}
           />

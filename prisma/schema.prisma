@@ -92,6 +92,18 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum ProductGender {
+  MASCULINO
+  FEMININO
+  UNISSEX
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // ---------------------------------------------------------------------------
 // Usuário e perfil
 // ---------------------------------------------------------------------------
@@ -109,6 +121,7 @@ model User {
   savedPaymentMethods SavedPaymentMethod[]
   carts              Cart[]
   orders             Order[]
+  reviews            Review[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -150,6 +163,15 @@ model Product {
   slug                     String           @unique
   description              String?
   brand                    String?
+  gender                   ProductGender?
+  collection               String?
+  /// Material predominante, curto — usado como filtro (ex.: "Algodão").
+  material                 String?
+  /// Ficha técnica de composição, texto livre (ex.: "100% algodão penteado, 180g/m²").
+  composition              String?
+  careInstructions         String?
+  returnPolicy             String?
+  maxInstallments          Int?
   basePrice                Decimal          @db.Decimal(10, 2)
   promotionalPrice         Decimal?         @db.Decimal(10, 2)
   status                   ProductStatus    @default(DRAFT)
@@ -161,24 +183,26 @@ model Product {
   images                   ProductImage[]
   model3D                  Model3D?
   sizeChart                SizeChart?
+  reviews                  Review[]
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 }
 
 model ProductVariant {
-  id            String        @id @default(cuid())
-  productId     String
-  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku           String        @unique
-  color         String
-  size          String
-  price         Decimal?      @db.Decimal(10, 2)
-  stockQuantity Int           @default(0)
-  status        VariantStatus @default(ACTIVE)
-  cartItems     CartItem[]
-  orderItems    OrderItem[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  productId          String
+  product            Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku                String        @unique
+  color              String
+  size               String
+  price              Decimal?      @db.Decimal(10, 2)
+  stockQuantity      Int           @default(0)
+  lowStockThreshold  Int           @default(5)
+  status             VariantStatus @default(ACTIVE)
+  cartItems          CartItem[]
+  orderItems         OrderItem[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 model ProductImage {
@@ -192,17 +216,50 @@ model ProductImage {
 }
 
 model Model3D {
+  id             String             @id @default(cuid())
+  productId      String             @unique
+  product        Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fileUrl        String
+  format         Model3DFormat      @default(GLB)
+  textureUrl     String?
+  version        Int                @default(1)
+  fileSizeMb     Float?
+  status         Model3DStatus      @default(PENDING)
+  /// Tamanhos (ProductVariant.size) com simulação 3D validada — vazio = todos.
+  availableSizes String[]           @default([])
+  versions       Model3DVersion[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+/// Histórico de versões do Model3D — permite reverter para um upload anterior.
+model Model3DVersion {
   id         String        @id @default(cuid())
-  productId  String        @unique
-  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  model3DId  String
+  model3D    Model3D       @relation(fields: [model3DId], references: [id], onDelete: Cascade)
+  version    Int
   fileUrl    String
-  format     Model3DFormat @default(GLB)
+  format     Model3DFormat
   textureUrl String?
-  version    Int           @default(1)
   fileSizeMb Float?
-  status     Model3DStatus @default(PENDING)
   createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+
+  @@unique([model3DId, version])
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  productId String
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  status    ReviewStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([productId, userId])
 }
 
 model SizeChart {

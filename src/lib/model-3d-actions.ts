@@ -53,16 +53,30 @@ export async function registerModel3DAction(
   const existing = await prisma.model3D.findUnique({ where: { productId } });
 
   if (existing) {
-    await prisma.model3D.update({
-      where: { productId },
-      data: {
-        fileUrl,
-        format,
-        fileSizeMb,
-        version: existing.version + 1,
-        status: "PENDING",
-      },
-    });
+    // Guarda a versão atual no histórico (item 3D-02) antes de sobrescrever.
+    await prisma.$transaction([
+      prisma.model3DVersion.create({
+        data: {
+          model3DId: existing.id,
+          version: existing.version,
+          fileUrl: existing.fileUrl,
+          format: existing.format,
+          textureUrl: existing.textureUrl,
+          fileSizeMb: existing.fileSizeMb,
+        },
+      }),
+      prisma.model3D.update({
+        where: { productId },
+        data: {
+          fileUrl,
+          format,
+          fileSizeMb,
+          textureUrl: null,
+          version: existing.version + 1,
+          status: "PENDING",
+        },
+      }),
+    ]);
   } else {
     await prisma.model3D.create({
       data: {
@@ -147,6 +161,77 @@ export async function markOptimizedAction(formData: FormData) {
 
   revalidatePath("/admin/modelos-3d");
   revalidatePath(`/admin/modelos-3d/${model.productId}`);
+}
+
+/**
+ * Restaura uma versão anterior do histórico (item 3D-02). A versão atual
+ * também é preservada no histórico antes da troca, então dá pra ir e voltar.
+ * O modelo restaurado volta para PENDING — precisa ser revalidado.
+ */
+export async function restoreModel3DVersionAction(formData: FormData) {
+  await requireAdmin();
+
+  const versionId = str(formData.get("versionId"));
+  if (!versionId) return;
+
+  const version = await prisma.model3DVersion.findUnique({
+    where: { id: versionId },
+    include: { model3D: true },
+  });
+  if (!version) return;
+
+  const current = version.model3D;
+
+  await prisma.$transaction([
+    prisma.model3DVersion.create({
+      data: {
+        model3DId: current.id,
+        version: current.version,
+        fileUrl: current.fileUrl,
+        format: current.format,
+        textureUrl: current.textureUrl,
+        fileSizeMb: current.fileSizeMb,
+      },
+    }),
+    prisma.model3D.update({
+      where: { id: current.id },
+      data: {
+        fileUrl: version.fileUrl,
+        format: version.format,
+        textureUrl: version.textureUrl,
+        fileSizeMb: version.fileSizeMb,
+        version: current.version + 1,
+        status: "PENDING",
+      },
+    }),
+    prisma.product.update({
+      where: { id: current.productId },
+      data: { has3DModel: false },
+    }),
+  ]);
+
+  revalidatePath("/admin/modelos-3d");
+  revalidatePath(`/admin/modelos-3d/${current.productId}`);
+  revalidatePath(`/admin/produtos/${current.productId}`);
+}
+
+/** Define quais tamanhos do produto têm simulação 3D validada (item 3D-02). */
+export async function setAvailableSizesAction(formData: FormData) {
+  await requireModelAccess();
+
+  const productId = str(formData.get("productId"));
+  if (!productId) return;
+
+  const sizes = formData.getAll("sizes").map((s) => String(s));
+
+  const model = await prisma.model3D.update({
+    where: { productId },
+    data: { availableSizes: sizes },
+    select: { productId: true },
+  });
+
+  revalidatePath(`/admin/modelos-3d/${model.productId}`);
+  revalidatePath(`/produto/${productId}`);
 }
 
 export async function deleteModel3DAction(formData: FormData) {

@@ -23,6 +23,7 @@ export const ADMIN_ROUTES: AdminRoute[] = [
   { href: "/admin/pedidos", label: "Pedidos", index: "05", roles: ["ADMIN", "STOCK_OPERATOR"] },
   { href: "/admin/estoque", label: "Estoque", index: "06", roles: ["ADMIN", "STOCK_OPERATOR"] },
   { href: "/admin/medidas", label: "Tabela de medidas", index: "07", roles: ["ADMIN"] },
+  { href: "/admin/avaliacoes", label: "Avaliações", index: "08", roles: ["ADMIN"] },
   { href: "/admin", label: "Painel", index: "01", roles: ALL_STAFF_ROLES },
 ];
 

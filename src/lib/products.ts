@@ -7,6 +7,10 @@ export type ProductFilters = {
   tamanho?: string;
   cor?: string;
   preco?: string;
+  genero?: string;
+  colecao?: string;
+  material?: string;
+  provador?: boolean;
 };
 
 export type CatalogProduct = {
@@ -33,6 +37,14 @@ export type SizeChartRow = {
   legLengthMaxCm: number | null;
 };
 
+export type ReviewItem = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  authorName: string;
+  createdAt: string;
+};
+
 export type ProductDetail = {
   id: string;
   slug: string;
@@ -41,7 +53,9 @@ export type ProductDetail = {
   description: string | null;
   category: string;
   price: string;
+  priceNumber: number;
   promotionalPrice: string | null;
+  promotionalPriceNumber: number | null;
   colors: string[];
   sizes: string[];
   variants: {
@@ -53,7 +67,15 @@ export type ProductDetail = {
   tags: string[];
   has3D: boolean;
   modelUrl: string | null;
+  model3DAvailableSizes: string[];
   sizeChart: { name: string; rows: SizeChartRow[] } | null;
+  gender: "MASCULINO" | "FEMININO" | "UNISSEX" | null;
+  collection: string | null;
+  composition: string | null;
+  careInstructions: string | null;
+  returnPolicy: string | null;
+  maxInstallments: number | null;
+  reviews: { average: number | null; count: number; items: ReviewItem[] };
 };
 
 // Faixas de preço (presets usados nos filtros).
@@ -79,8 +101,23 @@ export async function getFilterOptions() {
   });
   const sizes = [...new Set(variants.map((v) => v.size))].sort();
   const colors = [...new Set(variants.map((v) => v.color))].sort();
-  return { sizes, colors };
+
+  const products = await prisma.product.findMany({
+    where: { status: "ACTIVE" },
+    select: { gender: true, collection: true, material: true },
+  });
+  const genders = [...new Set(products.map((p) => p.gender).filter((g): g is NonNullable<typeof g> => g != null))];
+  const collections = [...new Set(products.map((p) => p.collection).filter((c): c is string => Boolean(c)))].sort();
+  const materials = [...new Set(products.map((p) => p.material).filter((c): c is string => Boolean(c)))].sort();
+
+  return { sizes, colors, genders, collections, materials };
 }
+
+export const GENDER_LABEL: Record<string, string> = {
+  MASCULINO: "Masculino",
+  FEMININO: "Feminino",
+  UNISSEX: "Unissex",
+};
 
 export async function getProducts(
   filters: ProductFilters = {},
@@ -111,6 +148,10 @@ export async function getProducts(
             },
           }
         : {}),
+      ...(filters.genero ? { gender: filters.genero as "MASCULINO" | "FEMININO" | "UNISSEX" } : {}),
+      ...(filters.colecao ? { collection: filters.colecao } : {}),
+      ...(filters.material ? { material: filters.material } : {}),
+      ...(filters.provador ? { availableForVirtualTryOn: true } : {}),
     },
     include: {
       images: { orderBy: { position: "asc" }, take: 1 },
@@ -154,6 +195,11 @@ export async function getProductDetail(
       variants: { where: { status: "ACTIVE" } },
       model3D: true,
       sizeChart: { include: { measures: { orderBy: { createdAt: "asc" } } } },
+      reviews: {
+        where: { status: "APPROVED" },
+        include: { user: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
@@ -166,6 +212,12 @@ export async function getProductDetail(
   if (product.has3DModel) tags.push("3D DISPONÍVEL");
   if (product.availableForVirtualTryOn) tags.push("VESTRA FIT");
 
+  const approvedReviews = product.reviews;
+  const reviewAverage =
+    approvedReviews.length > 0
+      ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length
+      : null;
+
   return {
     id: product.id,
     slug: product.slug,
@@ -174,8 +226,12 @@ export async function getProductDetail(
     description: product.description,
     category: product.category.name,
     price: formatBRL(Number(product.basePrice)),
+    priceNumber: Number(product.basePrice),
     promotionalPrice: product.promotionalPrice
       ? formatBRL(Number(product.promotionalPrice))
+      : null,
+    promotionalPriceNumber: product.promotionalPrice
+      ? Number(product.promotionalPrice)
       : null,
     colors,
     sizes,
@@ -188,6 +244,24 @@ export async function getProductDetail(
     tags,
     has3D: product.has3DModel,
     modelUrl: await resolveModelUrl(product.model3D?.fileUrl ?? null),
+    model3DAvailableSizes: product.model3D?.availableSizes ?? [],
+    gender: product.gender,
+    collection: product.collection,
+    composition: product.composition,
+    careInstructions: product.careInstructions,
+    returnPolicy: product.returnPolicy,
+    maxInstallments: product.maxInstallments,
+    reviews: {
+      average: reviewAverage,
+      count: approvedReviews.length,
+      items: approvedReviews.map((r) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        authorName: r.user.name,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    },
     sizeChart: product.sizeChart
       ? {
           name: product.sizeChart.name,

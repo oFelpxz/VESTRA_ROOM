@@ -12,11 +12,19 @@ const prisma = new PrismaClient({ adapter });
 
 const categories = [
   { name: "Camisetas", slug: "camisetas" },
+  { name: "Camisas", slug: "camisas" },
   { name: "Calças", slug: "calcas" },
+  { name: "Bermudas", slug: "bermudas" },
+  { name: "Saias", slug: "saias" },
+  { name: "Vestidos", slug: "vestidos" },
   { name: "Moletons", slug: "moletons" },
   { name: "Jaquetas", slug: "jaquetas" },
   { name: "Acessórios", slug: "acessorios" },
 ];
+
+// Política de troca padrão — usada quando o produto não tem uma específica.
+const DEFAULT_RETURN_POLICY =
+  "Troca ou devolução em até 30 dias corridos após o recebimento, peça sem uso e com etiqueta.";
 
 type SeedProduct = {
   name: string;
@@ -28,11 +36,45 @@ type SeedProduct = {
   has3D?: boolean;
   modelUrl?: string;
   description?: string;
+  gender?: "MASCULINO" | "FEMININO" | "UNISSEX";
+  collection?: string;
+  material?: string;
+  composition?: string;
+  careInstructions?: string;
+  returnPolicy?: string;
+  maxInstallments?: number;
 };
 
 const products: SeedProduct[] = [
-  { name: "Boxy Tee 01", slug: "boxy-tee-01", categorySlug: "camisetas", basePrice: 189, colors: ["Preto", "Off-white"], sizes: ["P", "M", "G", "GG"], has3D: true },
-  { name: "Cargo Pant 02", slug: "cargo-pant-02", categorySlug: "calcas", basePrice: 349, colors: ["Preto", "Bege"], sizes: ["38", "40", "42", "44"] },
+  {
+    name: "Boxy Tee 01",
+    slug: "boxy-tee-01",
+    categorySlug: "camisetas",
+    basePrice: 189,
+    colors: ["Preto", "Off-white"],
+    sizes: ["P", "M", "G", "GG"],
+    has3D: true,
+    gender: "UNISSEX",
+    collection: "Verão 26",
+    material: "Algodão",
+    composition: "100% algodão penteado, 180g/m²",
+    careInstructions: "Lavar à máquina até 30°C, não usar alvejante, secar à sombra.",
+    maxInstallments: 3,
+  },
+  {
+    name: "Cargo Pant 02",
+    slug: "cargo-pant-02",
+    categorySlug: "calcas",
+    basePrice: 349,
+    colors: ["Preto", "Bege"],
+    sizes: ["38", "40", "42", "44"],
+    gender: "UNISSEX",
+    collection: "Inverno 26",
+    material: "Algodão",
+    composition: "98% algodão, 2% elastano",
+    careInstructions: "Lavar do avesso, não usar secadora.",
+    maxInstallments: 6,
+  },
   {
     name: "Hoodie Core",
     slug: "hoodie-core",
@@ -43,12 +85,144 @@ const products: SeedProduct[] = [
     has3D: true,
     description:
       "Moletom com capuz em algodão pesado, caimento boxy e bolso canguru duplo. Peça-âncora do provador VESTRA FIT — vista no seu avatar em 3D antes de comprar.",
+    gender: "UNISSEX",
+    collection: "Inverno 26",
+    material: "Algodão",
+    composition: "80% algodão, 20% poliéster, moletom flanelado",
+    careInstructions: "Lavar à máquina até 30°C, secar à sombra, não passar no estampado.",
+    maxInstallments: 6,
   },
-  { name: "Oversized Shirt", slug: "oversized-shirt", categorySlug: "camisetas", basePrice: 229, colors: ["Off-white"], sizes: ["P", "M", "G"] },
-  { name: "Track Jacket", slug: "track-jacket", categorySlug: "jaquetas", basePrice: 399, colors: ["Preto"], sizes: ["P", "M", "G", "GG"], has3D: true, modelUrl: "/models/track_jacket.glb" },
-  { name: "Knit Beanie", slug: "knit-beanie", categorySlug: "acessorios", basePrice: 89, colors: ["Preto", "Cinza"], sizes: ["Único"] },
-  { name: "Wide Denim", slug: "wide-denim", categorySlug: "calcas", basePrice: 329, colors: ["Azul"], sizes: ["38", "40", "42"] },
-  { name: "Tech Vest", slug: "tech-vest", categorySlug: "jaquetas", basePrice: 279, colors: ["Preto", "Verde"], sizes: ["P", "M", "G"], has3D: true, modelUrl: "/models/tech_vest.glb" },
+  {
+    name: "Oversized Shirt",
+    slug: "oversized-shirt",
+    categorySlug: "camisetas",
+    basePrice: 229,
+    colors: ["Off-white"],
+    sizes: ["P", "M", "G"],
+    gender: "UNISSEX",
+    collection: "Verão 26",
+    material: "Algodão",
+    composition: "100% algodão penteado, 220g/m²",
+    careInstructions: "Lavar à máquina até 30°C.",
+    maxInstallments: 3,
+  },
+  {
+    name: "Track Jacket",
+    slug: "track-jacket",
+    categorySlug: "jaquetas",
+    basePrice: 399,
+    colors: ["Preto"],
+    sizes: ["P", "M", "G", "GG"],
+    has3D: true,
+    modelUrl: "/models/track_jacket.glb",
+    gender: "UNISSEX",
+    collection: "Inverno 26",
+    material: "Poliéster",
+    composition: "100% poliéster reciclado, forro em mesh",
+    careInstructions: "Lavar à máquina até 30°C, não usar ferro no zíper.",
+    maxInstallments: 6,
+  },
+  {
+    name: "Knit Beanie",
+    slug: "knit-beanie",
+    categorySlug: "acessorios",
+    basePrice: 89,
+    colors: ["Preto", "Cinza"],
+    sizes: ["Único"],
+    gender: "UNISSEX",
+    collection: "Inverno 26",
+    material: "Acrílico",
+    composition: "100% acrílico",
+    careInstructions: "Lavar à mão, não torcer.",
+    maxInstallments: 2,
+  },
+  {
+    name: "Wide Denim",
+    slug: "wide-denim",
+    categorySlug: "calcas",
+    basePrice: 329,
+    colors: ["Azul"],
+    sizes: ["38", "40", "42"],
+    gender: "FEMININO",
+    collection: "Verão 26",
+    material: "Denim",
+    composition: "100% algodão, denim rígido",
+    careInstructions: "Lavar do avesso em água fria.",
+    maxInstallments: 6,
+  },
+  {
+    name: "Tech Vest",
+    slug: "tech-vest",
+    categorySlug: "jaquetas",
+    basePrice: 279,
+    colors: ["Preto", "Verde"],
+    sizes: ["P", "M", "G"],
+    has3D: true,
+    modelUrl: "/models/tech_vest.glb",
+    gender: "MASCULINO",
+    collection: "Inverno 26",
+    material: "Nylon",
+    composition: "100% nylon ripstop, acabamento repelente à água",
+    careInstructions: "Lavar à máquina até 30°C, não usar secadora.",
+    maxInstallments: 6,
+  },
+  // --- categorias novas (item 08) ---
+  {
+    name: "Camisa Studio",
+    slug: "camisa-studio",
+    categorySlug: "camisas",
+    basePrice: 259,
+    colors: ["Branco", "Azul"],
+    sizes: ["P", "M", "G", "GG"],
+    gender: "MASCULINO",
+    collection: "Verão 26",
+    material: "Algodão",
+    composition: "70% algodão, 30% viscose",
+    careInstructions: "Lavar à máquina até 30°C, passar morno.",
+    maxInstallments: 4,
+  },
+  {
+    name: "Bermuda Utility",
+    slug: "bermuda-utility",
+    categorySlug: "bermudas",
+    basePrice: 199,
+    colors: ["Bege", "Preto"],
+    sizes: ["38", "40", "42", "44"],
+    gender: "MASCULINO",
+    collection: "Verão 26",
+    material: "Algodão",
+    composition: "100% algodão sarja",
+    careInstructions: "Lavar à máquina até 30°C.",
+    maxInstallments: 3,
+  },
+  {
+    name: "Saia Midi Plissada",
+    slug: "saia-midi-plissada",
+    categorySlug: "saias",
+    basePrice: 219,
+    colors: ["Preto", "Verde"],
+    sizes: ["P", "M", "G"],
+    gender: "FEMININO",
+    collection: "Verão 26",
+    material: "Poliéster",
+    composition: "100% poliéster plissado",
+    careInstructions: "Lavar à mão, não torcer, secar pendurada.",
+    maxInstallments: 3,
+  },
+  {
+    name: "Vestido Slip Acetinado",
+    slug: "vestido-slip-acetinado",
+    categorySlug: "vestidos",
+    basePrice: 289,
+    colors: ["Preto", "Off-white"],
+    sizes: ["P", "M", "G"],
+    gender: "FEMININO",
+    collection: "Verão 26",
+    material: "Poliéster",
+    composition: "95% poliéster, 5% elastano, acetinado",
+    careInstructions: "Lavar à mão em água fria, não usar alvejante.",
+    maxInstallments: 4,
+  },
 ];
 
 async function main() {
@@ -76,6 +250,13 @@ async function main() {
         has3DModel: Boolean(p.has3D),
         availableForVirtualTryOn: Boolean(p.has3D),
         categoryId: category.id,
+        gender: p.gender,
+        collection: p.collection,
+        material: p.material,
+        composition: p.composition,
+        careInstructions: p.careInstructions,
+        returnPolicy: p.returnPolicy ?? DEFAULT_RETURN_POLICY,
+        maxInstallments: p.maxInstallments,
       },
       create: {
         name: p.name,
@@ -89,6 +270,13 @@ async function main() {
         has3DModel: Boolean(p.has3D),
         availableForVirtualTryOn: Boolean(p.has3D),
         categoryId: category.id,
+        gender: p.gender,
+        collection: p.collection,
+        material: p.material,
+        composition: p.composition,
+        careInstructions: p.careInstructions,
+        returnPolicy: p.returnPolicy ?? DEFAULT_RETURN_POLICY,
+        maxInstallments: p.maxInstallments,
       },
     });
 
@@ -237,6 +425,28 @@ async function main() {
       acceptedTerms: true,
     },
   });
+
+  // 4. Avaliações de exemplo (item 09) — dado de demonstração, sem passar
+  // pela verificação de compra (que só vale para avaliações criadas pela UI).
+  const reviewSeed: { slug: string; rating: number; comment: string }[] = [
+    { slug: "boxy-tee-01", rating: 5, comment: "Caimento perfeito, tecido grosso e não desbota." },
+    { slug: "hoodie-core", rating: 5, comment: "O provador 3D bateu certinho com o tamanho que comprei." },
+  ];
+  for (const r of reviewSeed) {
+    const product = await prisma.product.findUnique({ where: { slug: r.slug } });
+    if (!product) continue;
+    await prisma.review.upsert({
+      where: { productId_userId: { productId: product.id, userId: customer.id } },
+      update: {},
+      create: {
+        productId: product.id,
+        userId: customer.id,
+        rating: r.rating,
+        comment: r.comment,
+        status: "APPROVED",
+      },
+    });
+  }
 
   console.log("Seed concluído:");
   console.log(`  ${categories.length} categorias`);
