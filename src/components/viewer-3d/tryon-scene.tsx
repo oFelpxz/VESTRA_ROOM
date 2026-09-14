@@ -10,6 +10,7 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import { Avatar } from "./avatar";
 
 function Garment({
   url,
@@ -128,6 +129,7 @@ export function TryOnScene({
       <directionalLight position={[-4, 3, -2]} intensity={0.5} />
 
       <Suspense fallback={<Loader />}>
+        <Avatar params={avatarParams} />
         {garmentUrl && (
           <Garment
             url={garmentUrl}
