@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { Tag } from "@/components/ui/tag";
-import { Viewer3D } from "@/components/viewer-3d/viewer";
+import { ProductViewer } from "@/components/viewer-3d/product-viewer";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
-import { getProductDetail } from "@/lib/products";
+import { ProductPurchase } from "@/components/product/product-purchase";
+import { ReviewForm } from "@/components/product/review-form";
+import { getProductDetail, GENDER_LABEL } from "@/lib/products";
+import { getReviewEligibility } from "@/lib/review-actions";
+import { formatBRL } from "@/lib/format";
 
 export async function generateMetadata({
   params,
@@ -36,11 +41,28 @@ export default async function ProdutoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const product = await getProductDetail(id);
+  const [product, session] = await Promise.all([
+    getProductDetail(id),
+    auth(),
+  ]);
 
   if (!product) {
     notFound();
   }
+
+  const isLoggedIn = !!session?.user;
+  const eligibility = await getReviewEligibility(product.id);
+
+  const installments = product.maxInstallments && product.maxInstallments > 1
+    ? {
+        n: product.maxInstallments,
+        value: (product.promotionalPriceNumber ?? product.priceNumber) / product.maxInstallments,
+      }
+    : null;
+
+  const hasTechSheet = Boolean(
+    product.composition || product.careInstructions || product.returnPolicy || product.gender || product.collection,
+  );
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
@@ -53,7 +75,7 @@ export default async function ProdutoPage({
                 <span className="inline-block size-1.5 rounded-full bg-acid" />
                 VESTRA FIT · 3D
               </span>
-              <Viewer3D modelUrl={product.modelUrl} />
+              <ProductViewer modelUrl={product.modelUrl} controls />
             </div>
           ) : (
             <div className="relative aspect-square overflow-hidden rounded-sm bg-secondary">
@@ -63,6 +85,12 @@ export default async function ProdutoPage({
           {product.has3D && (
             <p className="mt-3 text-xs text-muted-foreground">
               Arraste para girar · scroll para zoom
+            </p>
+          )}
+          {product.has3D && product.model3DAvailableSizes.length > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Simulação 3D disponível nos tamanhos:{" "}
+              {product.model3DAvailableSizes.join(", ")}
             </p>
           )}
         </div>
@@ -88,6 +116,11 @@ export default async function ProdutoPage({
               <span className="text-2xl">{product.price}</span>
             )}
           </div>
+          {installments && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              ou {installments.n}x de {formatBRL(installments.value)} sem juros
+            </p>
+          )}
 
           {product.tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-1.5">
@@ -105,59 +138,25 @@ export default async function ProdutoPage({
             </p>
           )}
 
-          {/* Cores */}
-          {product.colors.length > 0 && (
-            <div className="mt-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Cor
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {product.colors.map((c) => (
-                  <span
-                    key={c}
-                    className="rounded-sm border border-foreground/20 px-3 py-1.5 text-sm transition-colors hover:border-foreground"
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Compra: seleção cor + tamanho + adicionar à sacola */}
+          <div className="mt-8">
+            <ProductPurchase
+              variants={product.variants}
+              colors={product.colors}
+              sizes={product.sizes}
+              isLoggedIn={isLoggedIn}
+            />
+          </div>
 
-          {/* Tamanhos */}
-          {product.sizes.length > 0 && (
-            <div className="mt-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Tamanho
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {product.sizes.map((s) => (
-                  <span
-                    key={s}
-                    className="flex h-11 min-w-11 items-center justify-center rounded-sm border border-foreground/20 px-3 text-sm transition-colors hover:border-foreground"
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Ações */}
-          <div className="mt-10 flex flex-col gap-3">
-            <button
-              type="button"
-              className="inline-flex h-12 items-center justify-center rounded-sm bg-foreground px-8 text-xs font-semibold uppercase tracking-[0.15em] text-background transition-opacity hover:opacity-90"
-            >
-              Adicionar à sacola
-            </button>
+          {product.has3D && product.modelUrl && (
             <Link
-              href="/teste-3d"
-              className="inline-flex h-12 items-center justify-center rounded-sm border border-foreground/20 px-8 text-xs font-semibold uppercase tracking-[0.15em] transition-colors hover:bg-secondary"
+              href={`/produto/${product.slug}/provador`}
+              className="mt-3 inline-flex h-12 items-center justify-center gap-2 rounded-sm border border-foreground/20 px-8 text-xs font-semibold uppercase tracking-[0.15em] transition-colors hover:bg-secondary"
             >
+              <span className="inline-block size-1.5 rounded-full bg-acid" />
               Experimentar no VESTRA FIT
             </Link>
-          </div>
+          )}
 
           {/* Tabela de medidas */}
           {product.sizeChart && product.sizeChart.rows.length > 0 && (
@@ -172,7 +171,9 @@ export default async function ProdutoPage({
                       <th className="py-2 pr-4 font-medium">Tamanho</th>
                       <th className="py-2 pr-4 font-medium">Tórax (cm)</th>
                       <th className="py-2 pr-4 font-medium">Cintura (cm)</th>
-                      <th className="py-2 font-medium">Quadril (cm)</th>
+                      <th className="py-2 pr-4 font-medium">Quadril (cm)</th>
+                      <th className="py-2 pr-4 font-medium">Braço (cm)</th>
+                      <th className="py-2 font-medium">Perna (cm)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -185,8 +186,14 @@ export default async function ProdutoPage({
                         <td className="py-2 pr-4 text-muted-foreground">
                           {range(r.waistMinCm, r.waistMaxCm)}
                         </td>
-                        <td className="py-2 text-muted-foreground">
+                        <td className="py-2 pr-4 text-muted-foreground">
                           {range(r.hipMinCm, r.hipMaxCm)}
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground">
+                          {range(r.armLengthMinCm, r.armLengthMaxCm)}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {range(r.legLengthMinCm, r.legLengthMaxCm)}
                         </td>
                       </tr>
                     ))}
@@ -195,6 +202,111 @@ export default async function ProdutoPage({
               </div>
             </div>
           )}
+
+          {/* Ficha técnica */}
+          {hasTechSheet && (
+            <div className="mt-12 border-t border-border pt-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Ficha técnica
+              </p>
+              <dl className="mt-4 divide-y divide-border/60 text-sm">
+                {product.gender && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Gênero</dt>
+                    <dd>{GENDER_LABEL[product.gender] ?? product.gender}</dd>
+                  </div>
+                )}
+                {product.collection && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Coleção</dt>
+                    <dd>{product.collection}</dd>
+                  </div>
+                )}
+                {product.composition && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Composição</dt>
+                    <dd className="text-right">{product.composition}</dd>
+                  </div>
+                )}
+                {product.careInstructions && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Cuidados</dt>
+                    <dd className="text-right">{product.careInstructions}</dd>
+                  </div>
+                )}
+                {product.returnPolicy && (
+                  <div className="flex justify-between gap-4 py-2">
+                    <dt className="text-muted-foreground">Trocas e devoluções</dt>
+                    <dd className="text-right">{product.returnPolicy}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+
+          {/* Avaliações */}
+          <div className="mt-12 border-t border-border pt-8">
+            <div className="flex items-baseline justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Avaliações
+              </p>
+              {product.reviews.average != null && (
+                <p className="text-sm">
+                  <span className="text-acid">★</span>{" "}
+                  {product.reviews.average.toFixed(1)}{" "}
+                  <span className="text-muted-foreground">
+                    ({product.reviews.count})
+                  </span>
+                </p>
+              )}
+            </div>
+
+            {product.reviews.items.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Ainda não há avaliações para esta peça.
+              </p>
+            ) : (
+              <ul className="mt-4 flex flex-col gap-4">
+                {product.reviews.items.map((r) => (
+                  <li key={r.id} className="border-b border-border/60 pb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-acid">{"★".repeat(r.rating)}</span>
+                      <span className="text-muted-foreground/40">
+                        {"★".repeat(5 - r.rating)}
+                      </span>
+                      <span className="font-medium">{r.authorName}</span>
+                    </div>
+                    {r.comment && (
+                      <p className="mt-1.5 text-sm text-muted-foreground">
+                        {r.comment}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="mt-6">
+              {eligibility.canReview ? (
+                <ReviewForm productId={product.id} productSlug={product.slug} />
+              ) : eligibility.reason === "already-reviewed" ? (
+                <p className="text-sm text-muted-foreground">
+                  Você já avaliou esta peça — obrigado!
+                </p>
+              ) : eligibility.reason === "not-purchased" ? (
+                <p className="text-sm text-muted-foreground">
+                  Só clientes que compraram esta peça podem avaliar.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  <Link href="/login" className="underline underline-offset-2">
+                    Entre na sua conta
+                  </Link>{" "}
+                  para avaliar esta peça.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </section>

@@ -95,6 +95,10 @@ export async function saveSizeChartAction(
     waistMaxCm: num(formData.get(`${s}_waistMax`)),
     hipMinCm: num(formData.get(`${s}_hipMin`)),
     hipMaxCm: num(formData.get(`${s}_hipMax`)),
+    armLengthMinCm: num(formData.get(`${s}_armLengthMin`)),
+    armLengthMaxCm: num(formData.get(`${s}_armLengthMax`)),
+    legLengthMinCm: num(formData.get(`${s}_legLengthMin`)),
+    legLengthMaxCm: num(formData.get(`${s}_legLengthMax`)),
   }));
 
   const chart = await prisma.sizeChart.upsert({

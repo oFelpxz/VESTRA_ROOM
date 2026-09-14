@@ -10,6 +10,10 @@ datasource db {
   provider = "postgresql"
 }
 
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
 enum UserRole {
   CUSTOMER
   ADMIN
@@ -51,6 +55,59 @@ enum FitPreference {
   OVERSIZED
 }
 
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  SIMULATED
+  MERCADO_PAGO
+  STRIPE
+  PAGARME
+}
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BOLETO
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum ProductGender {
+  MASCULINO
+  FEMININO
+  UNISSEX
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Usuário e perfil
+// ---------------------------------------------------------------------------
+
 model User {
   id                 String              @id @default(cuid())
   name               String
@@ -60,6 +117,11 @@ model User {
   role               UserRole            @default(CUSTOMER)
   status             UserStatus          @default(ACTIVE)
   measurementProfile MeasurementProfile?
+  addresses          Address[]
+  savedPaymentMethods SavedPaymentMethod[]
+  carts              Cart[]
+  orders             Order[]
+  reviews            Review[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -82,6 +144,10 @@ model MeasurementProfile {
   updatedAt     DateTime      @updatedAt
 }
 
+// ---------------------------------------------------------------------------
+// Catálogo
+// ---------------------------------------------------------------------------
+
 model Category {
   id        String    @id @default(cuid())
   name      String
@@ -97,6 +163,15 @@ model Product {
   slug                     String           @unique
   description              String?
   brand                    String?
+  gender                   ProductGender?
+  collection               String?
+  /// Material predominante, curto — usado como filtro (ex.: "Algodão").
+  material                 String?
+  /// Ficha técnica de composição, texto livre (ex.: "100% algodão penteado, 180g/m²").
+  composition              String?
+  careInstructions         String?
+  returnPolicy             String?
+  maxInstallments          Int?
   basePrice                Decimal          @db.Decimal(10, 2)
   promotionalPrice         Decimal?         @db.Decimal(10, 2)
   status                   ProductStatus    @default(DRAFT)
@@ -108,22 +183,26 @@ model Product {
   images                   ProductImage[]
   model3D                  Model3D?
   sizeChart                SizeChart?
+  reviews                  Review[]
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 }
 
 model ProductVariant {
-  id            String        @id @default(cuid())
-  productId     String
-  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku           String        @unique
-  color         String
-  size          String
-  price         Decimal?      @db.Decimal(10, 2)
-  stockQuantity Int           @default(0)
-  status        VariantStatus @default(ACTIVE)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  productId          String
+  product            Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku                String        @unique
+  color              String
+  size               String
+  price              Decimal?      @db.Decimal(10, 2)
+  stockQuantity      Int           @default(0)
+  lowStockThreshold  Int           @default(5)
+  status             VariantStatus @default(ACTIVE)
+  cartItems          CartItem[]
+  orderItems         OrderItem[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 model ProductImage {
@@ -137,17 +216,50 @@ model ProductImage {
 }
 
 model Model3D {
+  id             String             @id @default(cuid())
+  productId      String             @unique
+  product        Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fileUrl        String
+  format         Model3DFormat      @default(GLB)
+  textureUrl     String?
+  version        Int                @default(1)
+  fileSizeMb     Float?
+  status         Model3DStatus      @default(PENDING)
+  /// Tamanhos (ProductVariant.size) com simulação 3D validada — vazio = todos.
+  availableSizes String[]           @default([])
+  versions       Model3DVersion[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+/// Histórico de versões do Model3D — permite reverter para um upload anterior.
+model Model3DVersion {
   id         String        @id @default(cuid())
-  productId  String        @unique
-  product    Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  model3DId  String
+  model3D    Model3D       @relation(fields: [model3DId], references: [id], onDelete: Cascade)
+  version    Int
   fileUrl    String
-  format     Model3DFormat @default(GLB)
+  format     Model3DFormat
   textureUrl String?
-  version    Int           @default(1)
   fileSizeMb Float?
-  status     Model3DStatus @default(PENDING)
   createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+
+  @@unique([model3DId, version])
+}
+
+model Review {
+  id        String       @id @default(cuid())
+  productId String
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  status    ReviewStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([productId, userId])
 }
 
 model SizeChart {
@@ -161,17 +273,139 @@ model SizeChart {
 }
 
 model SizeChartMeasure {
-  id          String    @id @default(cuid())
-  sizeChartId String
-  sizeChart   SizeChart @relation(fields: [sizeChartId], references: [id], onDelete: Cascade)
-  size        String
-  chestMinCm  Float?
-  chestMaxCm  Float?
-  waistMinCm  Float?
-  waistMaxCm  Float?
-  hipMinCm    Float?
-  hipMaxCm    Float?
-  heightMinCm Float?
-  heightMaxCm Float?
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  sizeChartId     String
+  sizeChart       SizeChart @relation(fields: [sizeChartId], references: [id], onDelete: Cascade)
+  size            String
+  chestMinCm      Float?
+  chestMaxCm      Float?
+  waistMinCm      Float?
+  waistMaxCm      Float?
+  hipMinCm        Float?
+  hipMaxCm        Float?
+  heightMinCm     Float?
+  heightMaxCm     Float?
+  armLengthMinCm  Float?
+  armLengthMaxCm  Float?
+  legLengthMinCm  Float?
+  legLengthMaxCm  Float?
+  createdAt       DateTime  @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Endereços
+// ---------------------------------------------------------------------------
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipient  String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("BR")
+  phone      String?
+  isDefault  Boolean  @default(false)
+  orders     Order[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// Cartão salvo pelo cliente. Nunca armazenamos o número completo nem o
+// código de segurança — só metadados de exibição (bandeira, 4 últimos
+// dígitos, validade) e um token opaco simulado. Em produção esse token
+// viria do gateway real (Mercado Pago/Stripe/Pagar.me — item 16).
+model SavedPaymentMethod {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand      String
+  last4      String
+  expMonth   Int
+  expYear    Int
+  holderName String
+  token      String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Carrinho
+// ---------------------------------------------------------------------------
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    CartStatus @default(ACTIVE)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id               String         @id @default(cuid())
+  cartId           String
+  cart             Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productVariantId String
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  quantity         Int            @default(1)
+  unitPrice        Decimal        @db.Decimal(10, 2)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([cartId, productVariantId])
+}
+
+// ---------------------------------------------------------------------------
+// Pedido + Pagamento
+// ---------------------------------------------------------------------------
+
+model Order {
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status            OrderStatus @default(PENDING_PAYMENT)
+  totalAmount       Decimal     @db.Decimal(10, 2)
+  shippingAmount   Decimal     @default(0) @db.Decimal(10, 2)
+  discountAmount   Decimal     @default(0) @db.Decimal(10, 2)
+  shippingAddressId String?
+  shippingAddress   Address?    @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  trackingCode     String?
+  items             OrderItem[]
+  payment           Payment?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model OrderItem {
+  id               String          @id @default(cuid())
+  orderId          String
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariantId String?
+  productVariant   ProductVariant? @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  productName      String
+  color            String
+  size             String
+  quantity         Int
+  unitPrice        Decimal         @db.Decimal(10, 2)
+  totalPrice       Decimal         @db.Decimal(10, 2)
+  createdAt        DateTime        @default(now())
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  orderId           String          @unique
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          PaymentProvider @default(SIMULATED)
+  method            PaymentMethod
+  status            PaymentStatus   @default(PENDING)
+  amount            Decimal         @db.Decimal(10, 2)
+  externalPaymentId String?
+  paidAt            DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }

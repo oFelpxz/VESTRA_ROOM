@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { formatBRL } from "@/lib/format";
+import { resolveModelUrl } from "@/lib/storage";
 
 export type ProductFilters = {
   categoria?: string;
   tamanho?: string;
   cor?: string;
   preco?: string;
+  genero?: string;
+  colecao?: string;
+  material?: string;
+  provador?: boolean;
 };
 
 export type CatalogProduct = {
@@ -13,8 +18,9 @@ export type CatalogProduct = {
   slug: string;
   name: string;
   price: string;
-  previewUrl: string;
   tags: string[];
+  imageUrl: string | null;
+  modelUrl: string | null;
 };
 
 export type SizeChartRow = {
@@ -25,6 +31,18 @@ export type SizeChartRow = {
   waistMaxCm: number | null;
   hipMinCm: number | null;
   hipMaxCm: number | null;
+  armLengthMinCm: number | null;
+  armLengthMaxCm: number | null;
+  legLengthMinCm: number | null;
+  legLengthMaxCm: number | null;
+};
+
+export type ReviewItem = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  authorName: string;
+  createdAt: string;
 };
 
 export type ProductDetail = {
@@ -35,13 +53,29 @@ export type ProductDetail = {
   description: string | null;
   category: string;
   price: string;
+  priceNumber: number;
   promotionalPrice: string | null;
+  promotionalPriceNumber: number | null;
   colors: string[];
   sizes: string[];
+  variants: {
+    id: string;
+    color: string;
+    size: string;
+    stockQuantity: number;
+  }[];
   tags: string[];
   has3D: boolean;
   modelUrl: string | null;
+  model3DAvailableSizes: string[];
   sizeChart: { name: string; rows: SizeChartRow[] } | null;
+  gender: "MASCULINO" | "FEMININO" | "UNISSEX" | null;
+  collection: string | null;
+  composition: string | null;
+  careInstructions: string | null;
+  returnPolicy: string | null;
+  maxInstallments: number | null;
+  reviews: { average: number | null; count: number; items: ReviewItem[] };
 };
 
 // Faixas de preço (presets usados nos filtros).
@@ -67,8 +101,23 @@ export async function getFilterOptions() {
   });
   const sizes = [...new Set(variants.map((v) => v.size))].sort();
   const colors = [...new Set(variants.map((v) => v.color))].sort();
-  return { sizes, colors };
+
+  const products = await prisma.product.findMany({
+    where: { status: "ACTIVE" },
+    select: { gender: true, collection: true, material: true },
+  });
+  const genders = [...new Set(products.map((p) => p.gender).filter((g): g is NonNullable<typeof g> => g != null))];
+  const collections = [...new Set(products.map((p) => p.collection).filter((c): c is string => Boolean(c)))].sort();
+  const materials = [...new Set(products.map((p) => p.material).filter((c): c is string => Boolean(c)))].sort();
+
+  return { sizes, colors, genders, collections, materials };
 }
+
+export const GENDER_LABEL: Record<string, string> = {
+  MASCULINO: "Masculino",
+  FEMININO: "Feminino",
+  UNISSEX: "Unissex",
+};
 
 export async function getProducts(
   filters: ProductFilters = {},
@@ -76,14 +125,6 @@ export async function getProducts(
   const range = filters.preco ? PRICE_RANGES[filters.preco] : undefined;
 
   const products = await prisma.product.findMany({
-  include: {
-    images: {
-      orderBy: {
-        position: "asc",
-      },
-      take: 1,
-    },
-  },
     where: {
       status: "ACTIVE",
       ...(filters.categoria
@@ -107,27 +148,37 @@ export async function getProducts(
             },
           }
         : {}),
+      ...(filters.genero ? { gender: filters.genero as "MASCULINO" | "FEMININO" | "UNISSEX" } : {}),
+      ...(filters.colecao ? { collection: filters.colecao } : {}),
+      ...(filters.material ? { material: filters.material } : {}),
+      ...(filters.provador ? { availableForVirtualTryOn: true } : {}),
+    },
+    include: {
+      images: { orderBy: { position: "asc" }, take: 1 },
+      model3D: true,
     },
     orderBy: { createdAt: "desc" },
   });
 
-  console.log("IMAGENS DO PRIMEIRO PRODUTO:");
-console.log(JSON.stringify(products[0]?.images, null, 2));
+  return Promise.all(
+    products.map(async (p) => {
+      const tags: string[] = [];
+      if (p.has3DModel) tags.push("3D DISPONÍVEL");
+      if (p.availableForVirtualTryOn) tags.push("VESTRA FIT");
 
-  return products.map((p) => {
-    const tags: string[] = [];
-    if (p.has3DModel) tags.push("3D DISPONÍVEL");
-    if (p.availableForVirtualTryOn) tags.push("VESTRA FIT");
-
-    return {
-  id: p.id,
-  slug: p.slug,
-  name: p.name,
-  price: formatBRL(Number(p.basePrice)),
-  previewUrl: p.images[0]?.url || "/fallback.png",
-  tags,
-};
-  });
+      return {
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        price: formatBRL(Number(p.basePrice)),
+        tags,
+        imageUrl: p.images[0]?.url ?? null,
+        modelUrl: p.has3DModel
+          ? await resolveModelUrl(p.model3D?.fileUrl ?? null)
+          : null,
+      };
+    }),
+  );
 }
 
 export async function getProductDetail(
@@ -144,6 +195,11 @@ export async function getProductDetail(
       variants: { where: { status: "ACTIVE" } },
       model3D: true,
       sizeChart: { include: { measures: { orderBy: { createdAt: "asc" } } } },
+      reviews: {
+        where: { status: "APPROVED" },
+        include: { user: { select: { name: true } } },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
@@ -156,6 +212,12 @@ export async function getProductDetail(
   if (product.has3DModel) tags.push("3D DISPONÍVEL");
   if (product.availableForVirtualTryOn) tags.push("VESTRA FIT");
 
+  const approvedReviews = product.reviews;
+  const reviewAverage =
+    approvedReviews.length > 0
+      ? approvedReviews.reduce((sum, r) => sum + r.rating, 0) / approvedReviews.length
+      : null;
+
   return {
     id: product.id,
     slug: product.slug,
@@ -164,14 +226,42 @@ export async function getProductDetail(
     description: product.description,
     category: product.category.name,
     price: formatBRL(Number(product.basePrice)),
+    priceNumber: Number(product.basePrice),
     promotionalPrice: product.promotionalPrice
       ? formatBRL(Number(product.promotionalPrice))
       : null,
+    promotionalPriceNumber: product.promotionalPrice
+      ? Number(product.promotionalPrice)
+      : null,
     colors,
     sizes,
+    variants: product.variants.map((v) => ({
+      id: v.id,
+      color: v.color,
+      size: v.size,
+      stockQuantity: v.stockQuantity,
+    })),
     tags,
     has3D: product.has3DModel,
-    modelUrl: product.model3D?.fileUrl ?? null,
+    modelUrl: await resolveModelUrl(product.model3D?.fileUrl ?? null),
+    model3DAvailableSizes: product.model3D?.availableSizes ?? [],
+    gender: product.gender,
+    collection: product.collection,
+    composition: product.composition,
+    careInstructions: product.careInstructions,
+    returnPolicy: product.returnPolicy,
+    maxInstallments: product.maxInstallments,
+    reviews: {
+      average: reviewAverage,
+      count: approvedReviews.length,
+      items: approvedReviews.map((r) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        authorName: r.user.name,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    },
     sizeChart: product.sizeChart
       ? {
           name: product.sizeChart.name,
@@ -183,6 +273,10 @@ export async function getProductDetail(
             waistMaxCm: m.waistMaxCm,
             hipMinCm: m.hipMinCm,
             hipMaxCm: m.hipMaxCm,
+            armLengthMinCm: m.armLengthMinCm,
+            armLengthMaxCm: m.armLengthMaxCm,
+            legLengthMinCm: m.legLengthMinCm,
+            legLengthMaxCm: m.legLengthMaxCm,
           })),
         }
       : null,

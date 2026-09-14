@@ -62,6 +62,32 @@ export async function saveMeasurementsAction(
 
   revalidatePath("/perfil/medidas");
   revalidatePath("/perfil");
+  revalidatePath("/teste-3d");
+
+  return { success: true };
+}
+
+/**
+ * Apaga o perfil de medidas do usuário. Como o avatar do VESTRA FIT é
+ * gerado em tempo real a partir dessas medidas (não existe um "avatar"
+ * persistido à parte), remover o perfil já faz o /teste-3d voltar a
+ * mostrar o avatar de referência genérico.
+ */
+export async function deleteMeasurementsAction(
+  _prevState: MeasurementFormState,
+): Promise<MeasurementFormState> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Sessão expirada. Faça login novamente." };
+  }
+
+  await prisma.measurementProfile.deleteMany({
+    where: { userId: session.user.id },
+  });
+
+  revalidatePath("/perfil/medidas");
+  revalidatePath("/perfil");
+  revalidatePath("/teste-3d");
 
   return { success: true };
 }

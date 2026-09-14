@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logoutAction } from "@/lib/auth-actions";
+import { DeleteAccountSection } from "@/components/profile/delete-account-section";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,10 +22,16 @@ export default async function PerfilPage() {
 
   const user = session.user;
 
-  const profile = await prisma.measurementProfile.findUnique({
-    where: { userId: user.id },
-    select: { id: true },
-  });
+  const [profile, ordersCount, addressesCount, paymentMethodsCount] =
+    await Promise.all([
+      prisma.measurementProfile.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      }),
+      prisma.order.count({ where: { userId: user.id } }),
+      prisma.address.count({ where: { userId: user.id } }),
+      prisma.savedPaymentMethod.count({ where: { userId: user.id } }),
+    ]);
   const hasMeasurements = Boolean(profile);
 
   return (
@@ -79,26 +86,67 @@ export default async function PerfilPage() {
           </Card>
         </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Endereços</CardTitle>
-            <CardDescription>Endereços de entrega</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Em breve (Semana 3).
-          </CardContent>
-        </Card>
+        <Link href="/perfil/enderecos" className="block">
+          <Card className="h-full transition-shadow hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Endereços</CardTitle>
+              <CardDescription>Endereços de entrega</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {addressesCount > 0 ? (
+                <span className="font-medium text-foreground">
+                  {addressesCount}{" "}
+                  {addressesCount === 1 ? "endereço cadastrado" : "endereços cadastrados"}
+                  {" "}— clique para gerenciar
+                </span>
+              ) : (
+                <span>Nenhum endereço cadastrado — clique para adicionar</span>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pedidos</CardTitle>
-            <CardDescription>Histórico de compras</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Em breve (Semana 3).
-          </CardContent>
-        </Card>
+        <Link href="/perfil/pagamento" className="block">
+          <Card className="h-full transition-shadow hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Formas de pagamento</CardTitle>
+              <CardDescription>Cartões salvos</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {paymentMethodsCount > 0 ? (
+                <span className="font-medium text-foreground">
+                  {paymentMethodsCount}{" "}
+                  {paymentMethodsCount === 1 ? "cartão salvo" : "cartões salvos"}
+                  {" "}— clique para gerenciar
+                </span>
+              ) : (
+                <span>Nenhum cartão salvo — clique para adicionar</span>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/perfil/pedidos" className="block">
+          <Card className="h-full transition-shadow hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Pedidos</CardTitle>
+              <CardDescription>Histórico de compras</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {ordersCount > 0 ? (
+                <span className="font-medium text-foreground">
+                  {ordersCount}{" "}
+                  {ordersCount === 1 ? "pedido" : "pedidos"} — ver todos →
+                </span>
+              ) : (
+                <span>Nenhum pedido ainda.</span>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
       </div>
+
+      {user.email && <DeleteAccountSection userEmail={user.email} />}
     </section>
   );
 }
