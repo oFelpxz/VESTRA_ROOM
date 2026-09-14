@@ -54,6 +54,7 @@ const products: SeedProduct[] = [
     colors: ["Preto", "Off-white"],
     sizes: ["P", "M", "G", "GG"],
     has3D: true,
+    modelUrl: "/models/boxy_tee_01.glb",
     gender: "UNISSEX",
     collection: "Verão 26",
     material: "Algodão",
@@ -83,6 +84,7 @@ const products: SeedProduct[] = [
     colors: ["Preto", "Cinza", "Branco"],
     sizes: ["P", "M", "G", "GG"],
     has3D: true,
+    modelUrl: "/models/hoodie_core.glb",
     description:
       "Moletom com capuz em algodão pesado, caimento boxy e bolso canguru duplo. Peça-âncora do provador VESTRA FIT — vista no seu avatar em 3D antes de comprar.",
     gender: "UNISSEX",
@@ -323,7 +325,10 @@ async function main() {
 
     // Modelo 3D + tabela de medidas para os produtos com 3D
     if (p.has3D) {
-      const modelUrl = p.modelUrl ?? "/models/hoodie_black.glb";
+      if (!p.modelUrl) {
+        throw new Error(`Produto "${p.name}" tem has3D mas nenhum modelUrl definido.`);
+      }
+      const modelUrl = p.modelUrl;
 
       await prisma.model3D.upsert({
         where: { productId: product.id },
