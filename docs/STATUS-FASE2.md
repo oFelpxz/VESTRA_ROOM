@@ -10,14 +10,24 @@
 
 ## Onde estamos agora
 
-- **Branch de trabalho: `Felipe`** (não é o `main` — o `main` no GitHub está
-  parado desde maio, ninguém deve clonar por ele).
-- Sprint 1 e Sprint 2 **completas e mergeadas** no `Felipe` local, mais o
-  avatar 3D real (item 3D-05, adiantado da Sprint 4).
-- **`origin/Felipe` ainda não recebeu o push** — o ambiente onde essas sessões
-  rodam não tem credencial de escrita no GitHub. Antes de continuar, rodar:
+- **`main` e `Felipe` estão sincronizados** (mesmo commit) — `main` estava
+  parado desde maio, foi mergeado com `Felipe` em 2026-09-14. Os dois branches
+  têm Sprint 1 + Sprint 2 + avatar 3D real completos.
+- Merge teve 3 conflitos reais (arquivos que `main` nunca tinha atualizado):
+  `next.config.ts` foi **combinado** (mantém `remotePatterns` do `main` +
+  `serverExternalPackages` do `Felipe`, os dois eram necessários);
+  `products.ts` e `product-card.tsx` ficaram com a versão do `Felipe` (o
+  `main` tinha a UI antiga, pré-redesign).
+- O merge expôs um bug: `public/models/hoodie_black.glb` mudou de lugar
+  (virou `others/moletompreto.glb`), quebrando o fallback que "Boxy Tee 01" e
+  "Hoodie Core" usavam no seed. **Corrigido** — os dois agora apontam pro
+  próprio `.glb` que já existia (`boxy_tee_01.glb`, `hoodie_core.glb`), seed
+  rodado de novo, verificado no navegador.
+- **Ainda não recebeu `git push`** — o ambiente onde essas sessões rodam não
+  tem credencial de escrita no GitHub. Antes de continuar noutra máquina/chat,
+  rodar (local, com os dois branches já sincronizados):
   ```bash
-  git push origin Felipe
+  git push origin main Felipe
   ```
   (pede login do GitHub — só o usuário consegue fazer isso).
 - Servidor local: `npm run dev` → http://localhost:3000. Precisa do `.env`
@@ -191,11 +201,13 @@ consolidado aqui pra sobreviver à troca de chat. 32 itens, 6 categorias.
 
 1. **Onda 1 (crítico, solo)**: A1 (avatar no provador) → B1 (reprocessar
    modelos gigantes) → C1 (assinar webhook). Branch já criado:
-   `feat/solo-fixes-wave1`, a partir do `Felipe` consolidado.
+   `feat/solo-fixes-wave1`, sincronizado com `main`/`Felipe` — **nenhum
+   código dessa onda foi escrito ainda**, a sessão foi interrompida antes de
+   começar A1.
 2. Depois: continuar a lista ✅ Solo por categoria ou por severidade — a
    decidir com o usuário.
 3. **Sprint 3 ainda não começou** (11–14, 23, 3D-04) — checkpoint 23/09.
-4. Lembrar de dar `git push origin Felipe` em algum momento (precisa do
+4. Lembrar de dar `git push origin main Felipe` em algum momento (precisa do
    usuário logado).
 
 ## Referências rápidas
