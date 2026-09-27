@@ -71,7 +71,10 @@ export async function addToCartAction(
     };
   }
 
-  const unitPrice = variant.price ?? variant.product.basePrice;
+  // A página do produto exibe o preço promocional quando existe — é ele que
+  // deve ser cobrado. Sem promoção, vale o preço da variação ou o cheio.
+  const unitPrice =
+    variant.product.promotionalPrice ?? variant.price ?? variant.product.basePrice;
 
   await prisma.cartItem.upsert({
     where: {

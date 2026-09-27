@@ -214,7 +214,9 @@ usuário como parâmetro, então ficam em um arquivo comum (`favorites.ts`); a
 
 | Achado | Onde | Situação |
 |---|---|---|
-| **O carrinho ignora o preço promocional.** A página de produto mostra o preço promocional (com o cheio riscado), mas ao adicionar à sacola o preço gravado é `variant.price ?? basePrice` — o promocional nunca é considerado. O cliente vê um preço e é cobrado por outro. | `addToCartAction` em `src/lib/cart-actions.ts` (Sprint 2, item 07) | Não corrigido — aguardando decisão do grupo |
+| **O carrinho ignorava o preço promocional.** A página de produto mostra o preço promocional (com o cheio riscado), mas ao adicionar à sacola o preço gravado era `variant.price ?? basePrice` — o promocional nunca era considerado. O cliente via um preço e era cobrado por outro. | `addToCartAction` em `src/lib/cart-actions.ts` (Sprint 2, item 07) | **Corrigido**, com autorização do grupo. Regra: promocional (se houver) → preço da variação → preço cheio. Princípio: o que o cliente vê é o que ele paga. |
+| O **preço por variação** (cadastrável no admin) nunca é exibido ao cliente — a página mostra só o preço do produto. Sem promoção, uma variação com preço próprio seria cobrada por um valor que o cliente não viu. Nenhum produto usa esse recurso hoje. | Página do produto × `addToCartAction` | Não corrigido — exigiria exibir o preço por variação na página do produto |
+| O preço fica gravado no item do carrinho no momento em que é adicionado. Se uma promoção começar ou acabar depois, o carrinho mantém o preço antigo até o item ser adicionado de novo. | `CartItem.unitPrice` | Não corrigido — comportamento já existente |
 | O filtro de tamanhos do catálogo lista os tamanhos em ordem alfabética ("G, GG, M, P"). Cosmético. | `getFilterOptions` em `src/lib/products.ts` | Não corrigido — a ordem certa já existe em `src/lib/sizes.ts` e pode ser reaproveitada |
 
 ---
