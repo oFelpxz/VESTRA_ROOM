@@ -14,13 +14,14 @@ import { AddressForm } from "@/components/checkout/address-form";
 import { PaymentStep } from "@/components/checkout/payment-step";
 
 type Step = "address" | "review" | "payment";
+const STEPS: readonly string[] = ["address", "review", "payment"];
 
 export const metadata = { title: "Checkout" };
 
 export default async function CheckoutPage({
   searchParams,
 }: {
-  searchParams: Promise<{ step?: string; addressId?: string }>;
+  searchParams: Promise<{ step?: string | string[]; addressId?: string | string[] }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?next=/checkout");
@@ -34,7 +35,12 @@ export default async function CheckoutPage({
   }
 
   const sp = await searchParams;
-  const requestedStep = (sp.step as Step) || "address";
+  // Etapa desconhecida (?step=xyz) ou repetida na URL deixava a área principal
+  // em branco, porque nenhuma etapa batia. Qualquer valor inválido vira "address".
+  const requestedStep: Step =
+    typeof sp.step === "string" && STEPS.includes(sp.step)
+      ? (sp.step as Step)
+      : "address";
 
   // Endereços do usuário — o padrão vem primeiro e é reaproveitado
   // automaticamente quando nenhum endereço foi escolhido explicitamente.
@@ -43,7 +49,9 @@ export default async function CheckoutPage({
     orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
   });
   const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0];
-  const addressId = sp.addressId ?? defaultAddress?.id;
+  const addressId =
+    (typeof sp.addressId === "string" ? sp.addressId : undefined) ??
+    defaultAddress?.id;
 
   // Determina o step efetivo (não permite pular sem endereço)
   let step: Step = requestedStep;

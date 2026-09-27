@@ -317,8 +317,9 @@ precisar preparar nada. Cada um foi testado contra a regra real do sistema:
 |---|---|---|
 | **O carrinho ignorava o preço promocional.** A página de produto mostra o preço promocional (com o cheio riscado), mas ao adicionar à sacola o preço gravado era `variant.price ?? basePrice` — o promocional nunca era considerado. O cliente via um preço e era cobrado por outro. | `addToCartAction` em `src/lib/cart-actions.ts` (Sprint 2, item 07) | **Corrigido**, com autorização do grupo. Regra: promocional (se houver) → preço da variação → preço cheio. Princípio: o que o cliente vê é o que ele paga. |
 | O **preço por variação** (cadastrável no admin) nunca é exibido ao cliente — a página mostra só o preço do produto. Sem promoção, uma variação com preço próprio seria cobrada por um valor que o cliente não viu. Nenhum produto usa esse recurso hoje. | Página do produto × `addToCartAction` | Não corrigido — exigiria exibir o preço por variação na página do produto |
-| **Parâmetro repetido na URL derruba 4 páginas antigas.** O mesmo problema corrigido na Sprint 3 (ex.: `?status=a&status=b` chega como lista, não como texto) existe em páginas anteriores. O catálogo já trata corretamente. | `/perfil/pedidos`, `/admin/pedidos`, `/admin/modelos-3d`, `/admin/produtos` | Não corrigido — fora do escopo. A correção é a mesma do catálogo: `typeof x === "string" ? x : undefined` |
-| **O login ignora a página de origem.** Rotas protegidas mandam para `/login?next=…`, mas depois de entrar o cliente sempre vai para `/perfil`. Afeta o provador e o coração de favoritos para visitante. | `loginAction` em `src/lib/auth-actions.ts` | Não corrigido — fora do escopo. Exige validar o destino para não virar redirecionamento aberto (golpe de phishing) |
+| **Parâmetro repetido na URL derrubava 5 páginas antigas.** O mesmo problema corrigido na Sprint 3 (ex.: `?status=a&status=b` chega como lista, não como texto) existia em páginas anteriores. Em produtos e estoque, a lista ia direto para a consulta do banco. O catálogo já tratava corretamente. | `/perfil/pedidos`, `/admin/pedidos`, `/admin/modelos-3d`, `/admin/produtos`, `/admin/estoque` | **Corrigido**, com autorização do grupo, no mesmo padrão do catálogo. Todas as 10 páginas que leem a URL foram conferidas uma a uma |
+| **Checkout em branco com etapa inválida.** `?step=` nunca era validado: com um valor desconhecido (`?step=xyz`) ou repetido, nenhuma etapa batia e a área principal ficava vazia — sem formulário e sem mensagem. | `/checkout` | **Corrigido**: qualquer etapa inválida vira "endereço" |
+| **O login ignora a página de origem.** Rotas protegidas mandam para `/login?next=…`, mas depois de entrar o cliente sempre vai para `/perfil`. Afeta o provador e o coração de favoritos para visitante. | `loginAction` em `src/lib/auth-actions.ts` | Não corrigido **nesta branch**: a mesma função foi alterada na branch `leonardoquartaroli` (redirecionamento por perfil), e corrigir nas duas daria conflito. Será feito lá, validando o destino para não virar redirecionamento aberto (golpe de phishing) |
 | 4 problemas de lint (2 erros, 2 avisos) | `marquee.tsx`, `tryon-experience.tsx`, `measurement-actions.ts` | Já existiam antes da Sprint 3, em arquivos não alterados. A sprint não adicionou nenhum |
 | O preço fica gravado no item do carrinho no momento em que é adicionado. Se uma promoção começar ou acabar depois, o carrinho mantém o preço antigo até o item ser adicionado de novo. | `CartItem.unitPrice` | Não corrigido — comportamento já existente |
 | O filtro de tamanhos do catálogo lista os tamanhos em ordem alfabética ("G, GG, M, P"). Cosmético. | `getFilterOptions` em `src/lib/products.ts` | Não corrigido — a ordem certa já existe em `src/lib/sizes.ts` e pode ser reaproveitada |
@@ -388,6 +389,21 @@ exportar e a separação entre código de servidor e de navegador.
   usuário alterar dados de outro.
 - Interações entre itens revisadas: frete × cupom, cupom × cliente bloqueado,
   favoritos × preço promocional, estado do carrinho depois do pedido.
+
+## Ambiente: projeto dentro de pasta sincronizada com o iCloud
+
+O projeto está em `~/Desktop`, que está sincronizado com o iCloud Drive. Quando
+um arquivo é reescrito durante a sincronização, o iCloud cria cópias
+duplicadas com sufixo numérico (`routes.d 3.ts`). Isso aconteceu nos arquivos
+temporários do build (`.next/types`) e fez o typecheck acusar erros falsos de
+forma intermitente — o build seguinte os apagou.
+
+Verificado: **nenhuma duplicata no código-fonte, na documentação nem no `.git`**,
+e `git fsck` confirmou o repositório íntegro. O risco real seria uma duplicata
+dentro do `.git`, que pode corromper o histórico. Recomendação: mover o projeto
+para uma pasta fora do iCloud (ex.: `~/Projetos`) — com a ressalva de que hoje o
+iCloud é, na prática, a única cópia de segurança dos commits que ainda não foram
+enviados ao GitHub.
 
 ## Armadilha conhecida
 

@@ -37,11 +37,13 @@ const ACTIVE_DEFAULT = ["PAID", "PREPARING", "SHIPPED"];
 export default async function AdminPedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string | string[]; q?: string | string[] }>;
 }) {
   const sp = await searchParams;
-  const filter = sp.status?.toUpperCase();
-  const q = sp.q?.trim();
+  // Parâmetro repetido na URL (?q=a&q=b) chega como lista — só texto vale.
+  const filter =
+    typeof sp.status === "string" ? sp.status.toUpperCase() : undefined;
+  const q = typeof sp.q === "string" ? sp.q.trim() : undefined;
 
   const whereStatus = filter && filter !== "ALL"
     ? { status: filter as (typeof ALL_STATUSES)[number] }
