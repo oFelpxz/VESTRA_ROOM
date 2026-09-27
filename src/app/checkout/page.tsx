@@ -139,6 +139,7 @@ export default async function CheckoutPage({
               discount={discount}
               couponCode={couponCode}
               shippingAmount={shipping.amount}
+              shippingLabel={shipping.label}
               total={total}
             />
           )}
@@ -272,6 +273,7 @@ function ReviewStepBlock({
   discount,
   couponCode,
   shippingAmount,
+  shippingLabel,
   total,
 }: {
   address: {
@@ -287,6 +289,7 @@ function ReviewStepBlock({
   discount: number;
   couponCode?: string;
   shippingAmount: number;
+  shippingLabel: string;
   total: number;
 }) {
   return (
@@ -333,7 +336,7 @@ function ReviewStepBlock({
             </li>
           )}
           <li className="flex items-baseline justify-between py-3">
-            <span className="text-muted-foreground">Frete</span>
+            <span className="text-muted-foreground">Frete · {shippingLabel}</span>
             <span>
               {shippingAmount === 0 ? "Grátis" : formatBRL(shippingAmount)}
             </span>

@@ -317,6 +317,9 @@ precisar preparar nada. Cada um foi testado contra a regra real do sistema:
 |---|---|---|
 | **O carrinho ignorava o preço promocional.** A página de produto mostra o preço promocional (com o cheio riscado), mas ao adicionar à sacola o preço gravado era `variant.price ?? basePrice` — o promocional nunca era considerado. O cliente via um preço e era cobrado por outro. | `addToCartAction` em `src/lib/cart-actions.ts` (Sprint 2, item 07) | **Corrigido**, com autorização do grupo. Regra: promocional (se houver) → preço da variação → preço cheio. Princípio: o que o cliente vê é o que ele paga. |
 | O **preço por variação** (cadastrável no admin) nunca é exibido ao cliente — a página mostra só o preço do produto. Sem promoção, uma variação com preço próprio seria cobrada por um valor que o cliente não viu. Nenhum produto usa esse recurso hoje. | Página do produto × `addToCartAction` | Não corrigido — exigiria exibir o preço por variação na página do produto |
+| **Parâmetro repetido na URL derruba 4 páginas antigas.** O mesmo problema corrigido na Sprint 3 (ex.: `?status=a&status=b` chega como lista, não como texto) existe em páginas anteriores. O catálogo já trata corretamente. | `/perfil/pedidos`, `/admin/pedidos`, `/admin/modelos-3d`, `/admin/produtos` | Não corrigido — fora do escopo. A correção é a mesma do catálogo: `typeof x === "string" ? x : undefined` |
+| **O login ignora a página de origem.** Rotas protegidas mandam para `/login?next=…`, mas depois de entrar o cliente sempre vai para `/perfil`. Afeta o provador e o coração de favoritos para visitante. | `loginAction` em `src/lib/auth-actions.ts` | Não corrigido — fora do escopo. Exige validar o destino para não virar redirecionamento aberto (golpe de phishing) |
+| 4 problemas de lint (2 erros, 2 avisos) | `marquee.tsx`, `tryon-experience.tsx`, `measurement-actions.ts` | Já existiam antes da Sprint 3, em arquivos não alterados. A sprint não adicionou nenhum |
 | O preço fica gravado no item do carrinho no momento em que é adicionado. Se uma promoção começar ou acabar depois, o carrinho mantém o preço antigo até o item ser adicionado de novo. | `CartItem.unitPrice` | Não corrigido — comportamento já existente |
 | O filtro de tamanhos do catálogo lista os tamanhos em ordem alfabética ("G, GG, M, P"). Cosmético. | `getFilterOptions` em `src/lib/products.ts` | Não corrigido — a ordem certa já existe em `src/lib/sizes.ts` e pode ser reaproveitada |
 
@@ -350,6 +353,8 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 6 | Um componente auxiliar foi exportado de dentro de um arquivo de página. O Next.js não permite isso e o **build de produção quebraria** — o typecheck comum não detecta. Movido para arquivo próprio antes do commit; o build de produção confirmou. | Alta |
 | 6 | **Dados pessoais dependiam de uma barreira só.** O layout do admin só confere se a pessoa é da equipe (qualquer perfil); quem restringia `/admin/clientes` ao Administrador era apenas o middleware. Se ele falhasse ou fosse contornado (já houve falha pública assim no Next.js, CVE-2025-29927), um Operador veria nome, e-mail, telefone e compras de todos os clientes. A documentação do Next.js também avisa que a checagem no layout não roda de novo a cada navegação. Corrigido: as consultas de clientes exigem Administrador por conta própria e falham fechadas. | Alta |
 | 2 e 6 | **Parâmetro repetido na URL derrubava a página.** No Next.js, `?cep=1&cep=2` chega como lista, não como texto, e o código chamava funções de texto nele. Afetava o CEP do carrinho e a busca de clientes. Corrigido aceitando só texto. | Média |
+| 7 | O cupom `LIMITE1` fica esgotado após o primeiro teste e o seed não o recria. Anotado no roteiro como repetir o teste. | Baixa |
+| Geral | Na etapa de revisão do checkout a linha dizia só "Frete", enquanto o resumo ao lado dizia "Frete · Expresso". Unificado. | Baixa |
 
 ---
 
@@ -373,6 +378,16 @@ Além de typecheck, lint e testes da lógica isolada a cada passo, o **build de
 produção** (`next build`) da sprint inteira passou: as 33 rotas compilam. O
 build valida regras que o typecheck não pega, como o que uma página pode
 exportar e a separação entre código de servidor e de navegador.
+
+**Pente fino geral** (depois de todos os itens, olhando a sprint como um todo):
+- O SQL da migration é **idêntico** ao gerado a partir do schema final.
+- Lint do projeto inteiro: **nenhum problema novo** em relação à `main`.
+- Sem resquícios de depuração.
+- **Todas as 8 ações públicas novas** conferem permissão na primeira linha (5
+  pela sessão do cliente, 3 exigindo Administrador), e nenhuma deixa um
+  usuário alterar dados de outro.
+- Interações entre itens revisadas: frete × cupom, cupom × cliente bloqueado,
+  favoritos × preço promocional, estado do carrinho depois do pedido.
 
 ## Armadilha conhecida
 
