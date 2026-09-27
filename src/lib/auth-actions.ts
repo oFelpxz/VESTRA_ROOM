@@ -1,11 +1,13 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { signIn, signOut } from "@/auth";
+import { isStaffRole } from "@/lib/admin-access";
 
 export type AuthFormState = { error?: string };
 
@@ -59,23 +61,22 @@ export async function loginAction(
     return { error: "Preencha e-mail e senha." };
   }
 
-  // Todos vão para /perfil. O acesso ao /admin é feito apenas pelo
-  // item "Admin" do menu, visível só para administradores logados.
   try {
-    await signIn("credentials", {
-      email,
-      password,
-      redirectTo: "/perfil",
-    });
+    await signIn("credentials", { email, password, redirect: false });
   } catch (error) {
     if (error instanceof AuthError) {
       return { error: "E-mail ou senha inválidos." };
     }
-    // Re-lança o redirect do Next (NEXT_REDIRECT) para funcionar.
     throw error;
   }
 
-  return {};
+  // Staff (Admin, Operador de Estoque, Modelador 3D) entra direto no painel;
+  // cliente vai para o perfil.
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { role: true },
+  });
+  redirect(isStaffRole(user?.role) ? "/admin" : "/perfil");
 }
 
 export async function logoutAction() {

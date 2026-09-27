@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/auth-actions";
+import { isStaffRole } from "@/lib/admin-access";
 
 const announce = [
   "Vista antes de comprar",
@@ -21,7 +22,7 @@ const baseMenu = [
 export default async function Home() {
   const session = await auth();
   const isLoggedIn = !!session?.user;
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isStaff = isStaffRole(session?.user?.role);
 
   return (
     <div className="flex h-[100svh] flex-col">
@@ -118,7 +119,7 @@ export default async function Home() {
                   {item.label}
                 </Link>
               ))}
-              {isAdmin && (
+              {isStaff && (
                 <Link
                   href="/admin"
                   className="w-fit text-sm font-semibold uppercase tracking-[0.2em] text-acid transition-opacity hover:opacity-80 md:text-base"
