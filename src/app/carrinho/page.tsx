@@ -1,19 +1,28 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
-import { formatBRL } from "@/lib/format";
+import { formatBRL, formatCep } from "@/lib/format";
+import { normalizePostalCode, quoteShippingOptions } from "@/lib/shipping";
 import { CartItemRow } from "@/components/cart/cart-item-row";
+import { ShippingEstimator } from "@/components/cart/shipping-estimator";
 
 export const metadata = {
   title: "Sacola",
 };
 
-export default async function CarrinhoPage() {
+export default async function CarrinhoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cep?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
   }
+
+  const { cep: cepParam } = await searchParams;
 
   const cart = await getActiveCartWithItems(session.user.id);
   const items = cart?.items ?? [];
@@ -22,6 +31,31 @@ export default async function CarrinhoPage() {
     (sum, i) => sum + Number(i.unitPrice) * i.quantity,
     0,
   );
+  const itemCount = items.reduce((s, i) => s + i.quantity, 0);
+
+  // CEP digitado tem prioridade; sem ele, usa o do endereço padrão.
+  let cepInput = cepParam ?? "";
+  let cepError: string | null = null;
+  if (cepParam === undefined) {
+    const defaultAddress = await prisma.address.findFirst({
+      where: { userId: session.user.id },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+      select: { postalCode: true },
+    });
+    cepInput = defaultAddress ? formatCep(defaultAddress.postalCode) : "";
+  } else if (!normalizePostalCode(cepParam)) {
+    cepError = "CEP inválido. Digite os 8 números.";
+  }
+  const cep = normalizePostalCode(cepInput);
+
+  const shippingOptions = cep
+    ? quoteShippingOptions({ subtotal, itemCount, postalCode: cep })
+    : [];
+  const selectedMethod = cart?.shippingMethod ?? "ECONOMICO";
+  const selectedShipping = shippingOptions.find(
+    (o) => o.method === selectedMethod,
+  );
+  const total = subtotal + (selectedShipping?.amount ?? 0);
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-12 md:px-6">
@@ -102,17 +136,35 @@ export default async function CarrinhoPage() {
                 <span className="text-sm">{formatBRL(subtotal)}</span>
               </div>
               <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-sm text-muted-foreground">Frete</span>
                 <span className="text-sm text-muted-foreground">
-                  Calculado no checkout
+                  Frete
+                  {selectedShipping && ` · ${selectedShipping.label}`}
+                </span>
+                <span
+                  className={`text-sm ${selectedShipping ? "" : "text-muted-foreground"}`}
+                >
+                  {!selectedShipping
+                    ? "Informe o CEP"
+                    : selectedShipping.free
+                      ? "Grátis"
+                      : formatBRL(selectedShipping.amount)}
                 </span>
               </div>
+
+              <ShippingEstimator
+                cepInput={cepInput}
+                cep={cep}
+                error={cepError}
+                options={shippingOptions}
+                selected={selectedMethod}
+              />
+
               <div className="mt-6 flex items-baseline justify-between border-t border-border pt-4">
                 <span className="text-xs font-semibold uppercase tracking-[0.15em]">
-                  Total
+                  {selectedShipping ? "Total" : "Total sem frete"}
                 </span>
                 <span className="text-lg font-semibold">
-                  {formatBRL(subtotal)}
+                  {formatBRL(total)}
                 </span>
               </div>
 

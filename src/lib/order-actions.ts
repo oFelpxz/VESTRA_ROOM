@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { calculateShipping } from "@/lib/shipping";
+import { quoteShippingFor } from "@/lib/shipping";
 
 export type CheckoutState = {
   error?: string;
@@ -93,7 +93,8 @@ export async function createOrderFromCartAction(
     0,
   );
   const itemCount = cart.items.reduce((s, i) => s + i.quantity, 0);
-  const shipping = calculateShipping({
+  // Modalidade vem do carrinho; o preço é sempre recalculado aqui.
+  const shipping = quoteShippingFor(cart.shippingMethod, {
     subtotal,
     itemCount,
     postalCode: address.postalCode,
@@ -108,6 +109,7 @@ export async function createOrderFromCartAction(
         status: "PENDING_PAYMENT",
         totalAmount: total,
         shippingAmount: shipping.amount,
+        shippingMethod: shipping.method,
         discountAmount: 0,
         shippingAddressId: addressId,
         items: {

@@ -14,6 +14,7 @@ export function OrderSummary({
   items,
   subtotal,
   shipping,
+  shippingLabel,
   shippingReason,
   total,
   estimatedDays,
@@ -21,6 +22,8 @@ export function OrderSummary({
   items: Item[];
   subtotal: number;
   shipping: number;
+  /** Nome da modalidade (ex.: "Expresso"). */
+  shippingLabel?: string;
   shippingReason?: string;
   total: number;
   estimatedDays?: number;
@@ -61,7 +64,9 @@ export function OrderSummary({
           <span>{formatBRL(subtotal)}</span>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-muted-foreground">Frete</span>
+          <span className="text-muted-foreground">
+            Frete{shippingLabel && ` · ${shippingLabel}`}
+          </span>
           <span>
             {shipping === 0 ? (
               <span className="font-semibold uppercase tracking-wide text-acid-foreground/0 text-foreground">

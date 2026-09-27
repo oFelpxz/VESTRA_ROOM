@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { parseShippingMethod } from "@/lib/shipping";
 
 export type CartActionState = { error?: string; success?: boolean };
 
@@ -176,6 +177,27 @@ export async function removeFromCartAction(formData: FormData) {
 
   await prisma.cartItem.delete({ where: { id: cartItemId } });
   revalidatePath("/", "layout");
+}
+
+/**
+ * Grava a modalidade de frete escolhida no carrinho ativo (item 14).
+ * Só o nome da modalidade é recebido — o preço é sempre recalculado no servidor.
+ *
+ * formData: shippingMethod.
+ */
+export async function setCartShippingMethodAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  const shippingMethod = parseShippingMethod(
+    String(formData.get("shippingMethod") ?? ""),
+  );
+
+  await prisma.cart.updateMany({
+    where: { userId: session.user.id, status: "ACTIVE" },
+    data: { shippingMethod },
+  });
+  revalidatePath("/carrinho");
 }
 
 /**

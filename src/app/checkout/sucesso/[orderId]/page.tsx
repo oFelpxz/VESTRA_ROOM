@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getOrderById } from "@/lib/order-actions";
 import { formatBRL } from "@/lib/format";
+import { shippingMethodLabel } from "@/lib/shipping";
 import { PaymentStatusPoller } from "@/components/checkout/payment-status-poller";
 
 export const metadata = { title: "Pedido confirmado" };
@@ -64,7 +65,9 @@ export default async function CheckoutSucessoPage({
               </span>
             </li>
             <li className="flex items-baseline justify-between py-3">
-              <span className="text-muted-foreground">Frete</span>
+              <span className="text-muted-foreground">
+                Frete · {shippingMethodLabel(order.shippingMethod)}
+              </span>
               <span>
                 {Number(order.shippingAmount) === 0
                   ? "Grátis"

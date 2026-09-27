@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
-import { calculateShipping } from "@/lib/shipping";
+import { quoteShippingFor } from "@/lib/shipping";
 import { formatBRL, formatCep } from "@/lib/format";
 import { deleteAddressAction } from "@/lib/address-actions";
 import { listMySavedPaymentMethods } from "@/lib/payment-method-actions";
@@ -73,7 +73,7 @@ export default async function CheckoutPage({
     0,
   );
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
-  const shipping = calculateShipping({
+  const shipping = quoteShippingFor(cart?.shippingMethod ?? "ECONOMICO", {
     subtotal,
     itemCount,
     postalCode: selectedAddress?.postalCode,
@@ -136,6 +136,7 @@ export default async function CheckoutPage({
             items={summaryItems}
             subtotal={subtotal}
             shipping={shipping.amount}
+            shippingLabel={shipping.label}
             shippingReason={shipping.reason}
             total={total}
             estimatedDays={shipping.estimatedDays}

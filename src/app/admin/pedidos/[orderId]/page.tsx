@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrderById } from "@/lib/order-actions";
 import { formatBRL, formatCep } from "@/lib/format";
+import { shippingMethodLabel } from "@/lib/shipping";
 import { OrderTimeline } from "@/components/profile/order-timeline";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
 
@@ -172,7 +173,9 @@ export default async function AdminPedidoDetalhePage({
                 <span>{formatBRL(subtotal)}</span>
               </li>
               <li className="flex items-baseline justify-between py-3">
-                <span className="text-muted-foreground">Frete</span>
+                <span className="text-muted-foreground">
+                  Frete · {shippingMethodLabel(order.shippingMethod)}
+                </span>
                 <span>
                   {Number(order.shippingAmount) === 0
                     ? "Grátis"
