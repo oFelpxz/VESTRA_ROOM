@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { use, useActionState } from "react";
 import Link from "next/link";
 import { loginAction, type AuthFormState } from "@/lib/auth-actions";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,27 @@ import { Label } from "@/components/ui/label";
 
 const initialState: AuthFormState = {};
 
-export default function LoginPage() {
+type SearchParams = {
+  next?: string | string[];
+  callbackUrl?: string | string[];
+};
+
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
   const [state, formAction, pending] = useActionState(
     loginAction,
     initialState,
   );
+  // Destino pós-login: `next` (páginas do projeto) ou `callbackUrl` (middleware
+  // do NextAuth). O servidor valida que é do próprio site antes de redirecionar.
+  const sp = use(searchParams);
+  const next =
+    (typeof sp.next === "string" ? sp.next : undefined) ??
+    (typeof sp.callbackUrl === "string" ? sp.callbackUrl : undefined) ??
+    "";
 
   return (
     <section className="mx-auto flex min-h-[calc(100vh-12rem)] max-w-md items-center px-4 py-12">
@@ -29,6 +45,7 @@ export default function LoginPage() {
         </p>
 
         <form action={formAction} className="mt-8 flex flex-col gap-4">
+          <input type="hidden" name="next" value={next} />
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">E-mail</Label>
             <Input

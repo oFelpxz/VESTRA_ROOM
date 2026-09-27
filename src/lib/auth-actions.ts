@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import bcrypt from "bcryptjs";
@@ -8,8 +9,21 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { signIn, signOut } from "@/auth";
 import { isStaffRole } from "@/lib/admin-access";
+import { resolveSafePath } from "@/lib/safe-redirect";
 
 export type AuthFormState = { error?: string };
+
+/**
+ * Destino pós-login vindo da URL: `?next=/checkout` das páginas do projeto ou
+ * `?callbackUrl=http://…` do middleware do NextAuth. Validado para só aceitar
+ * endereço do próprio site (ver resolveSafePath).
+ */
+async function safeRedirectPath(raw: FormDataEntryValue | null) {
+  const requestHeaders = await headers();
+  const host =
+    requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "";
+  return resolveSafePath(raw, host);
+}
 
 export async function registerAction(
   _prevState: AuthFormState,
@@ -70,8 +84,12 @@ export async function loginAction(
     throw error;
   }
 
-  // Staff (Admin, Operador de Estoque, Modelador 3D) entra direto no painel;
-  // cliente vai para o perfil.
+  // Quem veio de uma página do site volta para ela. Sem origem: staff (Admin,
+  // Operador de Estoque, Modelador 3D) entra direto no painel; cliente vai
+  // para o perfil.
+  const next = await safeRedirectPath(formData.get("next"));
+  if (next) redirect(next);
+
   const user = await prisma.user.findUnique({
     where: { email },
     select: { role: true },
