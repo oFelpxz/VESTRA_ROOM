@@ -9,6 +9,8 @@ import { ProductPurchase } from "@/components/product/product-purchase";
 import { ReviewForm } from "@/components/product/review-form";
 import { getProductDetail, GENDER_LABEL } from "@/lib/products";
 import { getReviewEligibility } from "@/lib/review-actions";
+import { isProductFavorite } from "@/lib/favorites";
+import { FavoriteButton } from "@/components/product/favorite-button";
 import { formatBRL } from "@/lib/format";
 
 export async function generateMetadata({
@@ -51,7 +53,12 @@ export default async function ProdutoPage({
   }
 
   const isLoggedIn = !!session?.user;
-  const eligibility = await getReviewEligibility(product.id);
+  const [eligibility, isFavorite] = await Promise.all([
+    getReviewEligibility(product.id),
+    session?.user?.id
+      ? isProductFavorite(session.user.id, product.id)
+      : Promise.resolve(false),
+  ]);
 
   const installments = product.maxInstallments && product.maxInstallments > 1
     ? {
@@ -97,9 +104,18 @@ export default async function ProdutoPage({
 
         {/* Detalhes */}
         <div className="flex flex-col">
-          <p className="text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">
-            {product.brand ?? "VESTRA ROOM"} · {product.category}
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">
+              {product.brand ?? "VESTRA ROOM"} · {product.category}
+            </p>
+            <FavoriteButton
+              productId={product.id}
+              isFavorite={isFavorite}
+              isLoggedIn={isLoggedIn}
+              withLabel
+              className="text-foreground/70 hover:text-foreground aria-pressed:text-foreground"
+            />
+          </div>
           <h1 className="font-heading mt-3 text-4xl font-bold uppercase tracking-tight md:text-5xl">
             {product.name}
           </h1>

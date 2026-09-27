@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShoppingBag, User, LogOut } from "lucide-react";
+import { Heart, ShoppingBag, User, LogOut } from "lucide-react";
 import { logoutAction } from "@/lib/auth-actions";
 import { MobileMenu } from "@/components/layout/mobile-menu";
 import { Logo } from "@/components/layout/logo";
@@ -68,6 +68,15 @@ export function HeaderClient({
         </nav>
 
         <div className="flex items-center gap-4">
+          {isLoggedIn && (
+            <Link
+              href="/favoritos"
+              aria-label="Favoritos"
+              className="hidden text-foreground/80 transition-colors hover:text-foreground md:block"
+            >
+              <Heart className="size-5" strokeWidth={1.5} />
+            </Link>
+          )}
           <Link
             href={isLoggedIn ? "/perfil" : "/login"}
             aria-label={isLoggedIn ? "Perfil" : "Entrar"}
