@@ -39,6 +39,19 @@ export async function createOrderFromCartAction(
   }
   const userId = session.user.id;
 
+  // A sessão (JWT) vale por até 30 dias e não sabe de bloqueio feito depois do
+  // login; por isso a compra confere o status direto no banco (item 23).
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { status: true },
+  });
+  if (account?.status !== "ACTIVE") {
+    return {
+      error:
+        "Não é possível finalizar compras com esta conta. Entre em contato com a loja.",
+    };
+  }
+
   const addressId = str(formData.get("addressId"));
   const paymentMethod = str(formData.get("paymentMethod")).toUpperCase();
   if (!addressId) return { error: "Selecione um endereço." };

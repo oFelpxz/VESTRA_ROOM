@@ -17,14 +17,16 @@ export const metadata = {
 export default async function CarrinhoPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cep?: string }>;
+  searchParams: Promise<{ cep?: string | string[] }>;
 }) {
   const session = await auth();
   if (!session?.user) {
     redirect("/login");
   }
 
-  const { cep: cepParam } = await searchParams;
+  // Parâmetro repetido na URL (?cep=1&cep=2) chega como lista — só texto vale.
+  const { cep: rawCep } = await searchParams;
+  const cepParam = typeof rawCep === "string" ? rawCep : undefined;
 
   const cart = await getActiveCartWithItems(session.user.id);
   const items = cart?.items ?? [];

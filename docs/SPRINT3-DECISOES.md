@@ -17,7 +17,7 @@
 | 12 | Gerenciar cupons | Código pronto · teste no navegador pendente |
 | 13 | Aplicar cupom no carrinho | Código pronto · teste no navegador pendente |
 | 11 | Favoritos | Código pronto · teste no navegador pendente |
-| 23 | Gestão de clientes | A fazer |
+| 23 | Gestão de clientes | Código pronto · teste no navegador pendente |
 
 ---
 
@@ -210,6 +210,66 @@ usuário como parâmetro, então ficam em um arquivo comum (`favorites.ts`); a
 
 ---
 
+## Item 23 — Gestão de clientes
+
+- `/admin/clientes`: lista com **busca por nome ou e-mail**, telefone, data de
+  cadastro, número de pedidos, total gasto e situação (Ativo / Bloqueado).
+- `/admin/clientes/[id]`: dados de contato, total gasto, histórico de compras
+  (cada pedido com link para o detalhe já existente) e botão Bloquear /
+  Desbloquear.
+- **Só Administrador.** O cronograma determina que Operador de Estoque e
+  Modelador 3D não acessam clientes; a permissão está na matriz única de acesso.
+
+**Privacidade — regra do escopo: sem exposição das medidas corporais.** As
+consultas usam seleção explícita de campos, então as medidas **nunca são
+carregadas do banco** nessas telas — não é só deixar de exibi-las.
+
+**Decisão: minimização de dados.** "Dados de contato" = e-mail e telefone. Os
+endereços não aparecem na tela do cliente; o endereço de cada entrega continua
+visível no detalhe do pedido, onde é necessário.
+
+**Decisão: quem aparece.** Só contas de cliente. Contas **excluídas pelo próprio
+cliente** (anonimizadas como "Usuário removido") ficam de fora. Staff não
+aparece.
+
+**Decisão: "total gasto"** soma o valor pago (com frete, já descontado o cupom)
+dos pedidos efetivados — Pago, Preparando, Enviado e Entregue. Pedidos
+aguardando pagamento, cancelados ou reembolsados não contam. É o mesmo critério
+de "compra efetivada" usado nas avaliações (Sprint 2).
+
+**Travas do bloqueio** (conferidas no servidor, numa única operação):
+- só bloqueia **clientes** — nunca outro admin, e o admin não bloqueia a si mesmo;
+- só alterna **Ativo ↔ Bloqueado** — uma conta excluída nunca é reativada por
+  engano.
+
+### Decisão: o que o bloqueio faz com quem já está logado
+
+A sessão de login (JWT) fica guardada no navegador por até 30 dias, e o sistema
+não consulta o banco a cada página. As duas opções consideradas:
+
+| | Opção A — **escolhida** | Opção B — descartada |
+|---|---|---|
+| Login novo | Barrado na hora | Barrado na hora |
+| Finalizar pedido | **Barrado na hora** (a criação do pedido confere o status no banco) | Barrado na hora |
+| Sessão já aberta | Continua navegando até expirar | **Derrubada** em poucos minutos |
+| Como | Uma checagem na criação do pedido | Reconferir o status no banco periodicamente dentro do sistema de login e deslogar o bloqueado |
+| Custo / risco | Mínimo | Mexe no sistema de login de todo o site, a parte mais delicada do projeto |
+
+**Por que A:** fecha o que importa — **o cliente bloqueado não compra** — com uma
+mudança pequena e isolada. A Opção B fica registrada como evolução futura.
+
+**Decisão: mensagem de login genérica para bloqueado.** Quem tenta entrar numa
+conta bloqueada vê "E-mail ou senha inválidos", a mesma mensagem de senha
+errada. Uma mensagem "conta bloqueada" confirmaria para qualquer pessoa que
+aquele e-mail está cadastrado. Na tentativa de compra (já logado), a mensagem é
+"Não é possível finalizar compras com esta conta. Entre em contato com a loja."
+
+**Fora do escopo:** paginação da lista (poucos clientes; já listada como
+melhoria futura) e confirmação antes de bloquear (a ação é reversível pelo
+botão Desbloquear).
+
+---
+
 ## Achados fora do escopo da Sprint 3
 
 | Achado | Onde | Situação |
@@ -246,6 +306,9 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 4 | A mensagem de falha de último instante dizia sempre "esgotou", mas também dispara se o cupom expirar ou for desativado no mesmo instante. | Baixa |
 | 2 | Nome da pasta da migration não citava o frete; renomeado antes de aplicar (depois de aplicado, o nome fica gravado no banco). | Baixa |
 | 5 | O seletor do atalho de favoritos ordenava tamanhos em ordem alfabética ("G, GG, M, P"). Criada uma ordem de vestuário (PP, P, M, G, GG…, depois numéricos em ordem crescente), em `src/lib/sizes.ts`. | Baixa |
+| 6 | Um componente auxiliar foi exportado de dentro de um arquivo de página. O Next.js não permite isso e o **build de produção quebraria** — o typecheck comum não detecta. Movido para arquivo próprio antes do commit; o build de produção confirmou. | Alta |
+| 6 | **Dados pessoais dependiam de uma barreira só.** O layout do admin só confere se a pessoa é da equipe (qualquer perfil); quem restringia `/admin/clientes` ao Administrador era apenas o middleware. Se ele falhasse ou fosse contornado (já houve falha pública assim no Next.js, CVE-2025-29927), um Operador veria nome, e-mail, telefone e compras de todos os clientes. A documentação do Next.js também avisa que a checagem no layout não roda de novo a cada navegação. Corrigido: as consultas de clientes exigem Administrador por conta própria e falham fechadas. | Alta |
+| 2 e 6 | **Parâmetro repetido na URL derrubava a página.** No Next.js, `?cep=1&cep=2` chega como lista, não como texto, e o código chamava funções de texto nele. Afetava o CEP do carrinho e a busca de clientes. Corrigido aceitando só texto. | Média |
 
 ---
 
@@ -258,6 +321,15 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 5. **Aplicar cupom:** cada mensagem de erro; desconto percentual e fixo; remover itens até ficar abaixo do mínimo.
 6. **Limite de usos:** cupom com limite 1, dois pedidos — o segundo deve ser recusado. Confirma também o SQL da comparação entre colunas (`usedCount < usageLimit`), que só pode ser verificado no banco real.
 7. **Favoritos:** favoritar pelo catálogo e pela página do produto; visitante vai ao login; coração não abre o produto; adicionar à sacola pelo atalho; produto sem estoque mostra "Esgotado"; desfavoritar pela lista.
+8. **Preço promocional:** cadastrar um promocional num produto, adicionar à sacola e conferir que o carrinho cobra o promocional.
+9. **Clientes:** buscar por nome e por e-mail; conferir que Operador e Modelador não acessam; bloquear o cliente de teste → login recusado; com uma sessão já aberta, tentar finalizar pedido → recusado; desbloquear → volta a comprar.
+
+## Validação sem banco
+
+Além de typecheck, lint e testes da lógica isolada a cada passo, o **build de
+produção** (`next build`) da sprint inteira passou: as 33 rotas compilam. O
+build valida regras que o typecheck não pega, como o que uma página pode
+exportar e a separação entre código de servidor e de navegador.
 
 ## Armadilha conhecida
 
