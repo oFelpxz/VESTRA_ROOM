@@ -33,7 +33,10 @@ export default async function PedidoDetalhePage({
   const order = await getOrderById(orderId);
   if (!order) notFound();
 
-  const subtotal = Number(order.totalAmount) - Number(order.shippingAmount);
+  const subtotal =
+    Number(order.totalAmount) -
+    Number(order.shippingAmount) +
+    Number(order.discountAmount);
   const canCancel = ["PENDING_PAYMENT", "PAID"].includes(order.status);
 
   return (
@@ -145,7 +148,9 @@ export default async function PedidoDetalhePage({
             </li>
             {Number(order.discountAmount) > 0 && (
               <li className="flex items-baseline justify-between py-3">
-                <span className="text-muted-foreground">Desconto</span>
+                <span className="text-muted-foreground">
+                  Desconto{order.coupon && ` · ${order.coupon.code}`}
+                </span>
                 <span>− {formatBRL(Number(order.discountAmount))}</span>
               </li>
             )}

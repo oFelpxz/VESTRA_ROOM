@@ -13,6 +13,8 @@ type Item = {
 export function OrderSummary({
   items,
   subtotal,
+  discount = 0,
+  couponCode,
   shipping,
   shippingLabel,
   shippingReason,
@@ -21,6 +23,8 @@ export function OrderSummary({
 }: {
   items: Item[];
   subtotal: number;
+  discount?: number;
+  couponCode?: string;
   shipping: number;
   /** Nome da modalidade (ex.: "Expresso"). */
   shippingLabel?: string;
@@ -63,6 +67,14 @@ export function OrderSummary({
           <span className="text-muted-foreground">Subtotal</span>
           <span>{formatBRL(subtotal)}</span>
         </div>
+        {discount > 0 && (
+          <div className="flex items-baseline justify-between">
+            <span className="text-muted-foreground">
+              Desconto{couponCode && ` · ${couponCode}`}
+            </span>
+            <span>− {formatBRL(discount)}</span>
+          </div>
+        )}
         <div className="flex items-baseline justify-between">
           <span className="text-muted-foreground">
             Frete{shippingLabel && ` · ${shippingLabel}`}

@@ -125,6 +125,86 @@ export function parseCouponForm(
   };
 }
 
+type DecimalLike = number | string | { toString(): string };
+
+/** Converte o cupom do Prisma (Decimal) para a forma usada nas regras. */
+export function toCouponLike(c: {
+  type: CouponType;
+  value: DecimalLike;
+  minOrderAmount: DecimalLike | null;
+  expiresAt: Date | null;
+  usageLimit: number | null;
+  usedCount: number;
+  active: boolean;
+}): CouponLike {
+  return {
+    type: c.type,
+    value: Number(c.value),
+    minOrderAmount: c.minOrderAmount === null ? null : Number(c.minOrderAmount),
+    expiresAt: c.expiresAt,
+    usageLimit: c.usageLimit,
+    usedCount: c.usedCount,
+    active: c.active,
+  };
+}
+
+const roundCents = (n: number) => Math.round(n * 100) / 100;
+
+/** Desconto sobre o valor dos produtos (nunca sobre o frete), nunca maior que ele. */
+export function computeDiscount(
+  coupon: Pick<CouponLike, "type" | "value">,
+  subtotal: number,
+): number {
+  const raw =
+    coupon.type === "PERCENT" ? (subtotal * coupon.value) / 100 : coupon.value;
+  return roundCents(Math.min(Math.max(raw, 0), subtotal));
+}
+
+export type CouponEvaluation =
+  | { ok: true; discount: number }
+  | {
+      ok: false;
+      reason: "INVALID" | "EXPIRED" | "EXHAUSTED" | "MIN_ORDER";
+      message: string;
+    };
+
+/**
+ * Este cupom vale para um carrinho com este subtotal? Fonte única para
+ * carrinho, checkout e criação do pedido. Cupom desativado aparece como
+ * "inválido" de propósito — não revela ao cliente que o código já existiu.
+ */
+export function evaluateCoupon(
+  coupon: CouponLike | null,
+  subtotal: number,
+  now: Date = new Date(),
+): CouponEvaluation {
+  if (!coupon) return { ok: false, reason: "INVALID", message: "Cupom inválido." };
+
+  // Soma de preços em ponto flutuante pode ficar um fio abaixo do valor exato
+  // (0.7 + 0.1 = 0.7999…) e recusar um carrinho que bate o mínimo.
+  subtotal = roundCents(subtotal);
+
+  switch (couponStatus(coupon, now)) {
+    case "DISABLED":
+      return { ok: false, reason: "INVALID", message: "Cupom inválido." };
+    case "EXPIRED":
+      return { ok: false, reason: "EXPIRED", message: "Este cupom expirou." };
+    case "EXHAUSTED":
+      return { ok: false, reason: "EXHAUSTED", message: "Este cupom esgotou." };
+  }
+
+  if (coupon.minOrderAmount !== null && subtotal < coupon.minOrderAmount) {
+    const missing = roundCents(coupon.minOrderAmount - subtotal);
+    return {
+      ok: false,
+      reason: "MIN_ORDER",
+      message: `Faltam ${formatBRL(missing)} para usar este cupom (pedido mínimo ${formatBRL(coupon.minOrderAmount)}).`,
+    };
+  }
+
+  return { ok: true, discount: computeDiscount(coupon, subtotal) };
+}
+
 export function couponStatus(coupon: CouponLike, now: Date = new Date()): CouponStatus {
   if (!coupon.active) return "DISABLED";
   if (coupon.expiresAt && coupon.expiresAt < now) return "EXPIRED";

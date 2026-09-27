@@ -42,7 +42,10 @@ export default async function AdminPedidoDetalhePage({
   const order = await getOrderById(orderId);
   if (!order) notFound();
 
-  const subtotal = Number(order.totalAmount) - Number(order.shippingAmount);
+  const subtotal =
+    Number(order.totalAmount) -
+    Number(order.shippingAmount) +
+    Number(order.discountAmount);
 
   return (
     <div className="flex flex-col gap-10">
@@ -182,6 +185,14 @@ export default async function AdminPedidoDetalhePage({
                     : formatBRL(Number(order.shippingAmount))}
                 </span>
               </li>
+              {Number(order.discountAmount) > 0 && (
+                <li className="flex items-baseline justify-between py-3">
+                  <span className="text-muted-foreground">
+                    Desconto{order.coupon && ` · ${order.coupon.code}`}
+                  </span>
+                  <span>− {formatBRL(Number(order.discountAmount))}</span>
+                </li>
+              )}
               <li className="flex items-baseline justify-between py-3">
                 <span className="font-semibold uppercase tracking-wide">
                   Total

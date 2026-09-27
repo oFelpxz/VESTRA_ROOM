@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
 import { quoteShippingFor } from "@/lib/shipping";
+import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { formatBRL, formatCep } from "@/lib/format";
 import { deleteAddressAction } from "@/lib/address-actions";
 import { listMySavedPaymentMethods } from "@/lib/payment-method-actions";
@@ -78,7 +79,16 @@ export default async function CheckoutPage({
     itemCount,
     postalCode: selectedAddress?.postalCode,
   });
-  const total = subtotal + shipping.amount;
+
+  const couponEvaluation = cart?.coupon
+    ? evaluateCoupon(toCouponLike(cart.coupon), subtotal)
+    : null;
+  const discount = couponEvaluation?.ok ? couponEvaluation.discount : 0;
+  const couponCode = cart?.coupon?.code;
+  const couponProblem =
+    couponEvaluation && !couponEvaluation.ok ? couponEvaluation.message : null;
+
+  const total = subtotal - discount + shipping.amount;
 
   const summaryItems = items.map((i) => ({
     id: i.id,
@@ -103,6 +113,16 @@ export default async function CheckoutPage({
         <CheckoutStepper current={step} addressId={addressId} />
       </div>
 
+      {couponProblem && (
+        <div className="mt-6 rounded-sm bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          O cupom <span className="font-mono font-semibold">{couponCode}</span>{" "}
+          não pode ser usado: {couponProblem}{" "}
+          <Link href="/carrinho" className="font-semibold underline">
+            Voltar à sacola
+          </Link>
+        </div>
+      )}
+
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_360px]">
         <div>
           {step === "address" && (
@@ -116,6 +136,8 @@ export default async function CheckoutPage({
             <ReviewStepBlock
               address={selectedAddress}
               subtotal={subtotal}
+              discount={discount}
+              couponCode={couponCode}
               shippingAmount={shipping.amount}
               total={total}
             />
@@ -135,6 +157,8 @@ export default async function CheckoutPage({
           <OrderSummary
             items={summaryItems}
             subtotal={subtotal}
+            discount={discount}
+            couponCode={couponCode}
             shipping={shipping.amount}
             shippingLabel={shipping.label}
             shippingReason={shipping.reason}
@@ -245,6 +269,8 @@ function AddressStepBlock({
 function ReviewStepBlock({
   address,
   subtotal,
+  discount,
+  couponCode,
   shippingAmount,
   total,
 }: {
@@ -258,6 +284,8 @@ function ReviewStepBlock({
     postalCode: string;
   };
   subtotal: number;
+  discount: number;
+  couponCode?: string;
   shippingAmount: number;
   total: number;
 }) {
@@ -296,6 +324,14 @@ function ReviewStepBlock({
             <span className="text-muted-foreground">Subtotal</span>
             <span>{formatBRL(subtotal)}</span>
           </li>
+          {discount > 0 && (
+            <li className="flex items-baseline justify-between py-3">
+              <span className="text-muted-foreground">
+                Desconto{couponCode && ` · ${couponCode}`}
+              </span>
+              <span>− {formatBRL(discount)}</span>
+            </li>
+          )}
           <li className="flex items-baseline justify-between py-3">
             <span className="text-muted-foreground">Frete</span>
             <span>

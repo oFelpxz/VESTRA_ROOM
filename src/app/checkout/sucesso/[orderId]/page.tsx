@@ -60,7 +60,9 @@ export default async function CheckoutSucessoPage({
               <span className="text-muted-foreground">Subtotal</span>
               <span>
                 {formatBRL(
-                  Number(order.totalAmount) - Number(order.shippingAmount),
+                  Number(order.totalAmount) -
+                    Number(order.shippingAmount) +
+                    Number(order.discountAmount),
                 )}
               </span>
             </li>
@@ -74,6 +76,14 @@ export default async function CheckoutSucessoPage({
                   : formatBRL(Number(order.shippingAmount))}
               </span>
             </li>
+            {Number(order.discountAmount) > 0 && (
+              <li className="flex items-baseline justify-between py-3">
+                <span className="text-muted-foreground">
+                  Desconto{order.coupon && ` · ${order.coupon.code}`}
+                </span>
+                <span>− {formatBRL(Number(order.discountAmount))}</span>
+              </li>
+            )}
             <li className="flex items-baseline justify-between py-3">
               <span className="font-semibold uppercase tracking-wide">
                 Total

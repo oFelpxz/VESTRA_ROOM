@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { quoteShippingFor } from "@/lib/shipping";
+import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
+
+/** Lançado dentro da transação para desfazer tudo quando o cupom deixa de valer no último instante. */
+class CouponUnavailableError extends Error {}
 
 export type CheckoutState = {
   error?: string;
@@ -55,6 +59,7 @@ export async function createOrderFromCartAction(
   const cart = await prisma.cart.findFirst({
     where: { userId, status: "ACTIVE" },
     include: {
+      coupon: true,
       items: {
         include: {
           productVariant: {
@@ -99,63 +104,111 @@ export async function createOrderFromCartAction(
     itemCount,
     postalCode: address.postalCode,
   });
-  const total = subtotal + shipping.amount;
+
+  // Cupom: revalidado aqui. Se deixou de valer, bloqueia em vez de cobrar
+  // sem o desconto que o cliente viu na tela.
+  const now = new Date();
+  let discount = 0;
+  if (cart.coupon) {
+    const evaluation = evaluateCoupon(toCouponLike(cart.coupon), subtotal, now);
+    if (!evaluation.ok) {
+      return {
+        error: `O cupom ${cart.coupon.code} não pode ser usado: ${evaluation.message} Remova-o na sacola para continuar.`,
+      };
+    }
+    discount = evaluation.discount;
+  }
+
+  const total = subtotal - discount + shipping.amount;
 
   // Transação
-  const order = await prisma.$transaction(async (tx) => {
-    const created = await tx.order.create({
-      data: {
-        userId,
-        status: "PENDING_PAYMENT",
-        totalAmount: total,
-        shippingAmount: shipping.amount,
-        shippingMethod: shipping.method,
-        discountAmount: 0,
-        shippingAddressId: addressId,
-        items: {
-          create: cart.items.map((i) => ({
-            productVariantId: i.productVariantId,
-            productName: i.productVariant.product.name,
-            color: i.productVariant.color,
-            size: i.productVariant.size,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            totalPrice: Number(i.unitPrice) * i.quantity,
-          })),
-        },
-        payment: {
-          create: {
-            provider: "SIMULATED",
-            method: paymentMethod as
-              | "PIX"
-              | "CREDIT_CARD"
-              | "DEBIT_CARD"
-              | "BOLETO",
-            status: "PENDING",
-            amount: total,
+  let order;
+  try {
+    order = await prisma.$transaction(async (tx) => {
+      // Reserva um uso do cupom numa única operação: só incrementa se ainda
+      // houver uso disponível. Dois pedidos simultâneos não passam do limite.
+      if (cart.coupon) {
+        const claimed = await tx.coupon.updateMany({
+          where: {
+            id: cart.coupon.id,
+            active: true,
+            AND: [
+              { OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] },
+              {
+                OR: [
+                  { usageLimit: null },
+                  { usedCount: { lt: prisma.coupon.fields.usageLimit } },
+                ],
+              },
+            ],
+          },
+          data: { usedCount: { increment: 1 } },
+        });
+        if (claimed.count === 0) throw new CouponUnavailableError();
+      }
+
+      const created = await tx.order.create({
+        data: {
+          userId,
+          status: "PENDING_PAYMENT",
+          totalAmount: total,
+          shippingAmount: shipping.amount,
+          shippingMethod: shipping.method,
+          discountAmount: discount,
+          couponId: cart.coupon?.id ?? null,
+          shippingAddressId: addressId,
+          items: {
+            create: cart.items.map((i) => ({
+              productVariantId: i.productVariantId,
+              productName: i.productVariant.product.name,
+              color: i.productVariant.color,
+              size: i.productVariant.size,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              totalPrice: Number(i.unitPrice) * i.quantity,
+            })),
+          },
+          payment: {
+            create: {
+              provider: "SIMULATED",
+              method: paymentMethod as
+                | "PIX"
+                | "CREDIT_CARD"
+                | "DEBIT_CARD"
+                | "BOLETO",
+              status: "PENDING",
+              amount: total,
+            },
           },
         },
-      },
-      include: { payment: true },
-    });
-
-    // Decrementa estoque das variantes
-    for (const i of cart.items) {
-      await tx.productVariant.update({
-        where: { id: i.productVariantId },
-        data: { stockQuantity: { decrement: i.quantity } },
+        include: { payment: true },
       });
-    }
 
-    // Marca carrinho como CONVERTED e cria um novo vazio
-    await tx.cart.update({
-      where: { id: cart.id },
-      data: { status: "CONVERTED" },
+      // Decrementa estoque das variantes
+      for (const i of cart.items) {
+        await tx.productVariant.update({
+          where: { id: i.productVariantId },
+          data: { stockQuantity: { decrement: i.quantity } },
+        });
+      }
+
+      // Marca carrinho como CONVERTED e cria um novo vazio
+      await tx.cart.update({
+        where: { id: cart.id },
+        data: { status: "CONVERTED" },
+      });
+      await tx.cart.create({ data: { userId } });
+
+      return created;
     });
-    await tx.cart.create({ data: { userId } });
-
-    return created;
-  });
+  } catch (e) {
+    if (e instanceof CouponUnavailableError) {
+      return {
+        error: `O cupom ${cart.coupon?.code} acabou de ficar indisponível (esgotou, expirou ou foi desativado). Remova-o na sacola para continuar.`,
+      };
+    }
+    throw e;
+  }
 
   // Dispara webhook simulado (não bloqueia a redirect)
   try {
@@ -199,6 +252,7 @@ export async function getOrderById(orderId: string) {
       items: true,
       payment: true,
       shippingAddress: true,
+      coupon: { select: { code: true } },
       user: { select: { id: true, name: true, email: true } },
     },
   });

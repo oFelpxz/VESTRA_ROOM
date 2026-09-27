@@ -5,8 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
 import { formatBRL, formatCep } from "@/lib/format";
 import { normalizePostalCode, quoteShippingOptions } from "@/lib/shipping";
+import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { CartItemRow } from "@/components/cart/cart-item-row";
 import { ShippingEstimator } from "@/components/cart/shipping-estimator";
+import { CouponField } from "@/components/cart/coupon-field";
 
 export const metadata = {
   title: "Sacola",
@@ -55,7 +57,15 @@ export default async function CarrinhoPage({
   const selectedShipping = shippingOptions.find(
     (o) => o.method === selectedMethod,
   );
-  const total = subtotal + (selectedShipping?.amount ?? 0);
+
+  // Cupom aplicado é reavaliado a cada visita: se deixou de valer, fica
+  // listado com o motivo e sem desconto.
+  const couponEvaluation = cart?.coupon
+    ? evaluateCoupon(toCouponLike(cart.coupon), subtotal)
+    : null;
+  const discount = couponEvaluation?.ok ? couponEvaluation.discount : 0;
+
+  const total = subtotal - discount + (selectedShipping?.amount ?? 0);
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-12 md:px-6">
@@ -135,6 +145,14 @@ export default async function CarrinhoPage({
                 <span className="text-sm text-muted-foreground">Subtotal</span>
                 <span className="text-sm">{formatBRL(subtotal)}</span>
               </div>
+              {discount > 0 && cart?.coupon && (
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Desconto · {cart.coupon.code}
+                  </span>
+                  <span className="text-sm">− {formatBRL(discount)}</span>
+                </div>
+              )}
               <div className="mt-2 flex items-baseline justify-between">
                 <span className="text-sm text-muted-foreground">
                   Frete
@@ -157,6 +175,20 @@ export default async function CarrinhoPage({
                 error={cepError}
                 options={shippingOptions}
                 selected={selectedMethod}
+              />
+
+              <CouponField
+                applied={
+                  cart?.coupon
+                    ? {
+                        code: cart.coupon.code,
+                        warning:
+                          couponEvaluation && !couponEvaluation.ok
+                            ? couponEvaluation.message
+                            : null,
+                      }
+                    : null
+                }
               />
 
               <div className="mt-6 flex items-baseline justify-between border-t border-border pt-4">

@@ -3,7 +3,7 @@ import {
   COUPON_STATUS_LABEL,
   couponStatus,
   describeCoupon,
-  type CouponLike,
+  toCouponLike,
   type CouponStatus,
 } from "@/lib/coupons";
 import { deleteCouponAction, setCouponActiveAction } from "@/lib/coupon-actions";
@@ -57,16 +57,7 @@ export default async function AdminCuponsPage() {
           ) : (
             <ul className="mt-4 divide-y divide-border border-y border-border">
               {coupons.map((c) => {
-                const coupon: CouponLike = {
-                  type: c.type,
-                  value: Number(c.value),
-                  minOrderAmount:
-                    c.minOrderAmount === null ? null : Number(c.minOrderAmount),
-                  expiresAt: c.expiresAt,
-                  usageLimit: c.usageLimit,
-                  usedCount: c.usedCount,
-                  active: c.active,
-                };
+                const coupon = toCouponLike(c);
                 const status = couponStatus(coupon, now);
                 const everUsed = c.usedCount > 0 || c._count.orders > 0;
 
