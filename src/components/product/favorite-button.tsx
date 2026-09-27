@@ -11,6 +11,7 @@ export function FavoriteButton({
   isFavorite,
   isLoggedIn,
   withLabel = false,
+  returnTo,
   className = "",
 }: {
   productId: string;
@@ -18,6 +19,8 @@ export function FavoriteButton({
   isLoggedIn: boolean;
   /** Mostra "Favoritar"/"Favoritado" ao lado do ícone (página de produto). */
   withLabel?: boolean;
+  /** Para onde o visitante volta depois de entrar (validado no login). */
+  returnTo?: string;
   className?: string;
 }) {
   const label = isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos";
@@ -39,7 +42,11 @@ export function FavoriteButton({
 
   if (!isLoggedIn) {
     return (
-      <Link href="/login" aria-label="Entre para favoritar" className={baseClass}>
+      <Link
+        href={returnTo ? `/login?next=${encodeURIComponent(returnTo)}` : "/login"}
+        aria-label="Entre para favoritar"
+        className={baseClass}
+      >
         {content}
       </Link>
     );

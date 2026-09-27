@@ -38,6 +38,7 @@ export function ProductCard({
         productId={id}
         isFavorite={isFavorite}
         isLoggedIn={isLoggedIn}
+        returnTo={href}
         className="absolute right-3 top-3 z-10 rounded-full bg-background/85 p-2 text-foreground/70 backdrop-blur hover:text-foreground aria-pressed:text-foreground"
       />
       <Link href={href} className="block">

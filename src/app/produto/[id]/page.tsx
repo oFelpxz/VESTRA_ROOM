@@ -112,6 +112,7 @@ export default async function ProdutoPage({
               productId={product.id}
               isFavorite={isFavorite}
               isLoggedIn={isLoggedIn}
+              returnTo={`/produto/${product.slug}`}
               withLabel
               className="text-foreground/70 hover:text-foreground aria-pressed:text-foreground"
             />
