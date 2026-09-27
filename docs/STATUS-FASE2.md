@@ -89,6 +89,37 @@ e-mail/push — cobre a necessidade prática do MVP.
 
 ---
 
+## Sprint 3 — 09/09 a 23/09 — 🟡 5/5 no código (sem o 3D-04), teste pendente
+
+Sem o item **3D-04**, por decisão do grupo. Branch **`feat/sprint3`**, a partir
+da `main`, **ainda não enviada ao GitHub** (ver abaixo). Desenvolvida com o
+Supabase pausado: tudo validado sem banco (typecheck, lint, testes da lógica
+isolada e build de produção). **Falta aplicar a migration e testar no
+navegador.**
+
+| Item | Entrega | Onde no código |
+|---|---|---|
+| 14 | Frete por CEP no carrinho, modalidades Econômico e Expresso; a escolha vale até o pedido | `src/lib/shipping.ts`, `src/components/cart/shipping-estimator.tsx` |
+| 12 | Gestão de cupons (só Admin) | `/admin/cupons`, `src/lib/coupons.ts`, `src/lib/coupon-actions.ts` |
+| 13 | Aplicar cupom no carrinho, com revalidação e reserva de uso na criação do pedido | `src/components/cart/coupon-field.tsx`, `src/lib/order-actions.ts` |
+| 11 | Favoritos: coração no catálogo e no produto, lista `/favoritos` com atalho para a sacola | `src/lib/favorites.ts`, `src/lib/favorite-actions.ts` |
+| 23 | Gestão de clientes (só Admin), sem expor medidas; bloqueio impede login e compra | `/admin/clientes`, `src/lib/customers.ts` |
+
+Também corrigido: o carrinho ignorava o **preço promocional** (bug do item 07).
+
+Migration: `20260927173052_sprint3_frete_cupons_favoritos_clientes` —
+**só aditiva**, compatível com o código das outras branches. Aplicar **só com
+`npx prisma migrate deploy`**, nunca `migrate dev`.
+
+**Todas as decisões, achados das revisões e o roteiro de testes:
+[`SPRINT3-DECISOES.md`](SPRINT3-DECISOES.md).**
+
+> ⚠️ **Não rodar `npm run db:seed` no banco compartilhado.** O seed completo
+> sobrescreve estoque, preços e modelos 3D alterados pelo admin. Para os cupons
+> de exemplo, use `npm run db:seed:sprint3`, que só cria o que falta.
+
+---
+
 ## Bônus — Avatar 3D real (item 3D-05, adiantado da Sprint 4)
 
 Corpo humano de verdade substituindo o avatar de primitivas (cápsulas/esferas).

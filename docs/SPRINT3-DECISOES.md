@@ -270,6 +270,47 @@ botão Desbloquear).
 
 ---
 
+## Seed (dados de exemplo)
+
+**Decisão: um seed separado, só da Sprint 3** (`npm run db:seed:sprint3`).
+Ao analisar o seed completo, vimos que ele não apaga nada, mas **sobrescreve**:
+o estoque de todas as variações volta para 10, nome/preço/status dos produtos
+voltam ao original, e **os modelos 3D voltam ao arquivo original, desfazendo
+uploads do Modelador**. Rodá-lo de novo no banco compartilhado destruiria o
+trabalho do grupo. O seed da Sprint 3 só **cria** os cupons que ainda não
+existem e não toca em mais nada — nem nos contadores de uso de testes
+anteriores.
+
+O seed completo também passou a criar os cupons, para quem montar um banco
+novo do zero. Os dados ficam num arquivo só (`prisma/seed-data/coupons.ts`),
+compartilhado pelos dois.
+
+**Cupons de exemplo** — os "DEMO…" demonstram cada mensagem de erro sem
+precisar preparar nada. Cada um foi testado contra a regra real do sistema:
+
+| Código | Regra | Demonstra |
+|---|---|---|
+| `BEMVINDO10` | 10%, sem mínimo | Uso normal |
+| `VESTRA20` | R$ 20, mínimo R$ 150, até 100 usos | "Faltam R$ X para usar este cupom" |
+| `DEMOEXPIRADO` | 15%, venceu em 31/01/2026 | "Este cupom expirou." |
+| `DEMOESGOTADO` | 10%, limite de 1 uso já atingido | "Este cupom esgotou." |
+| `DEMODESATIVADO` | 10%, desativado | "Cupom inválido." |
+| `LIMITE1` | 5%, limite de 1 uso | Limite com compras simultâneas |
+
+---
+
+## Versionamento
+
+- Um commit por item, cada um feito **depois** de uma revisão linha a linha.
+  O bug do preço promocional ficou num commit separado, para poder ser desfeito
+  sozinho se o grupo discordar da regra.
+- **Decisão: a branch não foi enviada ao GitHub ainda.** Enviar protegeria o
+  trabalho contra perda do computador, mas o grupo preferiu esperar: com a
+  migration no GitHub, alguém poderia aplicá-la no banco compartilhado antes da
+  hora, mesmo com aviso. O envio fica para depois dos testes com o banco.
+
+---
+
 ## Achados fora do escopo da Sprint 3
 
 | Achado | Onde | Situação |
@@ -315,14 +356,16 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 ## Roteiro de testes (quando o banco voltar)
 
 1. `npx prisma migrate status` → confirmar que só a migration da Sprint 3 está pendente.
-2. `npx prisma migrate deploy`.
-3. **Frete:** um pedido Econômico e um Expresso; conferir valor e modalidade gravados no admin.
-4. **Cupons (admin):** criar percentual e fixo; tentar código duplicado; desativar e reativar; tentar remover cupom usado.
-5. **Aplicar cupom:** cada mensagem de erro; desconto percentual e fixo; remover itens até ficar abaixo do mínimo.
-6. **Limite de usos:** cupom com limite 1, dois pedidos — o segundo deve ser recusado. Confirma também o SQL da comparação entre colunas (`usedCount < usageLimit`), que só pode ser verificado no banco real.
-7. **Favoritos:** favoritar pelo catálogo e pela página do produto; visitante vai ao login; coração não abre o produto; adicionar à sacola pelo atalho; produto sem estoque mostra "Esgotado"; desfavoritar pela lista.
-8. **Preço promocional:** cadastrar um promocional num produto, adicionar à sacola e conferir que o carrinho cobra o promocional.
-9. **Clientes:** buscar por nome e por e-mail; conferir que Operador e Modelador não acessam; bloquear o cliente de teste → login recusado; com uma sessão já aberta, tentar finalizar pedido → recusado; desbloquear → volta a comprar.
+2. `npx prisma migrate deploy`, depois `npx prisma migrate status` de novo → "up to date".
+3. `npm run db:seed:sprint3` → cria os cupons de exemplo. **Nunca** `npm run db:seed` nesse banco.
+4. **Frete:** um pedido Econômico e um Expresso; conferir valor e modalidade gravados no admin.
+5. **Cupons (admin):** criar percentual e fixo; tentar código duplicado; desativar e reativar; tentar remover cupom usado.
+6. **Aplicar cupom:** `DEMOEXPIRADO`, `DEMOESGOTADO`, `DEMODESATIVADO` e `VESTRA20` com carrinho abaixo de R$ 150 mostram cada mensagem de erro; `BEMVINDO10` (percentual) e `VESTRA20` (fixo) aplicam desconto; remover itens até ficar abaixo do mínimo.
+7. **Limite de usos:** `LIMITE1` em dois pedidos — o segundo deve ser recusado. Confirma também o SQL da comparação entre colunas (`usedCount < usageLimit`), que só pode ser verificado no banco real. O `LIMITE1` fica esgotado depois disso e o seed não o recria; para repetir o teste, crie outro cupom com limite 1 pelo admin.
+8. **Favoritos:** favoritar pelo catálogo e pela página do produto; visitante vai ao login; coração não abre o produto; adicionar à sacola pelo atalho; produto sem estoque mostra "Esgotado"; desfavoritar pela lista.
+9. **Preço promocional:** cadastrar um promocional num produto, adicionar à sacola e conferir que o carrinho cobra o promocional.
+10. **Clientes:** buscar por nome e por e-mail; conferir que Operador e Modelador não acessam; bloquear o cliente de teste → login recusado; com uma sessão já aberta, tentar finalizar pedido → recusado; desbloquear → volta a comprar.
+11. **Enviar a branch ao GitHub** (`git push -u origin feat/sprint3`) e abrir o pedido de merge para a `main`.
 
 ## Validação sem banco
 
