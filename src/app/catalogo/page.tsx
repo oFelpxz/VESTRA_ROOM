@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/auth-actions";
 import { ProductCard } from "@/components/product/product-card";
+import { getFavoriteProductIds } from "@/lib/favorites";
 import {
   getProducts,
   getCategories,
@@ -93,6 +94,10 @@ export default async function CatalogoPage({
 
   const isLoggedIn = !!session?.user;
   const isAdmin = session?.user?.role === "ADMIN";
+  // Uma consulta para a página inteira, não uma por card.
+  const favoriteIds = session?.user?.id
+    ? await getFavoriteProductIds(session.user.id)
+    : new Set<string>();
 
   return (
     <div className="min-h-screen px-5 py-6 md:px-8">
@@ -117,6 +122,9 @@ export default async function CatalogoPage({
           )}
           {isLoggedIn ? (
             <>
+              <Link href="/favoritos" className="hover:text-foreground">
+                Favoritos
+              </Link>
               <Link href="/perfil" className="hover:text-foreground">
                 Perfil
               </Link>
@@ -278,7 +286,12 @@ export default async function CatalogoPage({
           ) : (
             <div className="grid grid-cols-2 gap-x-5 gap-y-12 md:grid-cols-3">
               {products.map((p) => (
-                <ProductCard key={p.id} {...p} />
+                <ProductCard
+                  key={p.id}
+                  {...p}
+                  isFavorite={favoriteIds.has(p.id)}
+                  isLoggedIn={isLoggedIn}
+                />
               ))}
             </div>
           )}

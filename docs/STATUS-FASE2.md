@@ -23,9 +23,9 @@
   "Hoodie Core" usavam no seed. **Corrigido** — os dois agora apontam pro
   próprio `.glb` que já existia (`boxy_tee_01.glb`, `hoodie_core.glb`), seed
   rodado de novo, verificado no navegador.
-- **Ainda não recebeu `git push`** — o ambiente onde essas sessões rodam não
-  tem credencial de escrita no GitHub. Antes de continuar noutra máquina/chat,
-  rodar (local, com os dois branches já sincronizados):
+- **Já enviado ao GitHub** (conferido em 27/09/2026: `main` e `Felipe` no
+  GitHub iguais às locais). O ambiente onde essas sessões rodam não tem
+  credencial de escrita no GitHub; o envio foi feito com:
   ```bash
   git push origin main Felipe
   ```
@@ -86,6 +86,39 @@ Migration: `20260914160757_sprint2_catalogo_avaliacoes_estoque_3d`.
 **Decisão de escopo assumida**: item 10 ("notificação quando estoque cruzar o
 limite") virou destaque visual (badge + contador), não um sistema de
 e-mail/push — cobre a necessidade prática do MVP.
+
+---
+
+## Sprint 3 — 09/09 a 23/09 — ✅ 5/5 (sem o 3D-04), testada no banco real
+
+Sem o item **3D-04**, por decisão do grupo. Branch **`feat/sprint3`**, a partir
+da `main`. Desenvolvida com o Supabase pausado e validada sem banco (typecheck,
+lint, testes da lógica isolada e build de produção); a migration foi aplicada e
+tudo foi testado no navegador, no banco real, em 27/09/2026. Falta só o caso
+"Esgotado" dos favoritos, que exige zerar estoque e ficou para uma pessoa do
+grupo. **O envio ao GitHub depende do login de uma pessoa do grupo.**
+
+| Item | Entrega | Onde no código |
+|---|---|---|
+| 14 | Frete por CEP no carrinho, modalidades Econômico e Expresso; a escolha vale até o pedido | `src/lib/shipping.ts`, `src/components/cart/shipping-estimator.tsx` |
+| 12 | Gestão de cupons (só Admin) | `/admin/cupons`, `src/lib/coupons.ts`, `src/lib/coupon-actions.ts` |
+| 13 | Aplicar cupom no carrinho, com revalidação e reserva de uso na criação do pedido | `src/components/cart/coupon-field.tsx`, `src/lib/order-actions.ts` |
+| 11 | Favoritos: coração no catálogo e no produto, lista `/favoritos` com atalho para a sacola | `src/lib/favorites.ts`, `src/lib/favorite-actions.ts` |
+| 23 | Gestão de clientes (só Admin), sem expor medidas; bloqueio impede login e compra | `/admin/clientes`, `src/lib/customers.ts` |
+
+Também corrigido: o carrinho ignorava o **preço promocional** (bug do item 07).
+
+Migration: `20260927173052_sprint3_frete_cupons_favoritos_clientes` —
+**só aditiva**, compatível com o código das outras branches. **Já aplicada no
+banco compartilhado em 27/09/2026**; em outro banco, aplicar **só com
+`npx prisma migrate deploy`**, nunca `migrate dev`.
+
+**Todas as decisões, achados das revisões e o roteiro de testes:
+[`SPRINT3-DECISOES.md`](SPRINT3-DECISOES.md).**
+
+> ⚠️ **Não rodar `npm run db:seed` no banco compartilhado.** O seed completo
+> sobrescreve estoque, preços e modelos 3D alterados pelo admin. Para os cupons
+> de exemplo, use `npm run db:seed:sprint3`, que só cria o que falta.
 
 ---
 
@@ -206,9 +239,11 @@ consolidado aqui pra sobreviver à troca de chat. 32 itens, 6 categorias.
    começar A1.
 2. Depois: continuar a lista ✅ Solo por categoria ou por severidade — a
    decidir com o usuário.
-3. **Sprint 3 ainda não começou** (11–14, 23, 3D-04) — checkpoint 23/09.
-4. Lembrar de dar `git push origin main Felipe` em algum momento (precisa do
-   usuário logado).
+3. **Sprint 3 feita** na branch `feat/sprint3` (11–14 e 23; o 3D-04 ficou de
+   fora) — ver a seção da Sprint 3 acima.
+4. ~~Dar `git push origin main Felipe`~~ — feito: em 27/09/2026 as duas
+   estavam no GitHub, iguais às locais. Falta enviar `feat/sprint3` (precisa
+   do usuário logado).
 
 ## Referências rápidas
 

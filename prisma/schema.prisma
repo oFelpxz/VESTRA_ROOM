@@ -23,7 +23,10 @@ enum UserRole {
 
 enum UserStatus {
   ACTIVE
+  /// Conta excluída pelo próprio cliente (dados anonimizados).
   INACTIVE
+  /// Bloqueada pelo Administrador — reversível.
+  BLOCKED
 }
 
 enum ProductStatus {
@@ -104,6 +107,16 @@ enum ReviewStatus {
   REJECTED
 }
 
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+enum ShippingMethod {
+  ECONOMICO
+  EXPRESSO
+}
+
 // ---------------------------------------------------------------------------
 // Usuário e perfil
 // ---------------------------------------------------------------------------
@@ -122,6 +135,7 @@ model User {
   carts              Cart[]
   orders             Order[]
   reviews            Review[]
+  favorites          Favorite[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -184,6 +198,7 @@ model Product {
   model3D                  Model3D?
   sizeChart                SizeChart?
   reviews                  Review[]
+  favorites                Favorite[]
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 }
@@ -260,6 +275,17 @@ model Review {
   updatedAt DateTime     @updatedAt
 
   @@unique([productId, userId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
 }
 
 model SizeChart {
@@ -341,6 +367,10 @@ model Cart {
   userId    String
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   status    CartStatus @default(ACTIVE)
+  couponId  String?
+  coupon    Coupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  /// Modalidade escolhida no carrinho — o checkout e o pedido leem daqui.
+  shippingMethod ShippingMethod @default(ECONOMICO)
   items     CartItem[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -361,6 +391,29 @@ model CartItem {
 }
 
 // ---------------------------------------------------------------------------
+// Cupons
+// ---------------------------------------------------------------------------
+
+model Coupon {
+  id             String     @id @default(cuid())
+  /// Sempre gravado em maiúsculas.
+  code           String     @unique
+  type           CouponType
+  /// PERCENT: 0–100. FIXED: valor em reais.
+  value          Decimal    @db.Decimal(10, 2)
+  minOrderAmount Decimal?   @db.Decimal(10, 2)
+  expiresAt      DateTime?
+  /// Vazio = ilimitado.
+  usageLimit     Int?
+  usedCount      Int        @default(0)
+  active         Boolean    @default(true)
+  carts          Cart[]
+  orders         Order[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+// ---------------------------------------------------------------------------
 // Pedido + Pagamento
 // ---------------------------------------------------------------------------
 
@@ -374,6 +427,9 @@ model Order {
   discountAmount   Decimal     @default(0) @db.Decimal(10, 2)
   shippingAddressId String?
   shippingAddress   Address?    @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  couponId          String?
+  coupon            Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  shippingMethod    ShippingMethod @default(ECONOMICO)
   trackingCode     String?
   items             OrderItem[]
   payment           Payment?

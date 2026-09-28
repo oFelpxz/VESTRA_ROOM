@@ -20,10 +20,12 @@ const TABS = ["PENDING", "VALIDATED", "REJECTED", "OPTIMIZED"] as const;
 export default async function AdminModelos3DPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string | string[] }>;
 }) {
   const sp = await searchParams;
-  const status = sp.status?.toUpperCase();
+  // Parâmetro repetido na URL (?status=a&status=b) chega como lista — só texto vale.
+  const status =
+    typeof sp.status === "string" ? sp.status.toUpperCase() : undefined;
   const active =
     status && TABS.includes(status as (typeof TABS)[number])
       ? (status as (typeof TABS)[number])

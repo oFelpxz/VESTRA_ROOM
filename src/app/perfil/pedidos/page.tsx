@@ -29,13 +29,15 @@ export const metadata = { title: "Meus pedidos" };
 export default async function MeusPedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string | string[] }>;
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   const sp = await searchParams;
-  const filter = sp.status?.toUpperCase();
+  // Parâmetro repetido na URL (?status=a&status=b) chega como lista — só texto vale.
+  const filter =
+    typeof sp.status === "string" ? sp.status.toUpperCase() : undefined;
   const orders = await listMyOrders();
   const filtered = filter
     ? orders.filter((o) => o.status === filter)

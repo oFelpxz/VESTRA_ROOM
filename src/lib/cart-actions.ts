@@ -3,8 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { parseShippingMethod } from "@/lib/shipping";
+import { evaluateCoupon, normalizeCouponCode, toCouponLike } from "@/lib/coupons";
 
-export type CartActionState = { error?: string; success?: boolean };
+export type CartActionState = {
+  error?: string;
+  success?: boolean;
+  /** Código de cupom digitado, devolvido no erro para o campo não se apagar. */
+  code?: string;
+};
 
 async function getOrCreateActiveCart(userId: string) {
   const existing = await prisma.cart.findFirst({
@@ -64,7 +71,10 @@ export async function addToCartAction(
     };
   }
 
-  const unitPrice = variant.price ?? variant.product.basePrice;
+  // A página do produto exibe o preço promocional quando existe — é ele que
+  // deve ser cobrado. Sem promoção, vale o preço da variação ou o cheio.
+  const unitPrice =
+    variant.product.promotionalPrice ?? variant.price ?? variant.product.basePrice;
 
   await prisma.cartItem.upsert({
     where: {
@@ -176,6 +186,81 @@ export async function removeFromCartAction(formData: FormData) {
 
   await prisma.cartItem.delete({ where: { id: cartItemId } });
   revalidatePath("/", "layout");
+}
+
+/**
+ * Grava a modalidade de frete escolhida no carrinho ativo (item 14).
+ * Só o nome da modalidade é recebido — o preço é sempre recalculado no servidor.
+ *
+ * formData: shippingMethod.
+ */
+export async function setCartShippingMethodAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  const shippingMethod = parseShippingMethod(
+    String(formData.get("shippingMethod") ?? ""),
+  );
+
+  await prisma.cart.updateMany({
+    where: { userId: session.user.id, status: "ACTIVE" },
+    data: { shippingMethod },
+  });
+  revalidatePath("/carrinho");
+}
+
+/**
+ * Aplica um cupom ao carrinho ativo (item 13). Valida contra o subtotal atual;
+ * o desconto em si é sempre recalculado ao exibir e ao criar o pedido.
+ *
+ * formData: code.
+ */
+export async function applyCouponAction(
+  _prev: CartActionState,
+  formData: FormData,
+): Promise<CartActionState> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "Sessão expirada." };
+  }
+
+  const code = normalizeCouponCode(String(formData.get("code") ?? ""));
+  if (!code) return { error: "Digite o código do cupom." };
+
+  const cart = await prisma.cart.findFirst({
+    where: { userId: session.user.id, status: "ACTIVE" },
+    select: { id: true, items: { select: { quantity: true, unitPrice: true } } },
+  });
+  if (!cart || cart.items.length === 0) {
+    return { error: "Sua sacola está vazia.", code };
+  }
+  const subtotal = cart.items.reduce(
+    (sum, i) => sum + Number(i.unitPrice) * i.quantity,
+    0,
+  );
+
+  const coupon = await prisma.coupon.findUnique({ where: { code } });
+  const evaluation = evaluateCoupon(coupon ? toCouponLike(coupon) : null, subtotal);
+  if (!evaluation.ok) return { error: evaluation.message, code };
+
+  await prisma.cart.update({
+    where: { id: cart.id },
+    // evaluation.ok só acontece com cupom existente.
+    data: { couponId: coupon!.id },
+  });
+  revalidatePath("/carrinho");
+  return { success: true };
+}
+
+export async function removeCouponAction() {
+  const session = await auth();
+  if (!session?.user?.id) return;
+
+  await prisma.cart.updateMany({
+    where: { userId: session.user.id, status: "ACTIVE" },
+    data: { couponId: null },
+  });
+  revalidatePath("/carrinho");
 }
 
 /**
