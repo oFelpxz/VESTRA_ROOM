@@ -94,9 +94,9 @@ e-mail/push — cobre a necessidade prática do MVP.
 Sem o item **3D-04**, por decisão do grupo. Branch **`feat/sprint3`**, a partir
 da `main`. Desenvolvida com o Supabase pausado e validada sem banco (typecheck,
 lint, testes da lógica isolada e build de produção); a migration foi aplicada e
-tudo foi testado no navegador, no banco real, em 27/09/2026. Falta só o caso
-"Esgotado" dos favoritos, que exige zerar estoque e ficou para uma pessoa do
-grupo. **O envio ao GitHub depende do login de uma pessoa do grupo.**
+tudo foi testado no navegador, no banco real, em 27 e 28/09/2026. Enviada ao
+GitHub em 28/09/2026, com pedido de merge para a `main` aberto (#3), ainda não
+juntado.
 
 | Item | Entrega | Onde no código |
 |---|---|---|
@@ -242,8 +242,8 @@ consolidado aqui pra sobreviver à troca de chat. 32 itens, 6 categorias.
 3. **Sprint 3 feita** na branch `feat/sprint3` (11–14 e 23; o 3D-04 ficou de
    fora) — ver a seção da Sprint 3 acima.
 4. ~~Dar `git push origin main Felipe`~~ — feito: em 27/09/2026 as duas
-   estavam no GitHub, iguais às locais. Falta enviar `feat/sprint3` (precisa
-   do usuário logado).
+   estavam no GitHub, iguais às locais. `feat/sprint3` enviada em 28/09/2026
+   (pedido de merge #3 aberto).
 
 ## Referências rápidas
 
