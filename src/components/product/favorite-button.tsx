@@ -5,9 +5,14 @@ import { setFavoriteAction } from "@/lib/favorite-actions";
 /**
  * Coração de favoritar (item 11). Visitante é levado ao login; logado, o
  * formulário grava o estado desejado — funciona sem JavaScript no cliente.
+ *
+ * Acessibilidade: é um botão de alternar. O estado vai só no `aria-pressed`;
+ * o nome do ícone sozinho é fixo e leva o nome da peça (no catálogo há um
+ * coração por card). Com rótulo visível, o nome é o próprio texto.
  */
 export function FavoriteButton({
   productId,
+  productName,
   isFavorite,
   isLoggedIn,
   withLabel = false,
@@ -15,6 +20,7 @@ export function FavoriteButton({
   className = "",
 }: {
   productId: string;
+  productName: string;
   isFavorite: boolean;
   isLoggedIn: boolean;
   /** Mostra "Favoritar"/"Favoritado" ao lado do ícone (página de produto). */
@@ -23,7 +29,7 @@ export function FavoriteButton({
   returnTo?: string;
   className?: string;
 }) {
-  const label = isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos";
+  const hint = isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos";
   const content = (
     <>
       <Heart
@@ -44,7 +50,7 @@ export function FavoriteButton({
     return (
       <Link
         href={returnTo ? `/login?next=${encodeURIComponent(returnTo)}` : "/login"}
-        aria-label="Entre para favoritar"
+        aria-label={`Entre para favoritar ${productName}`}
         className={baseClass}
       >
         {content}
@@ -58,9 +64,9 @@ export function FavoriteButton({
       <input type="hidden" name="favorite" value={isFavorite ? "false" : "true"} />
       <button
         type="submit"
-        aria-label={label}
+        aria-label={withLabel ? undefined : `Favoritar ${productName}`}
         aria-pressed={isFavorite}
-        title={label}
+        title={withLabel ? undefined : hint}
         className={baseClass}
       >
         {content}

@@ -36,6 +36,7 @@ export function ProductCard({
     <div className="group relative">
       <FavoriteButton
         productId={id}
+        productName={name}
         isFavorite={isFavorite}
         isLoggedIn={isLoggedIn}
         returnTo={href}

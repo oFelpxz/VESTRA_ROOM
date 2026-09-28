@@ -49,13 +49,16 @@ export default async function FavoritosPage() {
                 key={product.id}
                 className="flex flex-col gap-4 py-6 sm:flex-row sm:gap-6"
               >
+                {/* Atalho visual: o link acessível é o do nome, logo ao lado. */}
                 <Link
                   href={`/produto/${product.slug}`}
+                  aria-hidden
+                  tabIndex={-1}
                   className="relative aspect-square w-28 shrink-0 overflow-hidden bg-secondary"
                 >
                   {imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageUrl} alt={product.name} className="h-full w-full object-cover" />
+                    <img src={imageUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <ProductPlaceholder />
                   )}
@@ -74,6 +77,7 @@ export default async function FavoritosPage() {
                     </div>
                     <FavoriteButton
                       productId={product.id}
+                      productName={product.name}
                       isFavorite
                       isLoggedIn
                       className="text-foreground/70 hover:text-foreground"
@@ -82,7 +86,10 @@ export default async function FavoritosPage() {
 
                   <div className="mt-2 max-w-sm">
                     {available ? (
-                      <FavoriteQuickAdd variants={product.variants} />
+                      <FavoriteQuickAdd
+                        productName={product.name}
+                        variants={product.variants}
+                      />
                     ) : (
                       <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
                         Indisponível no momento

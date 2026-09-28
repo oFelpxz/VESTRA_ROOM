@@ -10,9 +10,16 @@ type Variant = { id: string; color: string; size: string; stockQuantity: number 
 
 /**
  * Atalho da lista de desejos (item 11): o carrinho guarda cor + tamanho, então
- * o atalho pede a variação — só as que têm estoque.
+ * o atalho pede a variação — só as que têm estoque. Campo e botão levam o nome
+ * da peça: a lista tem um atalho por favorito.
  */
-export function FavoriteQuickAdd({ variants }: { variants: Variant[] }) {
+export function FavoriteQuickAdd({
+  productName,
+  variants,
+}: {
+  productName: string;
+  variants: Variant[];
+}) {
   const inStock = variants.filter((v) => v.stockQuantity > 0);
   const [variantId, setVariantId] = useState("");
   const [state, formAction, pending] = useActionState(
@@ -29,10 +36,10 @@ export function FavoriteQuickAdd({ variants }: { variants: Variant[] }) {
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-2">
+    <form action={formAction}>
       <div className="flex gap-2">
         <label htmlFor={`variant-${inStock[0].id}`} className="sr-only">
-          Cor e tamanho
+          Cor e tamanho de {productName}
         </label>
         <select
           id={`variant-${inStock[0].id}`}
@@ -54,20 +61,25 @@ export function FavoriteQuickAdd({ variants }: { variants: Variant[] }) {
         <button
           type="submit"
           disabled={!variantId || pending}
+          aria-label={`Adicionar ${productName} à sacola`}
           className="h-10 rounded-sm bg-foreground px-4 text-[11px] font-semibold uppercase tracking-[0.15em] text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {pending ? "..." : "Adicionar"}
         </button>
       </div>
-      {state.error && <p className="text-xs text-destructive">{state.error}</p>}
-      {state.success && (
-        <p className="text-xs text-foreground">
-          Adicionado à sacola.{" "}
-          <Link href="/carrinho" className="font-semibold underline">
-            Ver sacola
-          </Link>
-        </p>
-      )}
+      {/* Região sempre presente: o leitor de tela só anuncia mudanças numa
+          região que já existia antes delas. */}
+      <div aria-live="polite">
+        {state.error && <p className="mt-2 text-xs text-destructive">{state.error}</p>}
+        {state.success && (
+          <p className="mt-2 text-xs text-foreground">
+            Adicionado à sacola.{" "}
+            <Link href="/carrinho" className="font-semibold underline">
+              Ver sacola
+            </Link>
+          </p>
+        )}
+      </div>
     </form>
   );
 }

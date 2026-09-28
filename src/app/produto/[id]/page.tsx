@@ -110,6 +110,7 @@ export default async function ProdutoPage({
             </p>
             <FavoriteButton
               productId={product.id}
+              productName={product.name}
               isFavorite={isFavorite}
               isLoggedIn={isLoggedIn}
               returnTo={`/produto/${product.slug}`}

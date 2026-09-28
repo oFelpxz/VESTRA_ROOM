@@ -217,6 +217,18 @@ usuário como parâmetro, então ficam em um arquivo comum (`favorites.ts`); a
 - O catálogo busca os favoritos do usuário em **uma única consulta** para a
   página inteira, não uma por card.
 
+**Decisão de acessibilidade: o coração é um botão de alternar com nome fixo.**
+O leitor de tela anuncia "Favoritar Knit Beanie" e diz "pressionado" quando a
+peça já está nos favoritos. O nome não muda com o estado (o estado vai só no
+"pressionado"), como recomenda o guia de padrões do W3C, e leva o nome da peça,
+porque o catálogo tem um coração por card. Na página do produto, onde o texto
+"Favoritar"/"Favoritado" está visível, o nome é o próprio texto, para que
+comandos de voz ("clicar em Favoritar") funcionem. A dica ao passar o mouse
+continua dizendo a ação ("Adicionar aos favoritos"/"Remover dos favoritos").
+Pelo mesmo motivo, o atalho de compra da lista se anuncia "Cor e tamanho de
+Hoodie Core" e "Adicionar Hoodie Core à sacola", e a confirmação "Adicionado à
+sacola" é lida automaticamente.
+
 ---
 
 ## Item 23 — Gestão de clientes
@@ -332,6 +344,7 @@ precisar preparar nada. Cada um foi testado contra a regra real do sistema:
 | 4 problemas de lint (2 erros, 2 avisos) | `marquee.tsx`, `tryon-experience.tsx`, `measurement-actions.ts` | Já existiam antes da Sprint 3, em arquivos não alterados. A sprint não adicionou nenhum |
 | O preço fica gravado no item do carrinho no momento em que é adicionado. Se uma promoção começar ou acabar depois, o carrinho mantém o preço antigo até o item ser adicionado de novo. | `CartItem.unitPrice` | Não corrigido — comportamento já existente |
 | O filtro de tamanhos do catálogo lista os tamanhos em ordem alfabética ("G, GG, M, P"). Cosmético. | `getFilterOptions` em `src/lib/products.ts` | Não corrigido — a ordem certa já existe em `src/lib/sizes.ts` e pode ser reaproveitada |
+| O Hoodie Core tem variações nas cores "Branco" **e** "White" (P a GG em cada), que parecem a mesma cor cadastrada duas vezes. Aparece para o cliente na página do produto e no atalho dos favoritos. | Dados do banco (variações do produto `hoodie-core`) | Não corrigido — é dado de cadastro, não código; decisão do grupo (desativar as "White" pelo admin, se forem duplicadas) |
 
 ---
 
@@ -367,6 +380,7 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | Geral | Na etapa de revisão do checkout a linha dizia só "Frete", enquanto o resumo ao lado dizia "Frete · Expresso". Unificado. | Baixa |
 | 13 | **Achado nos testes no banco real:** com cupom aplicado, a sacola tinha três botões chamados só "Remover" (dois itens e o cupom); para leitor de tela o do cupom ficava indistinguível. Agora ele se anuncia "Remover cupom VESTRA20", nome que começa pelo texto visível, para comandos de voz ("clicar em Remover") continuarem funcionando. Os "Remover" dos itens já existiam antes da Sprint 3 e ficaram como estavam. | Baixa |
 | 13 | **Achado nos testes no banco real:** a ordem das linhas mudava de página para página — sacola e checkout mostravam Subtotal → Desconto → Frete, e confirmação, "Meus pedidos" e admin mostravam Subtotal → Frete → Desconto. Unificado na primeira, que explica melhor a conta: o cupom é calculado sobre os produtos, nunca sobre o frete. Só a ordem mudou; nenhum valor. | Baixa |
+| 11 | **Achado nos testes no banco real (acessibilidade dos favoritos):** o nome do coração mudava com o estado ("Adicionar aos favoritos" ↔ "Remover dos favoritos") ao mesmo tempo que usava "pressionado", anunciando o estado duas vezes; os 13 corações do catálogo tinham nomes idênticos; e na página do produto o texto visível ("Favoritar") não fazia parte do nome, quebrando comando de voz. Na lista de favoritos, campo e botão do atalho eram iguais em todas as peças, a confirmação "Adicionado à sacola" não era anunciada, e a foto de peça sem imagem virava um link sem nome. Corrigido — ver a decisão de acessibilidade no item 11. | Média |
 
 ---
 
@@ -394,6 +408,7 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 5 | ✅ Criados `TESTEPCT` (15%, digitado em minúsculas e gravado em maiúsculas) e `TESTEFIX` (R$ 30, mínimo R$ 100, 5 usos). Código duplicado recusado ("Já existe um cupom com o código TESTEPCT.") mantendo código, tipo "Fixo" e valor no formulário. Recusados: 150% ("não pode passar de 100%"), `ABC DEF` e `CAFÉ10` (só letras e números). Desativar e reativar funcionam. `DEMOESGOTADO` (já usado): botão desabilitado na tela e, forçando o envio pelo navegador, o servidor também não remove. Os dois cupons de teste foram removidos no fim; o banco ficou só com os 6 do seed. |
 | 6 | ✅ Sacola com Knit Beanie (R$ 89): `DEMOEXPIRADO` → "Este cupom expirou."; `DEMOESGOTADO` → "Este cupom esgotou."; `DEMODESATIVADO` e um código inexistente → "Cupom inválido." (de propósito, a mesma mensagem: não revela que o cupom desativado existe); `VESTRA20` → "Faltam R$ 61,00 … (pedido mínimo R$ 150,00)". Nenhuma recusa alterou o total. `BEMVINDO10`: − R$ 8,90, total R$ 97,10 (89 − 8,90 + 17), igual no checkout; ao somar a Relugar (R$ 288), o desconto recalculou para − R$ 28,80 e o frete para R$ 19 / R$ 31 (2 peças). `VESTRA20` com R$ 288: − R$ 20, total R$ 287. Ao tirar a Relugar, o cupom ficou na sacola com o aviso "Não se aplica: Faltam R$ 61,00…", o desconto sumiu (total R$ 106) e o checkout mostrou "O cupom VESTRA20 não pode ser usado…" com link para a sacola. Nenhum pedido foi finalizado neste passo. |
 | 7 | ✅ Pedido #Z9JL4DWO com `LIMITE1` (Knit Beanie R$ 89 − R$ 4,45 + R$ 17 = R$ 101,55): banco com desconto 4,45 e cupom `LIMITE1`; admin mostra "Desconto · LIMITE1" e o cupom como "Esgotado · 1 de 1 usos". Nova tentativa pela sacola → "Este cupom esgotou.". **Trava no banco real:** a operação exata que o pedido usa para gastar o cupom (`usedCount < usageLimit`, comparação entre colunas) foi executada dentro de uma transação desfeita no fim: `LIMITE1` → 0 linhas (recusado), e os controles `VESTRA20` (0 de 100) e `BEMVINDO10` (sem limite) → 1 linha cada, provando que a condição não recusa tudo. Depois do rollback, todos os contadores idênticos aos de antes. |
+| 8 | ✅ Visitante: o coração leva a `/login?next=/produto/…` e `/favoritos` manda para o login (o retorno à peça depois de entrar depende da branch `leonardoquartaroli`, ver "Achados fora do escopo"). Cliente: favoritou o Knit Beanie pelo card (coração preenchido, página continuou no catálogo) e o Hoodie Core pela página do produto ("Favoritar" → "Favoritado"). `/favoritos` listou os dois, mais recente primeiro, com "Adicionar" desabilitado até escolher a variação; o atalho colocou o Hoodie Core Preto M na sacola e mostrou "Adicionado à sacola". Desfavoritar pela lista e pelo catálogo funcionou; a lista vazia mostra a mensagem e o link para a coleção. O banco terminou com 0 favoritos. ⏳ **Pendente: "Esgotado"** — exige zerar o estoque de uma peça no banco compartilhado; a permissão para essa alteração não foi dada nesta sessão. Para testar: no admin → Estoque, zerar as duas variações do Knit Beanie, favoritá-lo, conferir "Esgotado" na lista e voltar o estoque a Cinza 10 / Preto 9. |
 
 ## Validação sem banco
 
