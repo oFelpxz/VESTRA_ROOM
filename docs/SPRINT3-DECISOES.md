@@ -13,11 +13,13 @@
 
 | Item | Descrição | Situação |
 |---|---|---|
-| 14 | Frete no carrinho | Código pronto · teste no navegador pendente |
-| 12 | Gerenciar cupons | Código pronto · teste no navegador pendente |
-| 13 | Aplicar cupom no carrinho | Código pronto · teste no navegador pendente |
-| 11 | Favoritos | Código pronto · teste no navegador pendente |
-| 23 | Gestão de clientes | Código pronto · teste no navegador pendente |
+| 14 | Frete no carrinho | ✅ Testado no banco real (passo 4) |
+| 12 | Gerenciar cupons | ✅ Testado no banco real (passo 5) |
+| 13 | Aplicar cupom no carrinho | ✅ Testado no banco real (passos 6 e 7) |
+| 11 | Favoritos | ✅ Testado no banco real (passos 8 e 9) · falta só o caso "Esgotado" |
+| 23 | Gestão de clientes | Código pronto · teste no navegador pendente (passo 10) |
+
+Resultados detalhados em "Roteiro de testes → Resultados".
 
 ---
 
@@ -216,6 +218,9 @@ usuário como parâmetro, então ficam em um arquivo comum (`favorites.ts`); a
   removido.
 - O catálogo busca os favoritos do usuário em **uma única consulta** para a
   página inteira, não uma por card.
+- Com promoção, a lista mostra o preço promocional e o cheio riscado, no mesmo
+  padrão da página do produto — a lista de desejos é justamente onde o cliente
+  quer saber que a peça baixou de preço.
 
 **Decisão de acessibilidade: o coração é um botão de alternar com nome fixo.**
 O leitor de tela anuncia "Favoritar Knit Beanie" e diz "pressionado" quando a
@@ -342,7 +347,9 @@ precisar preparar nada. Cada um foi testado contra a regra real do sistema:
 | **Checkout em branco com etapa inválida.** `?step=` nunca era validado: com um valor desconhecido (`?step=xyz`) ou repetido, nenhuma etapa batia e a área principal ficava vazia — sem formulário e sem mensagem. | `/checkout` | **Corrigido**: qualquer etapa inválida vira "endereço" |
 | **O login ignora a página de origem.** Rotas protegidas mandam para `/login?next=…`, mas depois de entrar o cliente sempre vai para `/perfil`. Afeta o provador e o coração de favoritos para visitante. | `loginAction` em `src/lib/auth-actions.ts` | **Corrigido na branch `leonardoquartaroli`** (commit `3fcbaf6`), não nesta: a mesma função já tinha sido alterada lá (redirecionamento por perfil), e mudar nas duas daria conflito no merge. O destino é validado no servidor para só aceitar endereço do próprio site — sem isso o link de login viraria um redirecionador aberto para phishing. Testado contra 8 truques conhecidos (`//`, `https://`, barra invertida, tab escondido, `javascript:`, `data:`, outra porta, `@`). Nesta branch, o coração de favoritos para visitante passou a enviar a página do produto como destino (`?next=`); **o retorno só funciona depois que as duas branches forem juntadas** |
 | 4 problemas de lint (2 erros, 2 avisos) | `marquee.tsx`, `tryon-experience.tsx`, `measurement-actions.ts` | Já existiam antes da Sprint 3, em arquivos não alterados. A sprint não adicionou nenhum |
-| O preço fica gravado no item do carrinho no momento em que é adicionado. Se uma promoção começar ou acabar depois, o carrinho mantém o preço antigo até o item ser adicionado de novo. | `CartItem.unitPrice` | Não corrigido — comportamento já existente |
+| O preço fica gravado no item do carrinho no momento em que é adicionado. Se uma promoção começar ou acabar depois, o carrinho mantém o preço antigo até o item ser adicionado de novo. **Confirmado no teste do passo 9:** depois que a promoção foi removida, a sacola continuou cobrando R$ 149 — ou seja, quem deixa a peça na sacola compra pelo preço promocional mesmo depois do fim da promoção. | `CartItem.unitPrice` | Não corrigido — comportamento já existente; a correção seria o checkout recalcular o preço atual |
+| O **card do catálogo mostra só o preço cheio**, mesmo com promoção: a Boxy Tee 01 aparecia a R$ 189 no catálogo e a R$ 149 na página do produto, na sacola e nos favoritos. O filtro de preço do catálogo também usa o preço cheio. Não prejudica o cliente (ele paga menos do que viu), mas esconde a promoção justamente onde ela chamaria atenção. | `getProducts` em `src/lib/products.ts` e `product-card.tsx` (catálogo, Sprint 2) | Não corrigido — fora do escopo; a correção é levar o promocional ao card, no mesmo padrão de preço riscado |
+| O admin aceita **preço promocional maior ou igual ao preço cheio** (não há validação). A página do produto mostraria o "promocional" com o cheio, menor, riscado ao lado. | `updateProductAction` / `createProductAction` em `src/lib/product-actions.ts` | Não corrigido — visto só na leitura do código, não testado para não gravar dado incoerente no banco compartilhado |
 | O filtro de tamanhos do catálogo lista os tamanhos em ordem alfabética ("G, GG, M, P"). Cosmético. | `getFilterOptions` em `src/lib/products.ts` | Não corrigido — a ordem certa já existe em `src/lib/sizes.ts` e pode ser reaproveitada |
 | O Hoodie Core tem variações nas cores "Branco" **e** "White" (P a GG em cada), que parecem a mesma cor cadastrada duas vezes. Aparece para o cliente na página do produto e no atalho dos favoritos. | Dados do banco (variações do produto `hoodie-core`) | Não corrigido — é dado de cadastro, não código; decisão do grupo (desativar as "White" pelo admin, se forem duplicadas) |
 
@@ -381,6 +388,7 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 13 | **Achado nos testes no banco real:** com cupom aplicado, a sacola tinha três botões chamados só "Remover" (dois itens e o cupom); para leitor de tela o do cupom ficava indistinguível. Agora ele se anuncia "Remover cupom VESTRA20", nome que começa pelo texto visível, para comandos de voz ("clicar em Remover") continuarem funcionando. Os "Remover" dos itens já existiam antes da Sprint 3 e ficaram como estavam. | Baixa |
 | 13 | **Achado nos testes no banco real:** a ordem das linhas mudava de página para página — sacola e checkout mostravam Subtotal → Desconto → Frete, e confirmação, "Meus pedidos" e admin mostravam Subtotal → Frete → Desconto. Unificado na primeira, que explica melhor a conta: o cupom é calculado sobre os produtos, nunca sobre o frete. Só a ordem mudou; nenhum valor. | Baixa |
 | 11 | **Achado nos testes no banco real (acessibilidade dos favoritos):** o nome do coração mudava com o estado ("Adicionar aos favoritos" ↔ "Remover dos favoritos") ao mesmo tempo que usava "pressionado", anunciando o estado duas vezes; os 13 corações do catálogo tinham nomes idênticos; e na página do produto o texto visível ("Favoritar") não fazia parte do nome, quebrando comando de voz. Na lista de favoritos, campo e botão do atalho eram iguais em todas as peças, a confirmação "Adicionado à sacola" não era anunciada, e a foto de peça sem imagem virava um link sem nome. Corrigido — ver a decisão de acessibilidade no item 11. | Média |
+| 11 | **Achado nos testes no banco real:** com a peça em promoção, a lista de favoritos mostrava só o preço promocional, sem o cheio riscado que a página do produto mostra — o cliente não percebia que a peça tinha baixado de preço. Agora mostra os dois; para leitor de tela, o riscado é lido como "antes R$ 189,00". | Baixa |
 
 ---
 
@@ -409,6 +417,7 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 6 | ✅ Sacola com Knit Beanie (R$ 89): `DEMOEXPIRADO` → "Este cupom expirou."; `DEMOESGOTADO` → "Este cupom esgotou."; `DEMODESATIVADO` e um código inexistente → "Cupom inválido." (de propósito, a mesma mensagem: não revela que o cupom desativado existe); `VESTRA20` → "Faltam R$ 61,00 … (pedido mínimo R$ 150,00)". Nenhuma recusa alterou o total. `BEMVINDO10`: − R$ 8,90, total R$ 97,10 (89 − 8,90 + 17), igual no checkout; ao somar a Relugar (R$ 288), o desconto recalculou para − R$ 28,80 e o frete para R$ 19 / R$ 31 (2 peças). `VESTRA20` com R$ 288: − R$ 20, total R$ 287. Ao tirar a Relugar, o cupom ficou na sacola com o aviso "Não se aplica: Faltam R$ 61,00…", o desconto sumiu (total R$ 106) e o checkout mostrou "O cupom VESTRA20 não pode ser usado…" com link para a sacola. Nenhum pedido foi finalizado neste passo. |
 | 7 | ✅ Pedido #Z9JL4DWO com `LIMITE1` (Knit Beanie R$ 89 − R$ 4,45 + R$ 17 = R$ 101,55): banco com desconto 4,45 e cupom `LIMITE1`; admin mostra "Desconto · LIMITE1" e o cupom como "Esgotado · 1 de 1 usos". Nova tentativa pela sacola → "Este cupom esgotou.". **Trava no banco real:** a operação exata que o pedido usa para gastar o cupom (`usedCount < usageLimit`, comparação entre colunas) foi executada dentro de uma transação desfeita no fim: `LIMITE1` → 0 linhas (recusado), e os controles `VESTRA20` (0 de 100) e `BEMVINDO10` (sem limite) → 1 linha cada, provando que a condição não recusa tudo. Depois do rollback, todos os contadores idênticos aos de antes. |
 | 8 | ✅ Visitante: o coração leva a `/login?next=/produto/…` e `/favoritos` manda para o login (o retorno à peça depois de entrar depende da branch `leonardoquartaroli`, ver "Achados fora do escopo"). Cliente: favoritou o Knit Beanie pelo card (coração preenchido, página continuou no catálogo) e o Hoodie Core pela página do produto ("Favoritar" → "Favoritado"). `/favoritos` listou os dois, mais recente primeiro, com "Adicionar" desabilitado até escolher a variação; o atalho colocou o Hoodie Core Preto M na sacola e mostrou "Adicionado à sacola". Desfavoritar pela lista e pelo catálogo funcionou; a lista vazia mostra a mensagem e o link para a coleção. O banco terminou com 0 favoritos. ⏳ **Pendente: "Esgotado"** — exige zerar o estoque de uma peça no banco compartilhado; a permissão para essa alteração não foi dada nesta sessão. Para testar: no admin → Estoque, zerar as duas variações do Knit Beanie, favoritá-lo, conferir "Esgotado" na lista e voltar o estoque a Cinza 10 / Preto 9. |
+| 9 | ✅ Com autorização, a Boxy Tee 01 (R$ 189) recebeu promocional de R$ 149 pelo admin. Página do produto: R$ 149,00 com R$ 189,00 riscado e "3x de R$ 49,67". Cliente adicionou Preto M: sacola e checkout cobram R$ 149,00 (subtotal 89 + 299 + 149 = R$ 537,00), e o banco gravou 149 no item. Favoritada, a peça aparece na lista a R$ 149 — daqui saiu o ajuste do preço riscado (ver "Problemas encontrados nas revisões"). Dois achados fora do escopo: o card do catálogo continuou mostrando R$ 189, e, depois de removida a promoção, a sacola seguiu cobrando R$ 149 (ver "Achados fora do escopo"). **Tudo restaurado e conferido no banco:** promocional de volta a vazio (nenhum produto com promoção), peça retirada da sacola (que voltou a ter só Knit Beanie e Hoodie Core) e 0 favoritos. Nenhum pedido finalizado. |
 
 ## Validação sem banco
 

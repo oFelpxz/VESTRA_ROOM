@@ -41,7 +41,7 @@ export default async function FavoritosPage() {
         <ul className="mt-10 divide-y divide-border border-y border-border">
           {favorites.map(({ product }) => {
             const available = product.status === "ACTIVE";
-            const price = Number(product.promotionalPrice ?? product.basePrice);
+            const promo = product.promotionalPrice;
             const imageUrl = product.images[0]?.url;
 
             return (
@@ -73,7 +73,17 @@ export default async function FavoritosPage() {
                       >
                         {product.name}
                       </Link>
-                      <p className="mt-1 text-sm">{formatBRL(price)}</p>
+                      {/* Mesmo padrão da página do produto: com promoção, o
+                          preço cheio aparece riscado ao lado. */}
+                      <p className="mt-1 text-sm">
+                        {formatBRL(Number(promo ?? product.basePrice))}
+                        {promo && (
+                          <s className="ml-2 text-muted-foreground">
+                            <span className="sr-only">antes </span>
+                            {formatBRL(Number(product.basePrice))}
+                          </s>
+                        )}
+                      </p>
                     </div>
                     <FavoriteButton
                       productId={product.id}
