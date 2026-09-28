@@ -365,6 +365,7 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 2 e 6 | **Parâmetro repetido na URL derrubava a página.** No Next.js, `?cep=1&cep=2` chega como lista, não como texto, e o código chamava funções de texto nele. Afetava o CEP do carrinho e a busca de clientes. Corrigido aceitando só texto. | Média |
 | 7 | O cupom `LIMITE1` fica esgotado após o primeiro teste e o seed não o recria. Anotado no roteiro como repetir o teste. | Baixa |
 | Geral | Na etapa de revisão do checkout a linha dizia só "Frete", enquanto o resumo ao lado dizia "Frete · Expresso". Unificado. | Baixa |
+| 13 | **Achado nos testes no banco real:** com cupom aplicado, a sacola tinha três botões chamados só "Remover" (dois itens e o cupom); para leitor de tela o do cupom ficava indistinguível. Agora ele se anuncia "Remover cupom VESTRA20", nome que começa pelo texto visível, para comandos de voz ("clicar em Remover") continuarem funcionando. Os "Remover" dos itens já existiam antes da Sprint 3 e ficaram como estavam. | Baixa |
 
 ---
 
@@ -390,6 +391,7 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 3 | Os 6 cupons de exemplo criados e conferidos no banco. |
 | 4 | ✅ CEP do endereço padrão vem preenchido; CEP do interior (13000-000): Econômico R$ 17 / 8 dias, Expresso R$ 28 / 4 dias; CEP de capital (01310-100): 4 e 2 dias; `?cep=123` mostra "CEP inválido". Pedido Econômico #GS6A28RO (R$ 199 + R$ 17 = R$ 216) e Expresso #40FHSPKS (R$ 199 + R$ 28 = R$ 227): valores e modalidade iguais no carrinho, na revisão, no pagamento, na confirmação, no banco e no admin. Ambos foram para PAGO (pagamento simulado). |
 | 5 | ✅ Criados `TESTEPCT` (15%, digitado em minúsculas e gravado em maiúsculas) e `TESTEFIX` (R$ 30, mínimo R$ 100, 5 usos). Código duplicado recusado ("Já existe um cupom com o código TESTEPCT.") mantendo código, tipo "Fixo" e valor no formulário. Recusados: 150% ("não pode passar de 100%"), `ABC DEF` e `CAFÉ10` (só letras e números). Desativar e reativar funcionam. `DEMOESGOTADO` (já usado): botão desabilitado na tela e, forçando o envio pelo navegador, o servidor também não remove. Os dois cupons de teste foram removidos no fim; o banco ficou só com os 6 do seed. |
+| 6 | ✅ Sacola com Knit Beanie (R$ 89): `DEMOEXPIRADO` → "Este cupom expirou."; `DEMOESGOTADO` → "Este cupom esgotou."; `DEMODESATIVADO` e um código inexistente → "Cupom inválido." (de propósito, a mesma mensagem: não revela que o cupom desativado existe); `VESTRA20` → "Faltam R$ 61,00 … (pedido mínimo R$ 150,00)". Nenhuma recusa alterou o total. `BEMVINDO10`: − R$ 8,90, total R$ 97,10 (89 − 8,90 + 17), igual no checkout; ao somar a Relugar (R$ 288), o desconto recalculou para − R$ 28,80 e o frete para R$ 19 / R$ 31 (2 peças). `VESTRA20` com R$ 288: − R$ 20, total R$ 287. Ao tirar a Relugar, o cupom ficou na sacola com o aviso "Não se aplica: Faltam R$ 61,00…", o desconto sumiu (total R$ 106) e o checkout mostrou "O cupom VESTRA20 não pode ser usado…" com link para a sacola. Nenhum pedido foi finalizado neste passo. |
 
 ## Validação sem banco
 

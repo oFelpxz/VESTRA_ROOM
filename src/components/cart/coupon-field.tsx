@@ -33,6 +33,7 @@ export function CouponField({
           <form action={removeCouponAction}>
             <button
               type="submit"
+              aria-label={`Remover cupom ${applied.code}`}
               className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
               Remover
