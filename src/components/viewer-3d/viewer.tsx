@@ -7,8 +7,10 @@ import {
   Html,
   Center,
   Bounds,
+  useBounds,
 } from "@react-three/drei";
 import {
+  lazy,
   Suspense,
   useEffect,
   useMemo,
@@ -18,11 +20,37 @@ import {
 } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { isFittedToMannequin } from "./mannequin-mark";
 
-function Model({ url }: { url: string }) {
+// Carregado só quando o cliente escolhe "Manequim": quem só olha a peça não
+// baixa o manequim.
+const Mannequin = lazy(() => import("./mannequin"));
+
+type DisplayMode = "piece" | "mannequin";
+
+function Model({
+  url,
+  onFitted,
+}: {
+  url: string;
+  /** Avisa se a peça foi ajustada ao manequim no Blender. */
+  onFitted?: (fitted: boolean) => void;
+}) {
   const { scene } = useGLTF(url);
   const model = useMemo(() => scene.clone(true), [scene]);
+  useEffect(() => {
+    onFitted?.(isFittedToMannequin(scene));
+  }, [scene, onFitted]);
   return <primitive object={model} />;
+}
+
+/** Reenquadra a câmera quando a cena troca entre peça e manequim. */
+function Refit({ mode }: { mode: DisplayMode }) {
+  const bounds = useBounds();
+  useEffect(() => {
+    bounds.refresh().clip().fit();
+  }, [bounds, mode]);
+  return null;
 }
 
 function Loader() {
@@ -44,7 +72,12 @@ const AZIMUTH: Record<ViewPreset, number> = {
   back: Math.PI,
 };
 
-/** Reposiciona a câmera num ângulo predefinido, preservando distância/elevação atuais. */
+/**
+ * Reposiciona a câmera num ângulo predefinido, preservando distância/elevação
+ * atuais. Fica dentro do <Bounds> e move a câmera pela API dele: o `observe`
+ * do Bounds reenquadra a cada novo render do Canvas e, se a câmera fosse
+ * movida por fora, a animação dele a devolvia para o ângulo anterior.
+ */
 function CameraPreset({
   view,
   controlsRef,
@@ -53,6 +86,7 @@ function CameraPreset({
   controlsRef: RefObject<OrbitControlsImpl | null>;
 }) {
   const { camera } = useThree();
+  const bounds = useBounds();
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -70,10 +104,10 @@ function CameraPreset({
       AZIMUTH[view],
     );
 
-    camera.position.copy(target).add(newOffset);
-    camera.lookAt(target);
-    controls.update();
-  }, [view, camera, controlsRef]);
+    bounds
+      .moveTo(target.clone().add(newOffset))
+      .lookAt({ target: target.clone() });
+  }, [view, camera, controlsRef, bounds]);
 
   return null;
 }
@@ -90,16 +124,22 @@ export function Viewer3D({
   autoRotate = false,
   /** Mostra a barra de controles (iluminação, tela cheia, vistas). */
   controls = false,
+  /** Oferece a peça vestida no manequim padrão (item 3D-04). */
+  mannequin = false,
 }: {
   modelUrl?: string;
   interactive?: boolean;
   autoRotate?: boolean;
   controls?: boolean;
+  mannequin?: boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
   const [bg, setBg] = useState<"light" | "dark">("light");
   const [view, setView] = useState<ViewPreset | null>(null);
+  const [mode, setMode] = useState<DisplayMode>("piece");
+  // O seletor só aparece para peças ajustadas ao manequim no Blender.
+  const [fitted, setFitted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -147,13 +187,17 @@ export function Viewer3D({
 
         <Suspense fallback={<Loader />}>
           <Bounds fit clip observe margin={1.2}>
+            <Refit mode={mode} />
+            <CameraPreset view={view} controlsRef={orbitRef} />
             <Center>
-              <Model url={modelUrl} />
+              {mode === "mannequin" ? (
+                <Mannequin garmentUrl={modelUrl} />
+              ) : (
+                <Model url={modelUrl} onFitted={setFitted} />
+              )}
             </Center>
           </Bounds>
         </Suspense>
-
-        <CameraPreset view={view} controlsRef={orbitRef} />
 
         <OrbitControls
           ref={orbitRef}
@@ -165,6 +209,29 @@ export function Viewer3D({
           enableZoom={interactive}
         />
       </Canvas>
+
+      {mannequin && fitted && (
+        <div
+          role="group"
+          aria-label="Modo de visualização"
+          className="absolute right-3 top-3 flex items-center gap-1 rounded-sm bg-background/85 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] backdrop-blur"
+        >
+          {(["piece", "mannequin"] as DisplayMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              onClick={() => {
+                setMode(m);
+                setView(null);
+              }}
+              className={`rounded-sm px-2 py-1 ${mode === m ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground"}`}
+            >
+              {m === "piece" ? "Peça" : "Manequim"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {controls && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-3">

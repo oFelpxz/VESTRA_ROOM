@@ -4,6 +4,9 @@
 > 23/09), **sem o item 3D-04** — a parte 3D ficou de fora por decisão do grupo.
 > Branch: `feat/sprint3`, criada a partir da `main`.
 >
+> **Atualização (28/09/2026):** o 3D-04 foi feito depois, na branch
+> `feat/sprint3-3d` — decisões em [`SPRINT3-3D04.md`](SPRINT3-3D04.md).
+>
 > **Contexto de execução:** o Supabase (plano gratuito) estava pausado durante
 > o desenvolvimento. Todo o código foi escrito e validado **sem banco**
 > (typecheck, lint e testes da lógica isolada); a aplicação da migration e os
