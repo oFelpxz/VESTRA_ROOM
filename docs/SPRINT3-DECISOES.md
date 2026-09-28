@@ -124,6 +124,15 @@ ser removidas se tiverem produtos).
 **Decisão: todas as ações conferem a permissão no servidor**, não só escondendo
 o botão.
 
+**Decisão: remover sem janela de confirmação.** Segue o padrão das outras
+remoções do admin (categorias, produtos). O risco é baixo: só dá para remover
+cupom nunca usado, e ele pode ser recriado com o mesmo código.
+
+**Limitação conhecida:** se um cliente usar o cupom entre o momento em que o
+admin abriu a tela e o clique em "Remover", o servidor recusa a remoção (a
+condição "nunca usado" está na própria operação do banco), mas sem mensagem:
+a tela só recarrega mostrando o cupom com 1 uso e o botão desabilitado.
+
 ---
 
 ## Item 13 — Aplicar cupom no carrinho
@@ -380,6 +389,7 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 | 1–2 | Só a migration da Sprint 3 estava pendente; aplicada com `migrate deploy`. Os 8 carrinhos e 5 pedidos existentes ficaram como Econômico, sem outra alteração. |
 | 3 | Os 6 cupons de exemplo criados e conferidos no banco. |
 | 4 | ✅ CEP do endereço padrão vem preenchido; CEP do interior (13000-000): Econômico R$ 17 / 8 dias, Expresso R$ 28 / 4 dias; CEP de capital (01310-100): 4 e 2 dias; `?cep=123` mostra "CEP inválido". Pedido Econômico #GS6A28RO (R$ 199 + R$ 17 = R$ 216) e Expresso #40FHSPKS (R$ 199 + R$ 28 = R$ 227): valores e modalidade iguais no carrinho, na revisão, no pagamento, na confirmação, no banco e no admin. Ambos foram para PAGO (pagamento simulado). |
+| 5 | ✅ Criados `TESTEPCT` (15%, digitado em minúsculas e gravado em maiúsculas) e `TESTEFIX` (R$ 30, mínimo R$ 100, 5 usos). Código duplicado recusado ("Já existe um cupom com o código TESTEPCT.") mantendo código, tipo "Fixo" e valor no formulário. Recusados: 150% ("não pode passar de 100%"), `ABC DEF` e `CAFÉ10` (só letras e números). Desativar e reativar funcionam. `DEMOESGOTADO` (já usado): botão desabilitado na tela e, forçando o envio pelo navegador, o servidor também não remove. Os dois cupons de teste foram removidos no fim; o banco ficou só com os 6 do seed. |
 
 ## Validação sem banco
 
