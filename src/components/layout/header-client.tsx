@@ -16,11 +16,11 @@ const navItems = [
 
 export function HeaderClient({
   isLoggedIn,
-  isAdmin,
+  isStaff,
   cartCount,
 }: {
   isLoggedIn: boolean;
-  isAdmin: boolean;
+  isStaff: boolean;
   cartCount: number;
 }) {
   const [scrolled, setScrolled] = useState(false);
@@ -57,7 +57,7 @@ export function HeaderClient({
               {item.label}
             </Link>
           ))}
-          {isAdmin && (
+          {isStaff && (
             <Link
               href="/admin"
               className="text-xs font-medium uppercase tracking-[0.15em] text-acid transition-opacity hover:opacity-80"
@@ -104,7 +104,7 @@ export function HeaderClient({
           <MobileMenu
             navItems={navItems}
             isLoggedIn={isLoggedIn}
-            isAdmin={isAdmin}
+            isStaff={isStaff}
           />
         </div>
       </div>

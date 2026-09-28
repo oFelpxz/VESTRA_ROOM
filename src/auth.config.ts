@@ -16,7 +16,8 @@ export const authConfig = {
 
       // Já logado não deve ver login/cadastro.
       if (isLoggedIn && (path === "/login" || path === "/cadastro")) {
-        return Response.redirect(new URL("/perfil", nextUrl));
+        const target = isStaffRole(auth?.user?.role) ? "/admin" : "/perfil";
+        return Response.redirect(new URL(target, nextUrl));
       }
 
       const isAdminArea = path.startsWith("/admin");

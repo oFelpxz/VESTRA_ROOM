@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/auth-actions";
+import { isStaffRole } from "@/lib/admin-access";
 import { ProductCard } from "@/components/product/product-card";
 import {
   getProducts,
@@ -92,7 +93,7 @@ export default async function CatalogoPage({
     ]);
 
   const isLoggedIn = !!session?.user;
-  const isAdmin = session?.user?.role === "ADMIN";
+  const isStaff = isStaffRole(session?.user?.role);
 
   return (
     <div className="min-h-screen px-5 py-6 md:px-8">
@@ -107,7 +108,7 @@ export default async function CatalogoPage({
         <div className="flex items-center gap-5 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
           <span>Pesquisa</span>
           <span>Cesto 0</span>
-          {isAdmin && (
+          {isStaff && (
             <Link
               href="/admin"
               className="font-semibold text-acid transition-opacity hover:opacity-80"

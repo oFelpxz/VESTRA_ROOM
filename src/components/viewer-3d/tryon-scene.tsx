@@ -10,49 +10,97 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import type { FitPreference } from "@/lib/fit-calculator";
+import { buildGarmentFit, type GarmentSizeRow } from "@/lib/garment-fit";
+import { Avatar } from "./avatar";
+
+/** Número de fatias horizontais usadas para medir a largura da malha. */
+const SLICES = 24;
+/** Faixa de fatias considerada "torso" — evita gola/manga no topo e barra embaixo. */
+const TORSO_BAND = { from: 0.15, to: 0.75 };
+
+/**
+ * Mede a malha da peça. A largura de torso é a mediana das fatias centrais:
+ * a bounding box sozinha mede envergadura quando a peça está em A-pose.
+ */
+function measureGarment(model: THREE.Object3D) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+
+  const height = size.y || 1;
+  const slices = Array.from({ length: SLICES }, () => ({
+    min: Infinity,
+    max: -Infinity,
+  }));
+
+  const vertex = new THREE.Vector3();
+  model.updateWorldMatrix(true, true);
+  model.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const position = mesh.geometry?.getAttribute("position");
+    if (!position) return;
+    for (let i = 0; i < position.count; i += 1) {
+      vertex.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      const t = (vertex.y - box.min.y) / height;
+      const index = clampIndex(Math.floor(t * SLICES));
+      const slice = slices[index];
+      if (vertex.x < slice.min) slice.min = vertex.x;
+      if (vertex.x > slice.max) slice.max = vertex.x;
+    }
+  });
+
+  const widths: number[] = [];
+  const from = Math.floor(SLICES * TORSO_BAND.from);
+  const to = Math.ceil(SLICES * TORSO_BAND.to);
+  for (let i = from; i < to; i += 1) {
+    const slice = slices[i];
+    if (slice.max > slice.min) widths.push(slice.max - slice.min);
+  }
+  widths.sort((a, b) => a - b);
+  const torsoWidth = widths.length
+    ? widths[Math.floor(widths.length / 2)]
+    : size.x;
+
+  return { box, size, center, torsoWidth };
+}
+
+function clampIndex(i: number) {
+  return Math.min(SLICES - 1, Math.max(0, i));
+}
 
 function Garment({
   url,
   params,
   selectedColor,
+  sizeRow,
+  preference,
 }: {
   url: string;
   params: AvatarParams;
   selectedColor?: string;
+  sizeRow: GarmentSizeRow | null;
+  preference: FitPreference;
 }) {
   const { scene } = useGLTF(url);
   const model = useMemo(() => scene.clone(true), [scene]);
 
-  // Mede a bounding box natural do modelo (em suas próprias unidades)
-  // e calcula a escala que faz a roupa caber no torso do avatar.
-  const fit = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(model);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
+  const shape = useMemo(() => measureGarment(model), [model]);
 
-    // Torso "vestível" do avatar: do ombro até um pouco abaixo do quadril
-    const torsoTop = params.anchors.shoulder.y;
-    const torsoBottom = params.anchors.hip.y - params.totalHeight * 0.08;
-    const targetHeight = torsoTop - torsoBottom;
-
-    // Escala baseada na altura do torso — multiplicador suaviza para hoodie
-    // ficar caindo um pouco abaixo do quadril (não fica espremido)
-    const baseScale = (targetHeight / size.y) * 1.15;
-
-    // Ajuste de largura: se a peça é mais larga, escalamos um pouco mais
-    // baseado na largura dos ombros do avatar
-    const shoulderWidth = params.anchors.shoulder.halfWidth * 2;
-    const shoulderRatio = shoulderWidth / (size.x * baseScale);
-    const widthBoost = Math.max(1.0, shoulderRatio * 1.05);
-
-    return {
-      scale: baseScale * widthBoost,
-      offset: center, // centro natural do modelo para subtrair
-      naturalSize: size,
-    };
-  }, [model, params]);
+  const fit = useMemo(
+    () =>
+      buildGarmentFit({
+        params,
+        naturalHeight: shape.size.y,
+        naturalTorsoWidth: shape.torsoWidth,
+        sizeRow,
+        preference,
+      }),
+    [params, shape, sizeRow, preference],
+  );
 
   // Aplica cor selecionada como tint em todos os materiais
   useMemo(() => {
@@ -72,15 +120,10 @@ function Garment({
     });
   }, [model, selectedColor]);
 
-  // Posiciona o grupo de modo que o centro Y do modelo (escalado) fique
-  // na altura do centro do torso do avatar.
-  const torsoCenterY =
-    (params.anchors.shoulder.y + params.anchors.hip.y) / 2;
-
   return (
-    <group position={[0, torsoCenterY, 0]} scale={fit.scale}>
-      {/* Compensa o offset do modelo para que ele seja centralizado em (0,0,0) */}
-      <group position={[-fit.offset.x, -fit.offset.y, -fit.offset.z]}>
+    <group position={[0, fit.topY, 0]} scale={fit.scale}>
+      {/* Topo da malha em y=0 (encosta no ombro), centrada em X/Z. */}
+      <group position={[-shape.center.x, -shape.box.max.y, -shape.center.z]}>
         <primitive object={model} />
       </group>
     </group>
@@ -102,10 +145,14 @@ export function TryOnScene({
   avatarParams,
   garmentUrl,
   selectedColor,
+  sizeRow,
+  preference,
 }: {
   avatarParams: AvatarParams;
   garmentUrl: string | null;
   selectedColor?: string;
+  sizeRow: GarmentSizeRow | null;
+  preference: FitPreference;
 }) {
   // Câmera "afasta" se o avatar for mais alto
   const camY = avatarParams.totalHeight * 0.55;
@@ -128,11 +175,14 @@ export function TryOnScene({
       <directionalLight position={[-4, 3, -2]} intensity={0.5} />
 
       <Suspense fallback={<Loader />}>
+        <Avatar params={avatarParams} />
         {garmentUrl && (
           <Garment
             url={garmentUrl}
             params={avatarParams}
             selectedColor={selectedColor}
+            sizeRow={sizeRow}
+            preference={preference}
           />
         )}
         <ContactShadows

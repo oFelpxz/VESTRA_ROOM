@@ -10,11 +10,11 @@ type NavItem = { label: string; href: string };
 export function MobileMenu({
   navItems,
   isLoggedIn,
-  isAdmin,
+  isStaff,
 }: {
   navItems: NavItem[];
   isLoggedIn: boolean;
-  isAdmin: boolean;
+  isStaff: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -56,7 +56,7 @@ export function MobileMenu({
                 {item.label}
               </Link>
             ))}
-            {isAdmin && (
+            {isStaff && (
               <Link
                 href="/admin"
                 onClick={() => setOpen(false)}

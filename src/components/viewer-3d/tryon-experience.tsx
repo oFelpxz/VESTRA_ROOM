@@ -173,6 +173,8 @@ export function TryOnExperience({
           avatarParams={avatarParams}
           garmentUrl={garmentUrl}
           selectedColor={selectedColor ? colorToHex(selectedColor) : undefined}
+          sizeRow={currentSizeRow ?? null}
+          preference={preference}
         />
 
         <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/60">
