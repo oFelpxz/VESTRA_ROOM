@@ -373,6 +373,14 @@ Cada passo passou por uma revisão linha a linha antes do commit.
 10. **Clientes:** buscar por nome e por e-mail; conferir que Operador e Modelador não acessam; bloquear o cliente de teste → login recusado; com uma sessão já aberta, tentar finalizar pedido → recusado; desbloquear → volta a comprar.
 11. **Enviar a branch ao GitHub** (`git push -u origin feat/sprint3`) e abrir o pedido de merge para a `main`.
 
+### Resultados (27/09/2026, banco real, `localhost:3000`)
+
+| Passo | Resultado |
+|---|---|
+| 1–2 | Só a migration da Sprint 3 estava pendente; aplicada com `migrate deploy`. Os 8 carrinhos e 5 pedidos existentes ficaram como Econômico, sem outra alteração. |
+| 3 | Os 6 cupons de exemplo criados e conferidos no banco. |
+| 4 | ✅ CEP do endereço padrão vem preenchido; CEP do interior (13000-000): Econômico R$ 17 / 8 dias, Expresso R$ 28 / 4 dias; CEP de capital (01310-100): 4 e 2 dias; `?cep=123` mostra "CEP inválido". Pedido Econômico #GS6A28RO (R$ 199 + R$ 17 = R$ 216) e Expresso #40FHSPKS (R$ 199 + R$ 28 = R$ 227): valores e modalidade iguais no carrinho, na revisão, no pagamento, na confirmação, no banco e no admin. Ambos foram para PAGO (pagamento simulado). |
+
 ## Validação sem banco
 
 Além de typecheck, lint e testes da lógica isolada a cada passo, o **build de
