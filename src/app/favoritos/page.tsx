@@ -74,14 +74,19 @@ export default async function FavoritosPage() {
                         {product.name}
                       </Link>
                       {/* Mesmo padrão da página do produto: com promoção, o
-                          preço cheio aparece riscado ao lado. */}
+                          preço cheio aparece riscado ao lado. O espaço antes
+                          do riscado separa os preços também para o leitor de
+                          tela (sem ele, lê "149,00antes"). */}
                       <p className="mt-1 text-sm">
                         {formatBRL(Number(promo ?? product.basePrice))}
                         {promo && (
-                          <s className="ml-2 text-muted-foreground">
-                            <span className="sr-only">antes </span>
-                            {formatBRL(Number(product.basePrice))}
-                          </s>
+                          <>
+                            {" "}
+                            <s className="ml-1 text-muted-foreground">
+                              <span className="sr-only">antes </span>
+                              {formatBRL(Number(product.basePrice))}
+                            </s>
+                          </>
                         )}
                       </p>
                     </div>
