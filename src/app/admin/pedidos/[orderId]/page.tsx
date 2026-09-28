@@ -175,6 +175,14 @@ export default async function AdminPedidoDetalhePage({
                 <span className="text-muted-foreground">Subtotal</span>
                 <span>{formatBRL(subtotal)}</span>
               </li>
+              {Number(order.discountAmount) > 0 && (
+                <li className="flex items-baseline justify-between py-3">
+                  <span className="text-muted-foreground">
+                    Desconto{order.coupon && ` · ${order.coupon.code}`}
+                  </span>
+                  <span>− {formatBRL(Number(order.discountAmount))}</span>
+                </li>
+              )}
               <li className="flex items-baseline justify-between py-3">
                 <span className="text-muted-foreground">
                   Frete · {shippingMethodLabel(order.shippingMethod)}
@@ -185,14 +193,6 @@ export default async function AdminPedidoDetalhePage({
                     : formatBRL(Number(order.shippingAmount))}
                 </span>
               </li>
-              {Number(order.discountAmount) > 0 && (
-                <li className="flex items-baseline justify-between py-3">
-                  <span className="text-muted-foreground">
-                    Desconto{order.coupon && ` · ${order.coupon.code}`}
-                  </span>
-                  <span>− {formatBRL(Number(order.discountAmount))}</span>
-                </li>
-              )}
               <li className="flex items-baseline justify-between py-3">
                 <span className="font-semibold uppercase tracking-wide">
                   Total
