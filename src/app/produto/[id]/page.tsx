@@ -82,7 +82,7 @@ export default async function ProdutoPage({
                 <span className="inline-block size-1.5 rounded-full bg-acid" />
                 VESTRA FIT · 3D
               </span>
-              <ProductViewer modelUrl={product.modelUrl} controls />
+              <ProductViewer modelUrl={product.modelUrl} controls mannequin />
             </div>
           ) : (
             <div className="relative aspect-square overflow-hidden rounded-sm bg-secondary">

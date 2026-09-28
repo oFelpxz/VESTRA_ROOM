@@ -120,6 +120,17 @@ banco compartilhado em 27/09/2026**; em outro banco, aplicar **só com
 > sobrescreve estoque, preços e modelos 3D alterados pelo admin. Para os cupons
 > de exemplo, use `npm run db:seed:sprint3`, que só cria o que falta.
 
+### 3D-04 — feito depois, em 28/09/2026
+
+Branch **`feat/sprint3-3d`**, a partir da `feat/sprint3`. Seletor **Peça |
+Manequim** na página do produto: a roupa vestida num manequim de vitrine sem
+braços, também para o Visitante. Só aparece para peças ajustadas no Blender
+(marca `vestra_fit` no arquivo); hoje, o **Hoodie Core**, publicado pelo painel
+como versão 3 (`/models/hoodie-core-v3.glb`, já aprovada no banco
+compartilhado — o arquivo vai no commit).
+Decisões, ajuste das outras peças e testes:
+[`SPRINT3-3D04.md`](SPRINT3-3D04.md).
+
 ---
 
 ## Bônus — Avatar 3D real (item 3D-05, adiantado da Sprint 4)
@@ -239,8 +250,9 @@ consolidado aqui pra sobreviver à troca de chat. 32 itens, 6 categorias.
    começar A1.
 2. Depois: continuar a lista ✅ Solo por categoria ou por severidade — a
    decidir com o usuário.
-3. **Sprint 3 feita** na branch `feat/sprint3` (11–14 e 23; o 3D-04 ficou de
-   fora) — ver a seção da Sprint 3 acima.
+3. **Sprint 3 feita** na branch `feat/sprint3` (11–14 e 23) e o 3D-04 na
+   `feat/sprint3-3d` — ver a seção da Sprint 3 acima. Falta ajustar no Blender
+   Boxy Tee / Relugar, Track Jacket e Tech Vest.
 4. ~~Dar `git push origin main Felipe`~~ — feito: em 27/09/2026 as duas
    estavam no GitHub, iguais às locais. `feat/sprint3` enviada em 28/09/2026
    (pedido de merge #3 aberto).
