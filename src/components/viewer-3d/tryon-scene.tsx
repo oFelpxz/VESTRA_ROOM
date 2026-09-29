@@ -10,6 +10,42 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import { AvatarErrorBoundary } from "./avatar";
+import { DressedAvatar } from "./dressed-avatar";
+import { isFittedToMannequin } from "./mannequin-mark";
+
+/**
+ * Peça ajustada ao corpo de referência (marca `vestra_fit`) aparece vestida
+ * no avatar do cliente; as demais seguem no encaixe aproximado antigo.
+ */
+function TryOnGarment({
+  url,
+  params,
+  size,
+  selectedColor,
+}: {
+  url: string;
+  params: AvatarParams;
+  size: number;
+  selectedColor?: string;
+}) {
+  const { scene } = useGLTF(url);
+  const loose = (
+    <Garment url={url} params={params} selectedColor={selectedColor} />
+  );
+  if (!isFittedToMannequin(scene)) return loose;
+  // Se o avatar não carregar, a peça ainda aparece (encaixe antigo).
+  return (
+    <AvatarErrorBoundary fallback={loose}>
+      <DressedAvatar
+        garmentUrl={url}
+        params={params}
+        size={size}
+        selectedColor={selectedColor}
+      />
+    </AvatarErrorBoundary>
+  );
+}
 
 function Garment({
   url,
@@ -102,10 +138,13 @@ export function TryOnScene({
   avatarParams,
   garmentUrl,
   selectedColor,
+  garmentSize = 1,
 }: {
   avatarParams: AvatarParams;
   garmentUrl: string | null;
   selectedColor?: string;
+  /** Escala da peça pelo tamanho escolhido (M = 1). */
+  garmentSize?: number;
 }) {
   // Câmera "afasta" se o avatar for mais alto
   const camY = avatarParams.totalHeight * 0.55;
@@ -129,9 +168,10 @@ export function TryOnScene({
 
       <Suspense fallback={<Loader />}>
         {garmentUrl && (
-          <Garment
+          <TryOnGarment
             url={garmentUrl}
             params={avatarParams}
+            size={garmentSize}
             selectedColor={selectedColor}
           />
         )}
