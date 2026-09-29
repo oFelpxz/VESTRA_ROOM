@@ -38,8 +38,11 @@ BL = np.array([d.co for d in kb["Basis"].data])  # espaço do objeto
 BW = BL @ R.T + T                                  # mundo (Z para cima)
 
 
-def circ(P, z, xmax):
-    s = P[(np.abs(P[:, 2] - z) < 0.006) & (np.abs(P[:, 0]) < xmax)][:, :2]
+def circ(P, z, xmax, ref=None):
+    """Circunferência na altura z. Com `ref`, usa os vértices que estão nessa
+    altura em `ref` (a mesma faixa de pele, onde quer que ela tenha ido)."""
+    R0 = P if ref is None else ref
+    s = P[(np.abs(R0[:, 2] - z) < 0.006) & (np.abs(R0[:, 0]) < xmax)][:, :2]
     h = [s[i] for i in convex_hull_2d([tuple(p) for p in s])]
     return float(sum(np.linalg.norm(h[i] - h[i - 1]) for i in range(len(h))) * 100)
 
@@ -87,6 +90,9 @@ ganhos = {}
 for k in ("weight", "chest", "waist", "hip"):
     P = np.array([d.co for d in kb[k].data]) @ R.T + T
     ganhos[k] = {n: round(circ(P, z, x) - base[n], 1) for n, (z, x) in NIVEIS.items()}
+# a altura escala o corpo e sobe/desce cada medida: mede na mesma faixa de pele
+P = np.array([d.co for d in kb["height"].data]) @ R.T + T
+ganhos["height"] = {n: round(circ(P, z, x, BW) - base[n], 1) for n, (z, x) in NIVEIS.items()}
 print("CALIBRACAO", json.dumps({"base": base, "ganhos": ganhos}))
 
 bpy.ops.object.select_all(action="DESELECT")

@@ -22,3 +22,12 @@ export function compareVariants(
   const [gb, nb, sb] = sizeRank(b.size);
   return ga - gb || na - nb || sa.localeCompare(sb, "pt-BR");
 }
+
+/** Lista de tamanhos na ordem de vestuário (não na do cadastro). */
+export function sortSizes(sizes: string[]) {
+  return [...sizes].sort((a, b) => {
+    const [ga, na, sa] = sizeRank(a);
+    const [gb, nb, sb] = sizeRank(b);
+    return ga - gb || na - nb || sa.localeCompare(sb, "pt-BR");
+  });
+}

@@ -23,10 +23,12 @@ Os arquivos de entrada "originais" são os de antes dos moldes, no commit
 mb avatar_medidas.py -- avatar_orig.glb avatar_v2.glb
 # braços a 30° (pose padrão) + pesos dos braços para as roupas
 mb avatar_pose.py -- avatar_v2.glb avatar_v3.glb pesos.npz
+# altura, entrepernas, braço e ombros em cm; imprime CALIBRACAO lengths
+mb avatar_comprimentos.py -- avatar_v3.glb
 ```
 
-`avatar_v3.glb` → `public/models/avatar_base.glb`. Se a CALIBRACAO impressa
-mudar, atualizar `AVATAR_CALIBRATION` em `src/lib/avatar-builder.ts`.
+`avatar_v3.glb` → `public/models/avatar_base.glb`. Se as CALIBRACAO impressas
+mudarem, atualizar `AVATAR_CALIBRATION` em `src/lib/avatar-builder.ts`.
 
 ## 2. Camiseta (Boxy Tee 01) — molde M
 
@@ -41,6 +43,9 @@ mb posar_roupa.py -- tee_r.glb pesos.npz tee_p.glb
 mb empurrar.py -- tee_p.glb tee_pe.glb avatar_v3.glb
 mb marcar.py -- tee_pe.glb boxy_tee_molde.glb
 ```
+
+`boxy_tee_molde.glb` → `public/models/boxy_tee_01.glb` e
+`public/models/relugar-t-shirt-v1.glb` (mesmo modelo).
 
 ## 3. Moletom (Hoodie Core) — molde M
 
@@ -60,9 +65,17 @@ mb marcar.py -- mol_pe.glb hoodie_molde.glb
 
 `hoodie_molde.glb` → `public/models/hoodie-core-v3.glb`.
 
-Rodando tudo a partir dos originais, avatar e moletom saem idênticos (byte a
-byte) aos do repositório. O molde da camiseta ainda não foi publicado: o
-`boxy_tee_01.glb` do site continua o original (aparece solto no provador).
+## 4. Manequim (`public/models/manequim.glb`)
+
+O manequim de vitrine é o avatar sem braços (`../manequim_sem_bracos.py`, o
+mesmo script que roda na aba Scripting do Blender):
+
+```bash
+mb manequim.py -- avatar_v3.glb manequim.glb
+```
+
+Rodando tudo a partir dos originais, avatar, camiseta, moletom e manequim
+saem idênticos (byte a byte) aos do repositório.
 
 ## Ferramentas de conferência
 

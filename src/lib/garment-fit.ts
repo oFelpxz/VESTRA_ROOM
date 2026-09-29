@@ -344,6 +344,7 @@ export function drape(
   const radius = new Float32Array(C * rows).fill(-Infinity);
   const col = new Float32Array(count);
   const row = new Float32Array(count);
+  const cellOf = new Int32Array(count);
   const ux = new Float32Array(count);
   const uz = new Float32Array(count);
   const pushed = new Float32Array(count);
@@ -361,6 +362,7 @@ export function drape(
     col[i] = ((Math.atan2(rz, rx) + Math.PI) / (2 * Math.PI)) * C;
     row[i] = (top - before[i * 3 + 1]) / DRAPE_ROW;
     const cell = (Math.floor(col[i]) % C) * rows + Math.floor(row[i]);
+    cellOf[i] = cell;
     push[cell] = Math.max(push[cell], pushed[i]);
     radius[cell] = Math.max(radius[cell], len + pushed[i]);
   }
@@ -381,12 +383,10 @@ export function drape(
       tension[c] = (prev[(c + C - 1) % C] + 2 * prev[c] + prev[(c + 1) % C]) / 4;
   }
   const hangPush = hang(push, C, rows);
-  const filled = fillColumns(radius, C, rows);
   const hangRadius = hang(radius, C, rows);
-  const taut = new Float32Array(C * rows);
-  for (let k = 0; k < taut.length; k++) taut[k] = Math.max(0, hangRadius[k] - filled[k]);
+  fillEmptyColumns(radius, [hangPush, hangRadius], C, rows);
   smoothColumns(hangPush, C, rows);
-  smoothColumns(taut, C, rows);
+  smoothColumns(hangRadius, C, rows);
 
   // 3) leva cada vértice até o caimento da coluna dele
   let moved = 0;
@@ -402,8 +402,11 @@ export function drape(
       (g[a * rows + r0] * (1 - tr) + g[a * rows + r1] * tr) * (1 - tc) +
       (g[b * rows + r0] * (1 - tr) + g[b * rows + r1] * tr) * tc;
     const t = tension[a] * (1 - tc) + tension[b] * tc;
+    // esticado: até a reta, medido contra o raio da própria célula (o de
+    // fora), para o avesso andar junto e manter a espessura
+    const taut = Math.max(0, at(hangRadius) - radius[cellOf[i]]);
     const extra =
-      (t * at(taut) + (1 - t) * Math.max(0, at(hangPush) - pushed[i])) * weight[i];
+      (t * taut + (1 - t) * Math.max(0, at(hangPush) - pushed[i])) * weight[i];
     if (extra <= 1e-4) continue;
     cloth[i * 3] += ux[i] * extra;
     cloth[i * 3 + 2] += uz[i] * extra;
@@ -458,24 +461,30 @@ function hang(grid: Float32Array, C: number, rows: number): Float32Array {
   return out;
 }
 
-/** Copia de cada coluna com as células vazias iguais à vizinha mais próxima. */
-function fillColumns(grid: Float32Array, C: number, rows: number): Float32Array {
-  const out = grid.slice();
+/**
+ * Coluna sem nenhum vértice (faixa estreita da peça) fica com a média das
+ * vizinhas com vértices, em vez de zero, que puxaria as vizinhas para dentro.
+ */
+function fillEmptyColumns(
+  measured: Float32Array,
+  grids: Float32Array[],
+  C: number,
+  rows: number,
+) {
+  const has = Array.from({ length: C }, (_, c) =>
+    measured.subarray(c * rows, (c + 1) * rows).some((v) => v !== -Infinity),
+  );
+  if (!has.some(Boolean)) return;
   for (let c = 0; c < C; c++) {
-    const g = c * rows;
-    let last = -Infinity;
-    for (let r = 0; r < rows; r++) {
-      if (out[g + r] === -Infinity) out[g + r] = last;
-      else last = out[g + r];
-    }
-    last = -Infinity;
-    for (let r = rows - 1; r >= 0; r--) {
-      if (grid[g + r] !== -Infinity) last = grid[g + r];
-      else if (out[g + r] === -Infinity) out[g + r] = last;
-    }
-    for (let r = 0; r < rows; r++) if (out[g + r] === -Infinity) out[g + r] = 0;
+    if (has[c]) continue;
+    let l = c;
+    let r = c;
+    do l = (l + C - 1) % C; while (!has[l]);
+    do r = (r + 1) % C; while (!has[r]);
+    for (const g of grids)
+      for (let k = 0; k < rows; k++)
+        g[c * rows + k] = (g[l * rows + k] + g[r * rows + k]) / 2;
   }
-  return out;
 }
 
 /** Suaviza entre colunas vizinhas (a volta é fechada), sem baixar nada. */
@@ -495,35 +504,84 @@ function smoothColumns(grid: Float32Array, C: number, rows: number) {
 }
 
 /**
- * Escala da peça por tamanho, a partir da tabela de medidas do produto: o
- * molde (a peça encaixada no Blender) é o tamanho M; os outros tamanhos
- * crescem/encolhem na proporção do peito da tabela. Sem tabela (ou sem M),
- * usa uma progressão padrão.
+ * Graduação da peça por tamanho. O molde (a peça encaixada no Blender) é o
+ * tamanho M; os outros tamanhos não são o M esticado por igual: cada parte
+ * cresce pela sua própria regra, como numa confecção.
  */
 export const MOLDE_SIZE = "M";
 
-const DEFAULT_SIZE_SCALE: Record<string, number> = {
-  PP: 0.88,
-  P: 0.94,
-  M: 1,
-  G: 1.06,
-  GG: 1.12,
-  XG: 1.18,
+export type Grade = {
+  /** Largura e profundidade do tronco na altura do peito (M = 1). */
+  chest: number;
+  /** Largura e profundidade na barra (M = 1). */
+  hem: number;
+  /** Ombro a ombro, a mais que no M (m). */
+  shoulder: number;
+  /** Comprimento do corpo a mais que no M (m), medido na barra. */
+  length: number;
+  /** Comprimento da manga a mais que no M (m), medido no punho. */
+  sleeve: number;
 };
 
-export function sizeScale(
-  size: string | null,
-  chart: { size: string; chestMinCm: number | null; chestMaxCm: number | null }[],
-): number {
-  if (!size) return 1;
-  const mid = (r: { chestMinCm: number | null; chestMaxCm: number | null }) =>
-    r.chestMinCm != null && r.chestMaxCm != null
-      ? (r.chestMinCm + r.chestMaxCm) / 2
-      : null;
+export const MOLDE_GRADE: Grade = { chest: 1, hem: 1, shoulder: 0, length: 0, sleeve: 0 };
+
+// Regras de confecção por tamanho, onde a tabela de medidas não diz nada.
+const GRADE_LENGTH = 0.02; // comprimento do corpo (m)
+const GRADE_SHOULDER = 0.012; // ombro a ombro (m)
+const GRADE_SLEEVE = 0.015; // manga, se a tabela não tiver braço (m)
+const GRADE_CHEST = 0.06; // peito, se a tabela não tiver peito (proporção)
+
+const DEFAULT_ORDER = ["PP", "P", "M", "G", "GG", "XG"];
+
+type SizeRow = {
+  size: string;
+  chestMinCm: number | null;
+  chestMaxCm: number | null;
+  hipMinCm?: number | null;
+  hipMaxCm?: number | null;
+  armLengthMinCm?: number | null;
+  armLengthMaxCm?: number | null;
+};
+
+const mid = (min?: number | null, max?: number | null) =>
+  min != null && max != null ? (min + max) / 2 : null;
+
+/**
+ * Graduação do tamanho escolhido a partir da tabela de medidas do produto:
+ * peito da tabela → largura do tronco; quadril → largura da barra; braço →
+ * comprimento da manga; comprimento do corpo e ombro seguem a regra de
+ * confecção (+2 cm e +1,2 cm por tamanho). Sem tabela (ou sem M), usa uma
+ * progressão padrão.
+ */
+export function sizeGrade(size: string | null, chart: SizeRow[]): Grade {
+  if (!size) return MOLDE_GRADE;
   const row = chart.find((r) => r.size === size);
   const ref = chart.find((r) => r.size === MOLDE_SIZE);
-  const a = row && mid(row);
-  const b = ref && mid(ref);
-  if (a && b) return a / b;
-  return DEFAULT_SIZE_SCALE[size.toUpperCase()] ?? 1;
+
+  // quantos tamanhos acima (+) ou abaixo (-) do M: pela tabela, em ordem de
+  // peito, ou pela ordem padrão
+  const byChest = [...chart].sort(
+    (a, b) => (mid(a.chestMinCm, a.chestMaxCm) ?? 0) - (mid(b.chestMinCm, b.chestMaxCm) ?? 0),
+  );
+  let order = byChest.map((r) => r.size);
+  if (!order.includes(size) || !order.includes(MOLDE_SIZE)) order = DEFAULT_ORDER;
+  const steps = order.includes(size) ? order.indexOf(size) - order.indexOf(MOLDE_SIZE) : 0;
+
+  const ratio = (a: number | null, b: number | null) => (a && b ? a / b : null);
+  const chest =
+    ratio(mid(row?.chestMinCm, row?.chestMaxCm), mid(ref?.chestMinCm, ref?.chestMaxCm)) ??
+    1 + steps * GRADE_CHEST;
+  const hem =
+    ratio(mid(row?.hipMinCm, row?.hipMaxCm), mid(ref?.hipMinCm, ref?.hipMaxCm)) ?? chest;
+  const arm = mid(row?.armLengthMinCm, row?.armLengthMaxCm);
+  const armRef = mid(ref?.armLengthMinCm, ref?.armLengthMaxCm);
+  const sleeve = arm != null && armRef != null ? (arm - armRef) / 100 : steps * GRADE_SLEEVE;
+
+  return {
+    chest,
+    hem,
+    shoulder: steps * GRADE_SHOULDER,
+    length: steps * GRADE_LENGTH,
+    sleeve,
+  };
 }
