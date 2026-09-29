@@ -84,7 +84,7 @@ const MORPH_ALIASES: Record<string, MorphKey> = {
   inseam: "legLength",
 };
 
-function canonicalMorph(name: string): MorphKey | null {
+export function canonicalMorph(name: string): MorphKey | null {
   return MORPH_ALIASES[name.toLowerCase().replace(/[^a-z]/g, "")] ?? null;
 }
 
@@ -181,7 +181,7 @@ function GltfAvatar({
 /* Error boundary — volta para o avatar de primitivas se o GLB falhar         */
 /* -------------------------------------------------------------------------- */
 
-class AvatarErrorBoundary extends Component<
+export class AvatarErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
   { failed: boolean }
 > {
