@@ -138,16 +138,31 @@ export function makeBody(positions: Float32Array, index: ArrayLike<number>): Bod
   };
 }
 
+/** Vértice da pele mais perto do ponto (até ~15 cm), ou -1. */
+export function nearestSkin(body: Body, x: number, y: number, z: number): number {
+  return body.grid.nearest(x, y, z, SEARCH_RINGS);
+}
+
 const MARGIN = 0.008; // folga mínima entre pele e tecido (m)
 const FIELD_CELL = 0.015; // célula do campo de deslocamento (m)
 const FIELD_SIGMA = 2; // borrão do campo, em células (~3 cm)
+// Fase final, com borrão curto (~1 cm): resolve os pontos presos entre dois
+// lados do corpo (axila, punho encostado na mão), onde o campo largo empurra
+// para lados opostos e quase não sai do lugar.
+const FINE_SIGMA = 0.7;
+const FINE_ITERATIONS = 15;
+// Na fase final, pontos a mais que isso da pele já não precisam ser
+// conferidos (cada passo move o tecido poucos milímetros).
+const FINE_OUTSIDE = 0.02;
 const SEARCH_RINGS = 6; // até ~15 cm dentro do corpo
 const FAR_OUTSIDE = 0.05; // acima disso o ponto não encosta mais no corpo
 
 /**
  * Empurra o tecido para fora onde o corpo atravessa. O deslocamento é
  * espalhado num campo 3D borrado, então o tecido estica de forma suave e todas
- * as camadas da peça (frente, avesso, gola) se movem juntas.
+ * as camadas da peça (frente, avesso, gola) se movem juntas. Depois de
+ * `iterations` passos com o campo largo, até FINE_ITERATIONS passos com um
+ * campo curto acertam o que sobrou.
  * Retorna quantos vértices ainda encostam no fim.
  */
 export function pushOut(
@@ -160,7 +175,7 @@ export function pushOut(
   const disp = new Float32Array(garment.length);
   let touching = 0;
 
-  for (let it = 0; it < iterations; it++) {
+  for (let it = 0; it < iterations + FINE_ITERATIONS; it++) {
     touching = 0;
     disp.fill(0);
     const hit: number[] = [];
@@ -181,7 +196,7 @@ export function pushOut(
         (x - body.positions[j * 3]) * nx +
         (y - body.positions[j * 3 + 1]) * ny +
         (z - body.positions[j * 3 + 2]) * nz;
-      if (s > FAR_OUTSIDE) {
+      if (s > (it < iterations ? FAR_OUTSIDE : FINE_OUTSIDE)) {
         active[i] = 0; // o campo só empurra para fora: não volta a encostar
         continue;
       }
@@ -195,21 +210,83 @@ export function pushOut(
     }
     touching = hit.length;
     if (touching === 0) break;
-    applyField(garment, disp, hit);
+    applyField(garment, disp, hit, it < iterations ? FIELD_SIGMA : FINE_SIGMA);
   }
   return touching;
 }
 
-/** Espalha os deslocamentos pontuais num campo suave e aplica em toda a peça. */
-function applyField(garment: Float32Array, disp: Float32Array, hit: number[]) {
+const SETTLE_ITERATIONS = 3;
+
+/**
+ * Assentamento, antes de `pushOut`: a peça desce/entra até encostar no corpo
+ * onde ela se apoia (`goal[i]`: folga desejada até a pele, em m; `pull[i]`:
+ * quanto o vértice se apoia, 0 a 1). Num corpo menor que o de referência,
+ * ombros e costas altas da peça voltam a encostar no cliente em vez de
+ * ficarem no ar com a forma do corpo de referência ("tenda"). Só puxa para
+ * dentro, e em campo suave, como `pushOut`, para as camadas andarem juntas.
+ * Retorna quantos vértices foram puxados na primeira passada.
+ */
+export function settle(
+  garment: Float32Array,
+  body: Body,
+  goal: ArrayLike<number>,
+  pull: ArrayLike<number>,
+): number {
+  const count = garment.length / 3;
+  const disp = new Float32Array(garment.length);
+  let first = -1;
+  for (let it = 0; it < SETTLE_ITERATIONS; it++) {
+    disp.fill(0);
+    const hit: number[] = [];
+    for (let i = 0; i < count; i++) {
+      if (!pull[i]) continue;
+      const x = garment[i * 3];
+      const y = garment[i * 3 + 1];
+      const z = garment[i * 3 + 2];
+      const j = body.grid.nearest(x, y, z, SEARCH_RINGS);
+      if (j < 0) continue;
+      const nx = body.normals[j * 3];
+      const ny = body.normals[j * 3 + 1];
+      const nz = body.normals[j * 3 + 2];
+      const s =
+        (x - body.positions[j * 3]) * nx +
+        (y - body.positions[j * 3 + 1]) * ny +
+        (z - body.positions[j * 3 + 2]) * nz;
+      const m = (s - goal[i]) * pull[i];
+      if (m <= 1e-4) continue;
+      disp[i * 3] = -nx * m;
+      disp[i * 3 + 1] = -ny * m;
+      disp[i * 3 + 2] = -nz * m;
+      hit.push(i);
+    }
+    if (first < 0) first = hit.length;
+    if (!hit.length) break;
+    applyField(garment, disp, hit, FIELD_SIGMA, 1);
+  }
+  return first;
+}
+
+/**
+ * Espalha os deslocamentos pontuais num campo suave e aplica na peça. O campo
+ * só existe em volta dos pontos que encostam (até o alcance do borrão); o
+ * resto da peça não se move.
+ */
+function applyField(
+  garment: Float32Array,
+  disp: Float32Array,
+  hit: number[],
+  sigma: number,
+  gain = 1.15,
+) {
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-  for (let i = 0; i < garment.length; i += 3) {
+  for (const v of hit) {
+    const i = v * 3;
     minX = Math.min(minX, garment[i]); maxX = Math.max(maxX, garment[i]);
     minY = Math.min(minY, garment[i + 1]); maxY = Math.max(maxY, garment[i + 1]);
     minZ = Math.min(minZ, garment[i + 2]); maxZ = Math.max(maxZ, garment[i + 2]);
   }
-  const pad = FIELD_CELL * (FIELD_SIGMA * 3 + 2);
+  const pad = FIELD_CELL * (sigma * 3 + 2);
   const ox = minX - pad, oy = minY - pad, oz = minZ - pad;
   const nx = Math.ceil((maxX + pad - ox) / FIELD_CELL) + 2;
   const ny = Math.ceil((maxY + pad - oy) / FIELD_CELL) + 2;
@@ -228,7 +305,7 @@ function applyField(garment: Float32Array, disp: Float32Array, hit: number[]) {
     fx[c] += disp[v * 3]; fy[c] += disp[v * 3 + 1]; fz[c] += disp[v * 3 + 2];
     fw[c] += 1;
   }
-  for (const f of [fx, fy, fz, fw]) blur3(f, nx, ny, nz);
+  for (const f of [fx, fy, fz, fw]) blur3(f, nx, ny, nz, sigma);
 
   let maxW = 0;
   for (let c = 0; c < size; c++) maxW = Math.max(maxW, fw[c]);
@@ -236,8 +313,8 @@ function applyField(garment: Float32Array, disp: Float32Array, hit: number[]) {
   for (let c = 0; c < size; c++) {
     const w = fw[c];
     if (w <= 1e-9) { fx[c] = fy[c] = fz[c] = 0; continue; }
-    // média local + queda suave nas bordas; 1,15 ajuda a convergir rápido
-    const k = (Math.min(1, w / floor) * 1.15) / w;
+    // média local + queda suave nas bordas; `gain` > 1 ajuda a convergir rápido
+    const k = (Math.min(1, w / floor) * gain) / w;
     fx[c] *= k; fy[c] *= k; fz[c] *= k;
   }
 
@@ -246,6 +323,8 @@ function applyField(garment: Float32Array, disp: Float32Array, hit: number[]) {
     const gy = (garment[v + 1] - oy) / FIELD_CELL;
     const gz = (garment[v + 2] - oz) / FIELD_CELL;
     const i0 = Math.floor(gx), j0 = Math.floor(gy), k0 = Math.floor(gz);
+    if (i0 < 0 || j0 < 0 || k0 < 0 || i0 >= nx - 1 || j0 >= ny - 1 || k0 >= nz - 1)
+      continue; // fora do alcance do campo
     const tx = gx - i0, ty = gy - j0, tz = gz - k0;
     let dx = 0, dy = 0, dz = 0;
     for (let a = 0; a < 2; a++)
@@ -260,10 +339,16 @@ function applyField(garment: Float32Array, disp: Float32Array, hit: number[]) {
 }
 
 /** Borrão gaussiano separável numa grade 3D (in place). */
-function blur3(f: Float32Array, nx: number, ny: number, nz: number) {
-  const r = Math.ceil(FIELD_SIGMA * 3);
+function blur3(
+  f: Float32Array,
+  nx: number,
+  ny: number,
+  nz: number,
+  sigma: number,
+) {
+  const r = Math.ceil(sigma * 3);
   const kernel = Array.from({ length: 2 * r + 1 }, (_, i) =>
-    Math.exp(-0.5 * ((i - r) / FIELD_SIGMA) ** 2),
+    Math.exp(-0.5 * ((i - r) / sigma) ** 2),
   );
   const dims = [nx, ny, nz];
   const strides = [ny * nz, nz, 1];

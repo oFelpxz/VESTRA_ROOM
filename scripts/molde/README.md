@@ -60,7 +60,8 @@ mb alinhar_moletom.py -- avatar_mol.glb mol_r.glb mol_a.glb
 mb empurrar.py -- mol_a.glb mol_e.glb avatar_mol.glb
 mb posar_roupa.py -- mol_e.glb pesos.npz mol_p.glb 12,6
 mb empurrar.py -- mol_p.glb mol_pe.glb avatar_v3.glb
-mb marcar.py -- mol_pe.glb hoodie_molde.glb
+# 0.10 = altura da ribana da barra (m), medida na costura
+mb marcar.py -- mol_pe.glb hoodie_molde.glb 0.10
 ```
 
 `hoodie_molde.glb` → `public/models/hoodie-core-v3.glb`.
@@ -91,6 +92,6 @@ saem idênticos (byte a byte) aos do repositório.
    de manga curta; `alinhar_moletom.py` + `avatar_pose.py … abertura,frente`
    para manga longa (medir o ângulo das mangas do arquivo).
 2. `empurrar.py` → `posar_roupa.py` → `empurrar.py` (no `avatar_v3.glb`) →
-   `marcar.py`.
+   `marcar.py` (com a altura da ribana da barra, em m, se a peça tiver).
 3. Conferir com `render.py` e no provador (`/produto/<id>/provador`, painel
    "Simular corpo (dev)").

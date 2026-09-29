@@ -1,6 +1,13 @@
 import type { AvatarParams } from "@/lib/avatar-builder";
 import type { Grade } from "@/lib/garment-fit";
-import { dress, type FitBody, type FitPart, type Fitted } from "./garment-dress";
+import {
+  dress,
+  NO_FIT_OPTIONS,
+  type FitBody,
+  type FitOptions,
+  type FitPart,
+  type Fitted,
+} from "./garment-dress";
 
 /**
  * Leva o caimento para um Web Worker e só manda o pedido mais recente: se o
@@ -17,7 +24,7 @@ export type FitRequest = {
 };
 
 export type FitWorkerMessage =
-  | { type: "init"; body: FitBody; parts: FitPart[] }
+  | { type: "init"; body: FitBody; parts: FitPart[]; options: FitOptions }
   | { type: "fit"; request: FitRequest };
 
 export class FitRunner {
@@ -32,6 +39,7 @@ export class FitRunner {
     private parts: FitPart[],
     private onResult: (fitted: Fitted) => void,
     private onError: (error: unknown) => void,
+    private options: FitOptions = NO_FIT_OPTIONS,
   ) {
     try {
       this.worker = new Worker(
@@ -49,7 +57,7 @@ export class FitRunner {
       this.worker = null;
       if (this.current) this.runHere(this.current);
     };
-    this.post({ type: "init", body, parts });
+    this.post({ type: "init", body, parts, options });
   }
 
   request(morphs: FitRequest["morphs"], totalHeight: number, grade: Grade) {
@@ -79,7 +87,9 @@ export class FitRunner {
     setTimeout(() => {
       if (this.disposed || this.current !== r) return;
       try {
-        this.done(dress(this.body, this.parts, r.morphs, r.totalHeight, r.grade));
+        this.done(
+          dress(this.body, this.parts, r.morphs, r.totalHeight, r.grade, this.options),
+        );
       } catch (error) {
         this.current = null;
         this.onError(error);

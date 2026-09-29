@@ -11,6 +11,7 @@ import {
   WRIST,
   mirror,
   type FitBody,
+  type FitOptions,
   type FitPart,
   type Fitted,
 } from "@/lib/garment-dress";
@@ -74,6 +75,19 @@ function extractBody(scene: THREE.Object3D): FitBody {
   return { base, deltas, keys, index, shoulders, arms };
 }
 
+/**
+ * Ajustes da peça gravados no molde (Custom Properties da cena no Blender,
+ * ver scripts/molde/marcar.py): `vestra_ribana` = altura da ribana da barra, em m.
+ */
+function readFitOptions(scene: THREE.Object3D): FitOptions {
+  let rib = 0;
+  scene.traverse((o) => {
+    const v = Number(o.userData?.vestra_ribana);
+    if (v > 0) rib = v;
+  });
+  return { rib };
+}
+
 function extractGarment(scene: THREE.Object3D): Part[] {
   scene.updateMatrixWorld(true);
   const parts: Part[] = [];
@@ -113,6 +127,7 @@ export function DressedAvatar({
 
   const body = useMemo(() => extractBody(avatar.scene), [avatar.scene]);
   const parts = useMemo(() => extractGarment(garment.scene), [garment.scene]);
+  const options = useMemo(() => readFitOptions(garment.scene), [garment.scene]);
   const { morphs, totalHeight } = params;
 
   // Resultado do worker, marcado com as peças para as quais foi calculado.
@@ -128,17 +143,18 @@ export function DressedAvatar({
       parts.map((p) => ({ base: p.base, arm: p.arm })),
       (fitted) => setResult({ parts, fitted }),
       (e) => setError(e ?? new Error("falha no caimento")),
+      options,
     );
     runner.current = r;
     return () => {
       r.dispose();
       runner.current = null;
     };
-  }, [body, parts]);
+  }, [body, parts, options]);
 
   useEffect(() => {
     runner.current?.request(morphs, totalHeight, grade);
-  }, [body, parts, morphs, totalHeight, grade]);
+  }, [body, parts, options, morphs, totalHeight, grade]);
 
   // Deixa o AvatarErrorBoundary mostrar o encaixe antigo.
   if (error) throw error;
@@ -215,7 +231,7 @@ function FittedAvatar({
       console.info(
         `[VESTRA FIT] caimento em ${fitted.ms} ms · peito ×${fitted.grade.chest.toFixed(2)}` +
           ` · ${fitted.touching} pontos ainda encostando` +
-          ` · ${fitted.draped} no caimento`,
+          ` · ${fitted.settled} assentados · ${fitted.draped} no caimento`,
       );
     }
   }, [fitted]);

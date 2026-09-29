@@ -10,11 +10,15 @@
 No provador (`/produto/<id>/provador`), o avatar tem as medidas do cliente e
 a peça aparece **no tamanho escolhido**, não sob medida:
 
-- **Magro num GG:** a peça sobra (mais larga e mais comprida).
+- **Magro num GG:** a peça sobra (mais larga e mais comprida), mas apoiada
+  nos ombros e com a frente e as costas caindo rente ao corpo, não "armada"
+  em volta dele.
 - **Grande num P:** o tecido fica esticado sobre o corpo.
 - **Corpo perto do tamanho:** a peça cai como no molde.
 - **Quadril ou barriga maiores que a peça:** o tecido desce reto a partir do
   ponto mais largo, em vez de "abraçar" o corpo por baixo.
+- **Moletom:** a ribana da barra abraça o quadril, e o corpo do moletom
+  franze um pouco por cima dela.
 
 Hoje isso vale para o **Hoodie Core**, a **Boxy Tee 01** e a **Relugar
 T-Shirt** (mesmo modelo da Boxy Tee). As outras peças continuam com o
@@ -39,10 +43,10 @@ essas medidas sem mexer no perfil salvo. Ele não aparece em produção.
 | Moletom moldado (tamanho M) | `public/models/hoodie-core-v3.glb` |
 | Camiseta moldada (tamanho M) | `public/models/boxy_tee_01.glb` |
 | Manequim de vitrine (avatar sem braços) | `public/models/manequim.glb` |
-| Vestir: tamanho, apoio nos ombros, mangas no braço | `src/lib/garment-dress.ts` (`dress`) |
+| Vestir: tamanho, apoio nos ombros, mangas no braço, ribana | `src/lib/garment-dress.ts` (`dress`) |
 | Conta num Web Worker, sem travar a página | `src/lib/garment-fit.worker.ts` + `src/lib/fit-runner.ts` |
 | Mostrar o avatar vestido | `src/components/viewer-3d/dressed-avatar.tsx` |
-| Empurrar o tecido para fora do corpo + caimento | `src/lib/garment-fit.ts` (`pushOut`, `drape`) |
+| Assentar, empurrar o tecido para fora do corpo e caimento | `src/lib/garment-fit.ts` (`settle`, `pushOut`, `drape`) |
 | Graduação por tamanho a partir da tabela de medidas | `src/lib/garment-fit.ts` (`sizeGrade`) |
 | Cor sobre a textura | `src/lib/garment-color.ts` (`tintMaterial`) |
 | Provador escolhe: peça moldada ou encaixe antigo | `src/components/viewer-3d/tryon-scene.tsx` |
@@ -55,11 +59,16 @@ A cada troca de tamanho ou de medida, o site:
    ombros do cliente;
 3. faz as mangas acompanharem o braço do cliente (atributo `_BRACO` gravado no
    molde);
-4. empurra o tecido para fora onde o corpo atravessa;
-5. aplica o caimento: no tronco, o tecido empurrado não volta para dentro
+4. encolhe a ribana da barra, se a peça tiver;
+5. faz a frente e as costas recuarem onde o cliente é mais raso que o corpo
+   de referência (ver "Peça maior não fica armada");
+6. assenta a peça onde ela se apoiava no corpo de referência: ombros, costas
+   altas, parte de cima do braço;
+7. empurra o tecido para fora onde o corpo atravessa, com folga de 8 mm;
+8. aplica o caimento: no tronco, o tecido empurrado não volta para dentro
    abaixo do ponto mais largo.
 
-A conta leva de 0,3 a 0,7 s no computador de desenvolvimento, mas roda num
+A conta leva de 0,3 a 0,75 s no computador de desenvolvimento, mas roda num
 Web Worker: a página continua respondendo e mostra a peça anterior até a nova
 ficar pronta. Se o cliente trocar de tamanho várias vezes seguidas, só o
 último pedido é calculado. Sem suporte a worker, a conta volta a rodar na
@@ -81,17 +90,54 @@ da tabela de medidas do produto:
 
 | Parte | Regra |
 |---|---|
-| Largura do tronco (peito) | peito da tabela ÷ peito do M |
+| Largura do tronco (peito) | peito da tabela ÷ peito do M; abaixo dos ombros, quase tudo vai para a largura (só 30% para a profundidade) |
 | Largura da barra | quadril da tabela ÷ quadril do M (sem quadril: igual ao peito) |
 | Comprimento da manga | braço da tabela − braço do M (sem braço: 1,5 cm por tamanho) |
 | Comprimento do corpo | 2 cm por tamanho |
 | Ombro a ombro | 1,2 cm por tamanho |
 | Gola e capuz | quase não mudam (¼ da mudança do peito) |
 
-Medido no provador (moletom, corpo magro): do P ao GG o comprimento vai de
-−2 a +4 cm, a largura de ×0,95 a ×1,16 e o capuz muda menos de 1 cm. Hoje a
-tabela do Hoodie Core só tem tórax e cintura; preenchendo quadril e braço no
-admin, barra e manga passam a seguir a tabela sem mudar código.
+A frente e as costas de uma peça são painéis planos que se apoiam no corpo:
+um tamanho maior fica mais largo, não mais fundo. Por isso, abaixo dos
+ombros, a mudança do peito vai quase toda para a largura, mantendo o
+perímetro da peça.
+
+Medido com a progressão padrão (moletom, corpo magro): do P ao GG a largura
+vai de ×0,96 a ×1,10, a profundidade quase não muda (×0,99 a ×1,01), a barra
+vai de 1,4 cm mais alta a 3,6 cm mais baixa e o capuz muda menos de 0,5 cm.
+Hoje a tabela do Hoodie Core só tem tórax e cintura; preenchendo quadril e
+braço no admin, barra e manga passam a seguir a tabela sem mudar código.
+
+### Peça maior não fica armada
+
+O molde tem a forma do corpo de referência (feminino, com busto). Num corpo
+mais raso, a peça ficava no ar com essa forma, como uma tenda. Agora:
+
+- **Frente e costas** pendem do ponto mais saliente do corpo acima delas
+  (peito, barriga; omoplatas). Onde o cliente é mais raso que o corpo de
+  referência nesse ponto, o painel recua o mesmo tanto, e o tecido que sobra
+  vai para os lados, com o mesmo perímetro.
+- **Ombros, costas altas e a parte de cima do braço** (pele virada para
+  cima): onde o molde encostava no corpo de referência, a peça volta a
+  encostar no cliente (`settle`). Embaixo do braço e abaixo da axila, a peça
+  fica pendurada.
+
+Corpo maior que o de referência não passa por aqui: quem cuida é o empurrão.
+
+### Ribana da barra
+
+A marca `vestra_ribana` do molde (altura da ribana, em m; o moletom usa
+0,10) faz a ribana encolher até 88% do raio e o corpo da peça afinar até ela
+nos 8 cm de cima. Quadril maior que isso estica a ribana de volta.
+
+### Folga mínima, também na axila
+
+Onde o tecido fica preso entre dois lados do corpo (braço e tronco na
+axila), os empurrões para lados opostos quase se anulam no campo suave de
+~3 cm. Uma fase final, com um campo de ~1 cm, resolve esses pontos: numa
+camiseta num corpo pesado, os pontos a menos de 8 mm da pele caíram de ~900
+(90 deles por dentro, até 6 mm) para ~200, nenhum por dentro. O
+que sobra fica onde o braço encosta no tronco e não há 16 mm de espaço.
 
 ### Cor sobre a textura
 
@@ -151,6 +197,9 @@ Os testes automáticos acharam dois defeitos, já corrigidos: uma célula vazia
 na grade (linha sem ponto) e uma coluna inteira vazia faziam o tecido logo
 abaixo do ponto mais largo voltar ~2 cm para dentro (um "vinco").
 
+O caimento não cria dobras: o tecido que sobra num tamanho maior aparece
+como largura, não como pregas.
+
 ### Scripts reproduzíveis
 
 Todo o processo roda no Blender sem interface. Rodando os scripts de
@@ -174,14 +223,17 @@ A **Relugar T-Shirt** usa o mesmo modelo da Boxy Tee com outro arquivo:
 ## Como testar
 
 `npm test` roda os testes automáticos (sem navegador nem banco): graduação,
-empurrão, caimento, altura, calibração e o Web Worker. No navegador:
+empurrão (inclusive preso entre dois lados), assentamento, caimento, altura,
+calibração e o Web Worker. No navegador:
 
 1. `npm run dev` e entrar com um cliente que tenha medidas no perfil.
 2. Abrir o provador do Hoodie Core e trocar P / M / G / GG.
 3. Em "Simular corpo (dev)", testar por exemplo:
    - normal: 175 cm, 75 kg, peito 96, cintura 82, quadril 100;
    - quadril grande: quadril 130;
-   - barriga: 110 kg, peito 112, cintura 120, quadril 112.
+   - barriga: 110 kg, peito 112, cintura 120, quadril 112;
+   - magro num GG: 178 cm, 58 kg, peito 84, cintura 68, quadril 86 (ver de
+     lado: a frente cai rente ao peito).
 4. O console do navegador mostra o tempo do caimento e quantos pontos ainda
    encostam na pele.
 
@@ -194,15 +246,19 @@ empurrão, caimento, altura, calibração e o Web Worker. No navegador:
 - **Graduação por regra, não molde real por tamanho.** As regras são as de
   confecção e da tabela de medidas; a loja não tem as medidas da peça pronta
   de cada tamanho.
-- **O caimento não é física.** Não surgem dobras novas, e uma peça apertada
-  no quadril não "sobe". Mangas e capuz não têm caimento.
+- **O caimento não é física.** Não surgem dobras novas (a sobra de um
+  tamanho maior vira largura, não pregas), e uma peça apertada no quadril
+  não "sobe". Mangas e capuz não têm caimento; a manga só assenta onde o
+  molde encostava no braço, o que é pouco nas duas peças de hoje.
 - **Não há colisão tecido com tecido.** Em corpos muito grandes, o tronco
   pode atravessar a manga.
-- **Moletom:** dobra pequena na axila, punho embolado aproximado, ribana da
-  barra que não aperta.
+- **Moletom:** dobra pequena na axila e punho embolado aproximado.
+- **Casos-limite do corpo:** quadril acima de ~130 cm leva a shape key de
+  quadril além de 1 e o avatar deforma (gomos e vinco em volta do quadril).
+  Corrigir pede refazer a shape key no Blender.
 - **Cor:** estampas coloridas viram um tom só (o da cor escolhida).
 - **Desempenho:** a conta não trava mais a página, mas a peça nova demora de
-  0,3 a 0,7 s para aparecer. Feito e testado para computador (o foco do
+  0,3 a 0,75 s para aparecer. Feito e testado para computador (o foco do
   projeto agora); não foi testado no celular.
 
 ## Pendências

@@ -5,6 +5,7 @@ import {
   drape,
   makeBody,
   pushOut,
+  settle,
   sizeGrade,
 } from "./garment-fit";
 
@@ -93,6 +94,58 @@ describe("pushOut", () => {
     const before = cloth.slice();
     pushOut(cloth, makeBody(positions, index));
     for (let i = 0; i < cloth.length; i++) close(cloth[i], before[i]);
+  });
+
+  it("resolve o tecido preso entre dois lados do corpo (axila)", () => {
+    // "braço" e "tronco": duas esferas com 2 cm entre as peles (x = ±1 cm)
+    const a = sphere(0.1, 48);
+    const b = sphere(0.1, 48);
+    const positions = new Float32Array([...a.positions, ...b.positions]);
+    for (let i = 0; i < a.positions.length; i += 3) {
+      positions[i] -= 0.11;
+      positions[a.positions.length + i] += 0.11;
+    }
+    const n = a.positions.length / 3;
+    const index = [...a.index, ...b.index.map((k) => k + n)];
+    // duas camadas de tecido, cada uma a 6 mm de uma pele: os empurrões são
+    // para lados opostos e, no campo largo, quase se anulam
+    const pts: number[] = [];
+    for (const x of [-0.004, 0.004])
+      for (let y = -0.02; y <= 0.02001; y += 0.01)
+        for (let z = -0.02; z <= 0.02001; z += 0.01) pts.push(x, y, z);
+    const cloth = new Float32Array(pts);
+    pushOut(cloth, makeBody(positions, index));
+    for (let i = 0; i < cloth.length; i += 3) {
+      const gap = (cx: number) =>
+        Math.hypot(cloth[i] - cx, cloth[i + 1], cloth[i + 2]) - 0.1;
+      assert.ok(
+        Math.min(gap(-0.11), gap(0.11)) > 0.007,
+        `ponto sem folga: ${(Math.min(gap(-0.11), gap(0.11)) * 1000).toFixed(1)} mm`,
+      );
+    }
+  });
+});
+
+describe("settle", () => {
+  it("assenta onde a peça se apoia e não mexe no resto", () => {
+    const { positions, index } = sphere(0.1);
+    // casca 4 cm acima da pele; só o topo se apoia (folga desejada: 1 cm)
+    const cloth = sphere(0.14, 24).positions;
+    const before = cloth.slice();
+    const count = cloth.length / 3;
+    const goal = new Float32Array(count).fill(0.01);
+    const pull = new Float32Array(count);
+    for (let i = 0; i < count; i++) pull[i] = cloth[i * 3 + 1] > 0.1 ? 1 : 0;
+    assert.ok(settle(cloth, makeBody(positions, index), goal, pull) > 0);
+    for (let i = 0; i < count; i++) {
+      const r0 = Math.hypot(before[i * 3], before[i * 3 + 1], before[i * 3 + 2]);
+      const r = Math.hypot(cloth[i * 3], cloth[i * 3 + 1], cloth[i * 3 + 2]);
+      // só para dentro
+      assert.ok(r <= r0 + 1e-6, `saiu para fora: ${r0} → ${r}`);
+      const y = before[i * 3 + 1];
+      if (y > 0.13) assert.ok(r < 0.116, `topo não assentou: r = ${r.toFixed(3)}`);
+      if (y < -0.05) close(r, r0);
+    }
   });
 });
 
