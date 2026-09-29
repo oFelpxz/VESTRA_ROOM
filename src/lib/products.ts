@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { formatBRL } from "@/lib/format";
 import { resolveModelUrl } from "@/lib/storage";
+import { sortSizes } from "@/lib/sizes";
 
 export type ProductFilters = {
   categoria?: string;
@@ -99,7 +100,7 @@ export async function getFilterOptions() {
   const variants = await prisma.productVariant.findMany({
     select: { size: true, color: true },
   });
-  const sizes = [...new Set(variants.map((v) => v.size))].sort();
+  const sizes = sortSizes([...new Set(variants.map((v) => v.size))]);
   const colors = [...new Set(variants.map((v) => v.color))].sort();
 
   const products = await prisma.product.findMany({
@@ -206,7 +207,7 @@ export async function getProductDetail(
   if (!product) return null;
 
   const colors = [...new Set(product.variants.map((v) => v.color))];
-  const sizes = [...new Set(product.variants.map((v) => v.size))];
+  const sizes = sortSizes([...new Set(product.variants.map((v) => v.size))]);
 
   const tags: string[] = [];
   if (product.has3DModel) tags.push("3D DISPONÍVEL");

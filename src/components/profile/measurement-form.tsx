@@ -31,9 +31,9 @@ const fields: { name: keyof NonNullable<MeasurementInitial>; label: string }[] =
     { name: "chestCm", label: "Tórax / Busto (cm)" },
     { name: "waistCm", label: "Cintura (cm)" },
     { name: "hipCm", label: "Quadril (cm)" },
-    { name: "shoulderCm", label: "Ombros (cm)" },
-    { name: "armLengthCm", label: "Comprimento do braço (cm)" },
-    { name: "legLengthCm", label: "Comprimento da perna (cm)" },
+    { name: "shoulderCm", label: "Ombros — de ombro a ombro (cm)" },
+    { name: "armLengthCm", label: "Braço — do ombro ao pulso (cm)" },
+    { name: "legLengthCm", label: "Perna — entrepernas até o chão (cm)" },
   ];
 
 const initialState: MeasurementFormState = {};

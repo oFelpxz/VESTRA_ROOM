@@ -8,7 +8,7 @@ import {
   type FitPreference,
 } from "@/lib/fit-calculator";
 import { buildAvatarParams } from "@/lib/avatar-builder";
-import { sizeScale } from "@/lib/garment-fit";
+import { MOLDE_SIZE, sizeGrade } from "@/lib/garment-fit";
 import { TryOnScene } from "./tryon-scene";
 import { FitIndicator } from "./fit-indicator";
 
@@ -49,13 +49,24 @@ type UserProfile = {
 
 // Só em desenvolvimento: simular outros corpos sem mexer no perfil salvo.
 const SIMULATE = process.env.NODE_ENV !== "production";
-type SimKey = "heightCm" | "weightKg" | "chestCm" | "waistCm" | "hipCm";
+type SimKey =
+  | "heightCm"
+  | "weightKg"
+  | "chestCm"
+  | "waistCm"
+  | "hipCm"
+  | "shoulderCm"
+  | "armLengthCm"
+  | "legLengthCm";
 const SIM_FIELDS: { key: SimKey; label: string; min: number; max: number }[] = [
   { key: "heightCm", label: "Altura (cm)", min: 150, max: 200 },
   { key: "weightKg", label: "Peso (kg)", min: 45, max: 130 },
   { key: "chestCm", label: "Peito (cm)", min: 78, max: 125 },
   { key: "waistCm", label: "Cintura (cm)", min: 60, max: 120 },
   { key: "hipCm", label: "Quadril (cm)", min: 80, max: 130 },
+  { key: "shoulderCm", label: "Ombros (cm)", min: 36, max: 56 },
+  { key: "armLengthCm", label: "Braço (cm)", min: 45, max: 72 },
+  { key: "legLengthCm", label: "Perna (cm)", min: 62, max: 95 },
 ];
 
 // Pequena paleta para "cor visual" — mapeia nome → hex aproximado
@@ -105,8 +116,11 @@ export function TryOnExperience({
   const [selectedColor, setSelectedColor] = useState<string | null>(
     colors[0] ?? null,
   );
+  // Começa no tamanho do molde (M), se a peça tiver; senão, no do meio.
   const [selectedSize, setSelectedSize] = useState<string | null>(
-    sizes[Math.floor(sizes.length / 2)] ?? null,
+    sizes.includes(MOLDE_SIZE)
+      ? MOLDE_SIZE
+      : (sizes[Math.floor(sizes.length / 2)] ?? null),
   );
   const [preference, setPreference] = useState<FitPreference>(
     profile.fitPreference,
@@ -135,8 +149,8 @@ export function TryOnExperience({
   );
 
   // A peça tem a forma do tamanho escolhido — não acompanha o corpo.
-  const garmentSize = useMemo(
-    () => sizeScale(selectedSize, sizeChart),
+  const garmentGrade = useMemo(
+    () => sizeGrade(selectedSize, sizeChart),
     [selectedSize, sizeChart],
   );
 
@@ -196,7 +210,7 @@ export function TryOnExperience({
           avatarParams={avatarParams}
           garmentUrl={garmentUrl}
           selectedColor={selectedColor ? colorToHex(selectedColor) : undefined}
-          garmentSize={garmentSize}
+          garmentGrade={garmentGrade}
         />
 
         <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/60">

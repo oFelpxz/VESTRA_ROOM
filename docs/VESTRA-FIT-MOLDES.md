@@ -16,13 +16,19 @@ a peça aparece **no tamanho escolhido**, não sob medida:
 - **Quadril ou barriga maiores que a peça:** o tecido desce reto a partir do
   ponto mais largo, em vez de "abraçar" o corpo por baixo.
 
-Hoje isso vale para o **Hoodie Core**. As outras peças continuam com o encaixe
-aproximado antigo até ganharem molde (o da Boxy Tee 01 já existe, ver
-"Pendências").
+Hoje isso vale para o **Hoodie Core**, a **Boxy Tee 01** e a **Relugar
+T-Shirt** (mesmo modelo da Boxy Tee). As outras peças continuam com o
+encaixe aproximado antigo até ganharem molde.
+
+A **cor** escolhida vale de verdade, mesmo sobre textura escura: o moletom
+preto fica branco em "Branco", e o desenho do tricô continua aparecendo.
+
+O avatar usa as 8 medidas do perfil em cm: altura, peso, peito, cintura,
+quadril, ombros (de ombro a ombro), braço (do ombro ao pulso) e perna
+(entrepernas). Ombro, braço e perna não informados acompanham a altura.
 
 Em desenvolvimento, o painel **"Simular corpo (dev)"** do provador troca
-altura, peso, peito, cintura e quadril sem mexer no perfil salvo. Ele não
-aparece em produção.
+essas medidas sem mexer no perfil salvo. Ele não aparece em produção.
 
 ## Como funciona
 
@@ -31,24 +37,33 @@ aparece em produção.
 | Avatar com medidas em cm e braços a 30° | `public/models/avatar_base.glb` |
 | Calibração das medidas (cm → shape keys) | `src/lib/avatar-builder.ts` (`AVATAR_CALIBRATION`) |
 | Moletom moldado (tamanho M) | `public/models/hoodie-core-v3.glb` |
-| Vestir: tamanho, apoio nos ombros, mangas no braço | `src/components/viewer-3d/dressed-avatar.tsx` |
+| Camiseta moldada (tamanho M) | `public/models/boxy_tee_01.glb` |
+| Manequim de vitrine (avatar sem braços) | `public/models/manequim.glb` |
+| Vestir: tamanho, apoio nos ombros, mangas no braço | `src/lib/garment-dress.ts` (`dress`) |
+| Conta num Web Worker, sem travar a página | `src/lib/garment-fit.worker.ts` + `src/lib/fit-runner.ts` |
+| Mostrar o avatar vestido | `src/components/viewer-3d/dressed-avatar.tsx` |
 | Empurrar o tecido para fora do corpo + caimento | `src/lib/garment-fit.ts` (`pushOut`, `drape`) |
-| Escala por tamanho a partir da tabela de medidas | `src/lib/garment-fit.ts` (`sizeScale`) |
+| Graduação por tamanho a partir da tabela de medidas | `src/lib/garment-fit.ts` (`sizeGrade`) |
+| Cor sobre a textura | `src/lib/garment-color.ts` (`tintMaterial`) |
 | Provador escolhe: peça moldada ou encaixe antigo | `src/components/viewer-3d/tryon-scene.tsx` |
 | Scripts do Blender que geram avatar e moldes | `scripts/molde/` (ver o README de lá) |
 
 A cada troca de tamanho ou de medida, o site:
 
 1. aplica as medidas no corpo (shape keys);
-2. aumenta ou diminui a peça pelo tamanho (peito da tabela ÷ peito do M; o
-   comprimento cresce metade disso) e a apoia nos ombros do cliente;
+2. gradua a peça pelo tamanho (ver "Graduação por tamanho") e a apoia nos
+   ombros do cliente;
 3. faz as mangas acompanharem o braço do cliente (atributo `_BRACO` gravado no
    molde);
 4. empurra o tecido para fora onde o corpo atravessa;
 5. aplica o caimento: no tronco, o tecido empurrado não volta para dentro
    abaixo do ponto mais largo.
 
-Leva de 0,3 a 0,7 s no computador de desenvolvimento.
+A conta leva de 0,3 a 0,7 s no computador de desenvolvimento, mas roda num
+Web Worker: a página continua respondendo e mostra a peça anterior até a nova
+ficar pronta. Se o cliente trocar de tamanho várias vezes seguidas, só o
+último pedido é calculado. Sem suporte a worker, a conta volta a rodar na
+própria página.
 
 ## Decisões
 
@@ -59,6 +74,32 @@ roupa sob medida. Isso esconde o que o provador existe para mostrar: um GG
 num corpo magro tem que sobrar. Agora a peça tem a forma do tamanho, e o
 corpo só a empurra onde for maior que ela.
 
+### Graduação por tamanho
+
+A peça não é o M esticado por igual. Cada parte segue a sua regra, a partir
+da tabela de medidas do produto:
+
+| Parte | Regra |
+|---|---|
+| Largura do tronco (peito) | peito da tabela ÷ peito do M |
+| Largura da barra | quadril da tabela ÷ quadril do M (sem quadril: igual ao peito) |
+| Comprimento da manga | braço da tabela − braço do M (sem braço: 1,5 cm por tamanho) |
+| Comprimento do corpo | 2 cm por tamanho |
+| Ombro a ombro | 1,2 cm por tamanho |
+| Gola e capuz | quase não mudam (¼ da mudança do peito) |
+
+Medido no provador (moletom, corpo magro): do P ao GG o comprimento vai de
+−2 a +4 cm, a largura de ×0,95 a ×1,16 e o capuz muda menos de 1 cm. Hoje a
+tabela do Hoodie Core só tem tórax e cintura; preenchendo quadril e braço no
+admin, barra e manga passam a seguir a tabela sem mudar código.
+
+### Cor sobre a textura
+
+O three.js multiplica a cor pela textura, e textura preta × branco continua
+preto. `tintMaterial` mede o brilho médio da textura e usa a textura só como
+desenho (claro/escuro em volta da média), com o tom vindo da cor escolhida.
+Estampas coloridas viram tons da cor escolhida.
+
 ### Medidas do avatar em centímetros
 
 As shape keys originais (MakeHuman) não correspondiam a circunferências: a de
@@ -66,7 +107,19 @@ cintura criava uma "barriga de grávida" e a de peito mudava menos de 1 cm.
 `avatar_medidas.py` refaz peito, cintura e quadril como faixas que crescem
 por igual em volta do tronco, e mede quantos cm cada uma muda. O site resolve
 um sistema 3×3 para acertar as três medidas ao mesmo tempo, já descontando o
-que o peso corporal acrescenta.
+que a altura e o peso corporal acrescentam.
+
+A shape key de altura aumenta o corpo inteiro, inclusive as circunferências
+(+1 de altura = +25,8 cm de peito). Antes isso não era descontado: um cliente
+de 1,88 m ganhava uns 5 cm a mais em cintura e quadril, e um baixo ficava
+mais fino. Ombros, braço e perna também são calibrados em cm
+(`avatar_comprimentos.py`); perna e altura são resolvidas juntas, porque a
+perna mais longa também deixa o corpo mais alto.
+
+Conferido no Blender em 5 corpos (de 1,55 m a 1,88 m): altura, entrepernas,
+braço e ombros ficam a até 1 cm do pedido; cintura e quadril a até 1,7 cm;
+peito a até ~3 cm (o busto do corpo base atrapalha). Antes, cintura e
+quadril saíam 4 a 6 cm maiores e braço e perna erravam até 7 cm.
 
 ### Braços abaixados (30°)
 
@@ -94,11 +147,15 @@ clique. O caimento trabalha em colunas verticais em volta do tronco:
 - **Muito empurrão** (a partir de ~4 cm): a lateral fica esticada em linha
   reta da axila até o ponto mais largo e cai reta dali.
 
+Os testes automáticos acharam dois defeitos, já corrigidos: uma célula vazia
+na grade (linha sem ponto) e uma coluna inteira vazia faziam o tecido logo
+abaixo do ponto mais largo voltar ~2 cm para dentro (um "vinco").
+
 ### Scripts reproduzíveis
 
 Todo o processo roda no Blender sem interface. Rodando os scripts de
-`scripts/molde/` a partir dos arquivos originais, o avatar e o moletom saem
-idênticos, byte a byte, aos do repositório.
+`scripts/molde/` a partir dos arquivos originais, o avatar, as peças e o
+manequim saem idênticos, byte a byte, aos do repositório.
 
 ## Arquivos que mudam juntos
 
@@ -107,10 +164,17 @@ não serve nele. Por isso `avatar_base.glb` e `hoodie-core-v3.glb` entram
 juntos. Não há mudança no banco: o `Model3D` do Hoodie Core continua
 apontando para `/models/hoodie-core-v3.glb`.
 
-O modo **Manequim** da página do produto continua funcionando: o manequim não
-tem braços, e o tronco do avatar não mudou de lugar.
+O modo **Manequim** da página do produto usa `manequim.glb`, gerado do avatar
+novo (o tronco mudou no máximo 0,9 cm, perto das axilas). A Boxy Tee 01 passa
+a ter o modo Manequim também, porque o molde dela tem a marca `vestra_fit`.
+
+A **Relugar T-Shirt** usa o mesmo modelo da Boxy Tee com outro arquivo:
+`relugar-t-shirt-v1.glb` recebeu o mesmo molde.
 
 ## Como testar
+
+`npm test` roda os testes automáticos (sem navegador nem banco): graduação,
+empurrão, caimento, altura, calibração e o Web Worker. No navegador:
 
 1. `npm run dev` e entrar com um cliente que tenha medidas no perfil.
 2. Abrir o provador do Hoodie Core e trocar P / M / G / GG.
@@ -126,23 +190,21 @@ tem braços, e o tronco do avatar não mudou de lugar.
 - **Uma pose só** (braços a 30°); sem animação.
 - **Corpo base único** (feminino, 1,66 m). Corpos masculinos são aproximados,
   e o busto cresce junto com o peito.
-- **Só 5 medidas entram.** Ombro, braço e perna são deduzidos.
-- **Tamanhos são o M em escala.** A graduação real entre tamanhos não é
-  proporcional assim.
+- **Ombros mudam pouco:** a shape key de ombro só vai de −3,8 a +3,8 cm.
+- **Graduação por regra, não molde real por tamanho.** As regras são as de
+  confecção e da tabela de medidas; a loja não tem as medidas da peça pronta
+  de cada tamanho.
 - **O caimento não é física.** Não surgem dobras novas, e uma peça apertada
   no quadril não "sobe". Mangas e capuz não têm caimento.
 - **Não há colisão tecido com tecido.** Em corpos muito grandes, o tronco
   pode atravessar a manga.
 - **Moletom:** dobra pequena na axila, punho embolado aproximado, ribana da
   barra que não aperta.
-- **Cor:** a troca de cor não clareia textura escura (já era assim antes).
-- **Desempenho:** o cálculo roda na mesma thread da página e trava a tela por
-  um instante. Não foi testado no celular.
+- **Cor:** estampas coloridas viram um tom só (o da cor escolhida).
+- **Desempenho:** a conta não trava mais a página, mas a peça nova demora de
+  0,3 a 0,7 s para aparecer. Feito e testado para computador (o foco do
+  projeto agora); não foi testado no celular.
 
 ## Pendências
 
-- **Publicar o molde da camiseta:** gerado e testado no provador, mas ainda
-  não publicado.
-- **Regenerar o `manequim.glb`** com o avatar novo (opcional).
-- **Levar o caimento para um Web Worker,** para não travar a tela.
-- **Corrigir a cor sobre texturas escuras.**
+- **Preencher quadril e braço** na tabela de medidas do Hoodie Core.

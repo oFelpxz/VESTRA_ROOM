@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import {
   OrbitControls,
@@ -10,6 +10,8 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
+import { tintMaterial } from "@/lib/garment-color";
 import { AvatarErrorBoundary } from "./avatar";
 import { DressedAvatar } from "./dressed-avatar";
 import { isFittedToMannequin } from "./mannequin-mark";
@@ -21,12 +23,12 @@ import { isFittedToMannequin } from "./mannequin-mark";
 function TryOnGarment({
   url,
   params,
-  size,
+  grade,
   selectedColor,
 }: {
   url: string;
   params: AvatarParams;
-  size: number;
+  grade: Grade;
   selectedColor?: string;
 }) {
   const { scene } = useGLTF(url);
@@ -40,12 +42,15 @@ function TryOnGarment({
       <DressedAvatar
         garmentUrl={url}
         params={params}
-        size={size}
+        grade={grade}
         selectedColor={selectedColor}
       />
     </AvatarErrorBoundary>
   );
 }
+
+// Material do arquivo de cada mesh, antes de receber a cor.
+const sourceMaterials = new WeakMap<THREE.Mesh, THREE.Material | THREE.Material[]>();
 
 function Garment({
   url,
@@ -90,23 +95,26 @@ function Garment({
     };
   }, [model, params]);
 
-  // Aplica cor selecionada como tint em todos os materiais
-  useMemo(() => {
-    if (!selectedColor) return;
+  // Cor selecionada numa cópia dos materiais (os originais ficam no cache do
+  // useGLTF e aparecem em outras telas).
+  const tinted = useMemo(() => {
+    const created: THREE.Material[] = [];
     model.traverse((obj) => {
-      const mesh = obj as unknown as {
-        isMesh?: boolean;
-        material?: { color?: { set: (c: string) => void } };
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      // sempre a partir do material do arquivo, não da cópia da cor anterior
+      const source = sourceMaterials.get(mesh) ?? mesh.material;
+      sourceMaterials.set(mesh, source);
+      const tint = (m: THREE.Material) => {
+        const t = tintMaterial(m, selectedColor);
+        created.push(t);
+        return t;
       };
-      if (mesh.isMesh && mesh.material?.color) {
-        try {
-          mesh.material.color.set(selectedColor);
-        } catch {
-          // ignora se o material não suporta cor
-        }
-      }
+      mesh.material = Array.isArray(source) ? source.map(tint) : tint(source);
     });
+    return created;
   }, [model, selectedColor]);
+  useEffect(() => () => tinted.forEach((m) => m.dispose()), [tinted]);
 
   // Posiciona o grupo de modo que o centro Y do modelo (escalado) fique
   // na altura do centro do torso do avatar.
@@ -138,13 +146,13 @@ export function TryOnScene({
   avatarParams,
   garmentUrl,
   selectedColor,
-  garmentSize = 1,
+  garmentGrade = MOLDE_GRADE,
 }: {
   avatarParams: AvatarParams;
   garmentUrl: string | null;
   selectedColor?: string;
-  /** Escala da peça pelo tamanho escolhido (M = 1). */
-  garmentSize?: number;
+  /** Graduação do tamanho escolhido em relação ao molde (M). */
+  garmentGrade?: Grade;
 }) {
   // Câmera "afasta" se o avatar for mais alto
   const camY = avatarParams.totalHeight * 0.55;
@@ -171,7 +179,7 @@ export function TryOnScene({
           <TryOnGarment
             url={garmentUrl}
             params={avatarParams}
-            size={garmentSize}
+            grade={garmentGrade}
             selectedColor={selectedColor}
           />
         )}
