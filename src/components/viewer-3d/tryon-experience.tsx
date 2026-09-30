@@ -8,6 +8,8 @@ import {
   type FitPreference,
 } from "@/lib/fit-calculator";
 import { buildAvatarParams } from "@/lib/avatar-builder";
+import { colorToHex } from "@/lib/color-names";
+import { MOLDE_SIZE, sizeGrade } from "@/lib/garment-fit";
 import { TryOnScene } from "./tryon-scene";
 import { FitIndicator } from "./fit-indicator";
 
@@ -46,27 +48,27 @@ type UserProfile = {
   fitPreference: FitPreference;
 };
 
-// Pequena paleta para "cor visual" — mapeia nome → hex aproximado
-const COLOR_HEX: Record<string, string> = {
-  preto: "#1a1a1a",
-  branco: "#f4f1ea",
-  cinza: "#9c9c9c",
-  azul: "#2a4a8a",
-  vermelho: "#a02a2a",
-  verde: "#2a7a3a",
-  bege: "#d4c4a8",
-  marrom: "#5a3a26",
-  rosa: "#d48aa8",
-  amarelo: "#e0b840",
-};
-
-function colorToHex(name: string): string {
-  const key = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  return COLOR_HEX[key] ?? "#3a3a3a";
-}
+// Só em desenvolvimento: simular outros corpos sem mexer no perfil salvo.
+const SIMULATE = process.env.NODE_ENV !== "production";
+type SimKey =
+  | "heightCm"
+  | "weightKg"
+  | "chestCm"
+  | "waistCm"
+  | "hipCm"
+  | "shoulderCm"
+  | "armLengthCm"
+  | "legLengthCm";
+const SIM_FIELDS: { key: SimKey; label: string; min: number; max: number }[] = [
+  { key: "heightCm", label: "Altura (cm)", min: 150, max: 200 },
+  { key: "weightKg", label: "Peso (kg)", min: 45, max: 130 },
+  { key: "chestCm", label: "Peito (cm)", min: 78, max: 125 },
+  { key: "waistCm", label: "Cintura (cm)", min: 60, max: 120 },
+  { key: "hipCm", label: "Quadril (cm)", min: 80, max: 130 },
+  { key: "shoulderCm", label: "Ombros (cm)", min: 36, max: 56 },
+  { key: "armLengthCm", label: "Braço (cm)", min: 45, max: 72 },
+  { key: "legLengthCm", label: "Perna (cm)", min: 62, max: 95 },
+];
 
 export function TryOnExperience({
   productName,
@@ -90,8 +92,11 @@ export function TryOnExperience({
   const [selectedColor, setSelectedColor] = useState<string | null>(
     colors[0] ?? null,
   );
+  // Começa no tamanho do molde (M), se a peça tiver; senão, no do meio.
   const [selectedSize, setSelectedSize] = useState<string | null>(
-    sizes[Math.floor(sizes.length / 2)] ?? null,
+    sizes.includes(MOLDE_SIZE)
+      ? MOLDE_SIZE
+      : (sizes[Math.floor(sizes.length / 2)] ?? null),
   );
   const [preference, setPreference] = useState<FitPreference>(
     profile.fitPreference,
@@ -100,21 +105,29 @@ export function TryOnExperience({
     addToCartAction,
     initialState,
   );
+  const [sim, setSim] = useState<Partial<Record<SimKey, number>>>({});
+  const body = useMemo(() => ({ ...profile, ...sim }), [profile, sim]);
 
-  // Parâmetros do avatar — fixos pelas medidas do usuário
+  // Parâmetros do avatar — medidas do usuário (ou as simuladas, em dev)
   const avatarParams = useMemo(
     () =>
       buildAvatarParams({
-        heightCm: profile.heightCm,
-        weightKg: profile.weightKg,
-        chestCm: profile.chestCm,
-        waistCm: profile.waistCm,
-        hipCm: profile.hipCm,
-        shoulderCm: profile.shoulderCm,
-        armLengthCm: profile.armLengthCm,
-        legLengthCm: profile.legLengthCm,
+        heightCm: body.heightCm,
+        weightKg: body.weightKg,
+        chestCm: body.chestCm,
+        waistCm: body.waistCm,
+        hipCm: body.hipCm,
+        shoulderCm: body.shoulderCm,
+        armLengthCm: body.armLengthCm,
+        legLengthCm: body.legLengthCm,
       }),
-    [profile],
+    [body],
+  );
+
+  // A peça tem a forma do tamanho escolhido — não acompanha o corpo.
+  const garmentGrade = useMemo(
+    () => sizeGrade(selectedSize, sizeChart),
+    [selectedSize, sizeChart],
   );
 
   // Linha da SizeChart correspondente ao tamanho selecionado
@@ -134,16 +147,16 @@ export function TryOnExperience({
     }
     return calculateFit(
       {
-        chestCm: profile.chestCm,
-        waistCm: profile.waistCm,
-        hipCm: profile.hipCm,
-        armLengthCm: profile.armLengthCm,
-        legLengthCm: profile.legLengthCm,
+        chestCm: body.chestCm,
+        waistCm: body.waistCm,
+        hipCm: body.hipCm,
+        armLengthCm: body.armLengthCm,
+        legLengthCm: body.legLengthCm,
       },
       currentSizeRow,
       preference,
     );
-  }, [profile, currentSizeRow, preference]);
+  }, [body, currentSizeRow, preference]);
 
   const selectedVariant = variants.find(
     (v) =>
@@ -173,6 +186,7 @@ export function TryOnExperience({
           avatarParams={avatarParams}
           garmentUrl={garmentUrl}
           selectedColor={selectedColor ? colorToHex(selectedColor) : undefined}
+          garmentGrade={garmentGrade}
         />
 
         <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/60">
@@ -197,6 +211,42 @@ export function TryOnExperience({
 
         {/* Caimento */}
         <FitIndicator result={fitResult} />
+
+        {SIMULATE && (
+          <details className="rounded-sm border border-dashed border-border p-3 text-xs">
+            <summary className="cursor-pointer font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              Simular corpo (dev)
+            </summary>
+            <div className="mt-3 flex flex-col gap-2">
+              {SIM_FIELDS.map((f) => {
+                const value = body[f.key] ?? Math.round((f.min + f.max) / 2);
+                return (
+                  <label key={f.key} className="flex items-center gap-2">
+                    <span className="w-24 shrink-0">{f.label}</span>
+                    <input
+                      type="range"
+                      min={f.min}
+                      max={f.max}
+                      value={value}
+                      onChange={(e) =>
+                        setSim((s) => ({ ...s, [f.key]: Number(e.target.value) }))
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-8 text-right tabular-nums">{value}</span>
+                  </label>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setSim({})}
+                className="self-start text-[10px] font-semibold uppercase tracking-[0.15em] underline"
+              >
+                Voltar às minhas medidas
+              </button>
+            </div>
+          </details>
+        )}
 
         {/* Preferência de caimento */}
         <div>

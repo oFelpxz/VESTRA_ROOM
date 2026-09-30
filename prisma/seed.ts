@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { seedCoupons } from "./seed-data/coupons";
 
 // Seed roda fora do Next.js — usa conexão DIRETA (5432) para evitar
 // problemas de prepared statements com o pooler.
@@ -453,9 +454,13 @@ async function main() {
     });
   }
 
+  // 5. Cupons de exemplo (Sprint 3) — mesmos dados do seed-sprint3.ts.
+  const couponCodes = await seedCoupons(prisma);
+
   console.log("Seed concluído:");
   console.log(`  ${categories.length} categorias`);
   console.log(`  ${products.length} produtos`);
+  console.log(`  Cupons: ${couponCodes.join(", ")}`);
   console.log("  Admin: admin@vestra.room / vestra123");
   console.log("  Cliente: cliente@vestra.room / cliente123");
 }

@@ -10,6 +10,7 @@ import {
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import { shapeBody } from "@/lib/garment-dress";
 
 /**
  * Avatar do VESTRA FIT.
@@ -84,8 +85,51 @@ const MORPH_ALIASES: Record<string, MorphKey> = {
   inseam: "legLength",
 };
 
-function canonicalMorph(name: string): MorphKey | null {
+export function canonicalMorph(name: string): MorphKey | null {
   return MORPH_ALIASES[name.toLowerCase().replace(/[^a-z]/g, "")] ?? null;
+}
+
+/**
+ * Posições e shape keys do primeiro mesh com morph targets, em coordenadas da
+ * cena (as da raiz `scene`). Sem mesh com morph targets, devolve null.
+ */
+export function readMorphBody(scene: THREE.Object3D) {
+  scene.updateMatrixWorld(true);
+  let found: THREE.Mesh | null = null;
+  scene.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!found && m.isMesh && m.geometry.morphAttributes.position) found = m;
+  });
+  const mesh = found as THREE.Mesh | null;
+  if (!mesh) return null;
+  const geo = mesh.geometry;
+  const matrix = mesh.matrixWorld;
+  // deltas são vetores: só a parte linear (giro/escala), sem translação
+  const linear = new THREE.Matrix3().setFromMatrix4(matrix);
+  const v = new THREE.Vector3();
+
+  const base = new Float32Array(geo.attributes.position.count * 3);
+  for (let i = 0; i < geo.attributes.position.count; i++) {
+    v.fromBufferAttribute(geo.attributes.position, i).applyMatrix4(matrix);
+    v.toArray(base, i * 3);
+  }
+  const deltas: Float32Array[] = [];
+  const keys: (MorphKey | null)[] = [];
+  const morphPositions = geo.morphAttributes.position ?? [];
+  for (const [name, idx] of Object.entries(mesh.morphTargetDictionary ?? {})) {
+    const attr = morphPositions[idx];
+    const d = new Float32Array(attr.count * 3);
+    for (let i = 0; i < attr.count; i++) {
+      v.fromBufferAttribute(attr, i).applyMatrix3(linear);
+      v.toArray(d, i * 3);
+    }
+    deltas.push(d);
+    keys.push(canonicalMorph(name));
+  }
+  const index = geo.index
+    ? Array.from(geo.index.array)
+    : Array.from({ length: base.length / 3 }, (_, i) => i);
+  return { base, deltas, keys, index };
 }
 
 function GltfAvatar({
@@ -99,19 +143,28 @@ function GltfAvatar({
   const model = useMemo(() => scene.clone(true), [scene]);
   const rootRef = useRef<THREE.Group>(null);
 
-  // Escala para a altura real do usuário, com os pés em y = 0.
+  // Altura do usuário: pela shape key de altura, resolvida em cm como no
+  // provador (ver `shapeBody`), com os pés em y = 0. Escalar o modelo inteiro
+  // e ainda aplicar a shape key contava a altura duas vezes. Sem shape keys,
+  // o modelo é escalado para a altura.
+  const body = useMemo(() => readMorphBody(model), [model]);
   const transform = useMemo(() => {
+    if (body) {
+      const { weights, lift } = shapeBody(body, params.morphs, params.totalHeight);
+      const hk = body.keys.indexOf("height");
+      return { scale: 1, y: lift, height: hk >= 0 ? weights[hk] : 0 };
+    }
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3();
     box.getSize(size);
     const scale = size.y > 0 ? params.totalHeight / size.y : 1;
-    return { scale, y: -box.min.y * scale };
-  }, [model, params.totalHeight]);
+    return { scale, y: -box.min.y * scale, height: 0 };
+  }, [model, body, params.morphs, params.totalHeight]);
 
   // Aplica os pesos das medidas nas influências dos morph targets.
   // Percorre a árvore renderizada (via ref) a cada mudança de medida.
+  const { height } = transform;
   const {
-    height,
     weight,
     chest,
     waist,
@@ -181,7 +234,7 @@ function GltfAvatar({
 /* Error boundary — volta para o avatar de primitivas se o GLB falhar         */
 /* -------------------------------------------------------------------------- */
 
-class AvatarErrorBoundary extends Component<
+export class AvatarErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
   { failed: boolean }
 > {

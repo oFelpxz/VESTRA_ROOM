@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
-import { calculateShipping } from "@/lib/shipping";
+import { quoteShippingFor } from "@/lib/shipping";
+import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { formatBRL, formatCep } from "@/lib/format";
 import { deleteAddressAction } from "@/lib/address-actions";
 import { listMySavedPaymentMethods } from "@/lib/payment-method-actions";
@@ -13,13 +14,14 @@ import { AddressForm } from "@/components/checkout/address-form";
 import { PaymentStep } from "@/components/checkout/payment-step";
 
 type Step = "address" | "review" | "payment";
+const STEPS: readonly string[] = ["address", "review", "payment"];
 
 export const metadata = { title: "Checkout" };
 
 export default async function CheckoutPage({
   searchParams,
 }: {
-  searchParams: Promise<{ step?: string; addressId?: string }>;
+  searchParams: Promise<{ step?: string | string[]; addressId?: string | string[] }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login?next=/checkout");
@@ -33,7 +35,12 @@ export default async function CheckoutPage({
   }
 
   const sp = await searchParams;
-  const requestedStep = (sp.step as Step) || "address";
+  // Etapa desconhecida (?step=xyz) ou repetida na URL deixava a área principal
+  // em branco, porque nenhuma etapa batia. Qualquer valor inválido vira "address".
+  const requestedStep: Step =
+    typeof sp.step === "string" && STEPS.includes(sp.step)
+      ? (sp.step as Step)
+      : "address";
 
   // Endereços do usuário — o padrão vem primeiro e é reaproveitado
   // automaticamente quando nenhum endereço foi escolhido explicitamente.
@@ -42,7 +49,9 @@ export default async function CheckoutPage({
     orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
   });
   const defaultAddress = addresses.find((a) => a.isDefault) ?? addresses[0];
-  const addressId = sp.addressId ?? defaultAddress?.id;
+  const addressId =
+    (typeof sp.addressId === "string" ? sp.addressId : undefined) ??
+    defaultAddress?.id;
 
   // Determina o step efetivo (não permite pular sem endereço)
   let step: Step = requestedStep;
@@ -73,12 +82,21 @@ export default async function CheckoutPage({
     0,
   );
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
-  const shipping = calculateShipping({
+  const shipping = quoteShippingFor(cart?.shippingMethod ?? "ECONOMICO", {
     subtotal,
     itemCount,
     postalCode: selectedAddress?.postalCode,
   });
-  const total = subtotal + shipping.amount;
+
+  const couponEvaluation = cart?.coupon
+    ? evaluateCoupon(toCouponLike(cart.coupon), subtotal)
+    : null;
+  const discount = couponEvaluation?.ok ? couponEvaluation.discount : 0;
+  const couponCode = cart?.coupon?.code;
+  const couponProblem =
+    couponEvaluation && !couponEvaluation.ok ? couponEvaluation.message : null;
+
+  const total = subtotal - discount + shipping.amount;
 
   const summaryItems = items.map((i) => ({
     id: i.id,
@@ -103,6 +121,16 @@ export default async function CheckoutPage({
         <CheckoutStepper current={step} addressId={addressId} />
       </div>
 
+      {couponProblem && (
+        <div className="mt-6 rounded-sm bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          O cupom <span className="font-mono font-semibold">{couponCode}</span>{" "}
+          não pode ser usado: {couponProblem}{" "}
+          <Link href="/carrinho" className="font-semibold underline">
+            Voltar à sacola
+          </Link>
+        </div>
+      )}
+
       <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_360px]">
         <div>
           {step === "address" && (
@@ -116,7 +144,10 @@ export default async function CheckoutPage({
             <ReviewStepBlock
               address={selectedAddress}
               subtotal={subtotal}
+              discount={discount}
+              couponCode={couponCode}
               shippingAmount={shipping.amount}
+              shippingLabel={shipping.label}
               total={total}
             />
           )}
@@ -135,7 +166,10 @@ export default async function CheckoutPage({
           <OrderSummary
             items={summaryItems}
             subtotal={subtotal}
+            discount={discount}
+            couponCode={couponCode}
             shipping={shipping.amount}
+            shippingLabel={shipping.label}
             shippingReason={shipping.reason}
             total={total}
             estimatedDays={shipping.estimatedDays}
@@ -244,7 +278,10 @@ function AddressStepBlock({
 function ReviewStepBlock({
   address,
   subtotal,
+  discount,
+  couponCode,
   shippingAmount,
+  shippingLabel,
   total,
 }: {
   address: {
@@ -257,7 +294,10 @@ function ReviewStepBlock({
     postalCode: string;
   };
   subtotal: number;
+  discount: number;
+  couponCode?: string;
   shippingAmount: number;
+  shippingLabel: string;
   total: number;
 }) {
   return (
@@ -295,8 +335,16 @@ function ReviewStepBlock({
             <span className="text-muted-foreground">Subtotal</span>
             <span>{formatBRL(subtotal)}</span>
           </li>
+          {discount > 0 && (
+            <li className="flex items-baseline justify-between py-3">
+              <span className="text-muted-foreground">
+                Desconto{couponCode && ` · ${couponCode}`}
+              </span>
+              <span>− {formatBRL(discount)}</span>
+            </li>
+          )}
           <li className="flex items-baseline justify-between py-3">
-            <span className="text-muted-foreground">Frete</span>
+            <span className="text-muted-foreground">Frete · {shippingLabel}</span>
             <span>
               {shippingAmount === 0 ? "Grátis" : formatBRL(shippingAmount)}
             </span>

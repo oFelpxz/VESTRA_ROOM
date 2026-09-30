@@ -17,11 +17,15 @@ const STATUS_STYLE: Record<string, string> = {
 export default async function AdminProdutosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; categoria?: string }>;
+  searchParams: Promise<{ status?: string | string[]; categoria?: string | string[] }>;
 }) {
   const sp = await searchParams;
-  const statusFilter = sp.status?.toUpperCase();
-  const categoryFilter = sp.categoria;
+  // Parâmetro repetido na URL (?categoria=a&categoria=b) chega como lista —
+  // só texto vale; lista iria direto para a consulta e derrubaria a página.
+  const statusFilter =
+    typeof sp.status === "string" ? sp.status.toUpperCase() : undefined;
+  const categoryFilter =
+    typeof sp.categoria === "string" ? sp.categoria : undefined;
 
   const [products, categories] = await Promise.all([
     prisma.product.findMany({
