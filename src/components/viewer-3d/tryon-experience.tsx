@@ -7,7 +7,7 @@ import {
   calculateFit,
   type FitPreference,
 } from "@/lib/fit-calculator";
-import { buildAvatarParams } from "@/lib/avatar-builder";
+import { buildAvatarParams, type AvatarBody } from "@/lib/avatar-builder";
 import { colorToHex } from "@/lib/color-names";
 import { MOLDE_SIZE, sizeGrade } from "@/lib/garment-fit";
 import { TryOnScene } from "./tryon-scene";
@@ -105,23 +105,28 @@ export function TryOnExperience({
     addToCartAction,
     initialState,
   );
+  // Corpo do avatar: começa no unissex; não é salvo no perfil
+  const [bodyType, setBodyType] = useState<AvatarBody>("neutral");
   const [sim, setSim] = useState<Partial<Record<SimKey, number>>>({});
   const body = useMemo(() => ({ ...profile, ...sim }), [profile, sim]);
 
   // Parâmetros do avatar — medidas do usuário (ou as simuladas, em dev)
   const avatarParams = useMemo(
     () =>
-      buildAvatarParams({
-        heightCm: body.heightCm,
-        weightKg: body.weightKg,
-        chestCm: body.chestCm,
-        waistCm: body.waistCm,
-        hipCm: body.hipCm,
-        shoulderCm: body.shoulderCm,
-        armLengthCm: body.armLengthCm,
-        legLengthCm: body.legLengthCm,
-      }),
-    [body],
+      buildAvatarParams(
+        {
+          heightCm: body.heightCm,
+          weightKg: body.weightKg,
+          chestCm: body.chestCm,
+          waistCm: body.waistCm,
+          hipCm: body.hipCm,
+          shoulderCm: body.shoulderCm,
+          armLengthCm: body.armLengthCm,
+          legLengthCm: body.legLengthCm,
+        },
+        bodyType,
+      ),
+    [body, bodyType],
   );
 
   // A peça tem a forma do tamanho escolhido — não acompanha o corpo.
@@ -247,6 +252,38 @@ export function TryOnExperience({
             </div>
           </details>
         )}
+
+        {/* Corpo do avatar */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Corpo
+          </p>
+          <div className="mt-3 flex gap-1.5">
+            {(["male", "female"] as const).map((b) => {
+              const active = bodyType === b;
+              return (
+                <button
+                  key={b}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setBodyType(active ? "neutral" : b)}
+                  className={`flex-1 rounded-sm border px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+                    active
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                  }`}
+                >
+                  {b === "male" ? "Homem" : "Mulher"}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            {bodyType === "neutral"
+              ? "Corpo unissex"
+              : "Não salva no perfil — só nesta tentativa"}
+          </p>
+        </div>
 
         {/* Preferência de caimento */}
         <div>

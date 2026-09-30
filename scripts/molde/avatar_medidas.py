@@ -123,7 +123,7 @@ for name, (z0, sig, x0, lados, costas) in FAIXAS.items():
 # o peito errava até ~4 cm.
 base = {n: round(circ(BW, z, x), 1) for n, (z, x) in NIVEIS.items()}
 ganhos = {}
-for k in ("height", "weight", "chest", "waist", "hip"):
+for k in ("height", "weight", "chest", "waist", "hip", "male", "female"):
     P = np.array([d.co for d in kb[k].data]) @ R.T + T
     ganhos[k] = {n: round(circ(P, z, x, BW) - base[n], 1) for n, (z, x) in NIVEIS.items()}
 print("CALIBRACAO", json.dumps({"base": base, "ganhos": ganhos}))

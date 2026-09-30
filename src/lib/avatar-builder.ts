@@ -19,6 +19,9 @@ export type MeasurementInput = {
   legLengthCm: number | null;
 };
 
+/** Corpo do avatar: o neutro (unissex) ou o masculino/feminino do MakeHuman. */
+export type AvatarBody = "neutral" | "male" | "female";
+
 /**
  * Parâmetros normalizados do corpo. Cada campo é uma escala/fator relativo
  * a um corpo "referência" de altura 1,70m e peso 70kg.
@@ -49,8 +52,10 @@ export type AvatarParams = {
    * valores em `mesh.morphTargetInfluences`, casando pelo nome da shape key.
    * `height` é só uma estimativa: quem desenha o corpo resolve o peso da
    * altura para bater `totalHeight` (ver `shapeBody` em garment-dress.ts).
+   * `male` / `female` valem 0 ou 1: o corpo escolhido (ver `AvatarBody`).
    * Nomes esperados no GLB (aceita variações: `arm_length`, `armLength`, `arm`):
-   * height · weight · chest · waist · hip · shoulder · armLength · legLength
+   * height · weight · chest · waist · hip · shoulder · armLength · legLength ·
+   * male · female
    */
   morphs: {
     height: number;
@@ -61,6 +66,8 @@ export type AvatarParams = {
     shoulder: number;
     armLength: number;
     legLength: number;
+    male: number;
+    female: number;
   };
 
   // Ancoragens (em unidades do avatar) — onde a roupa "encaixa"
@@ -103,6 +110,8 @@ const AVATAR_CALIBRATION = {
     chest: { chest: 29.9, waist: 1.0, hip: 0 },
     waist: { chest: 1.0, waist: 29.9, hip: 5.0 },
     hip: { chest: 0, waist: 3.3, hip: 30.0 },
+    male: { chest: 6.7, waist: 5.5, hip: 0.5 },
+    female: { chest: -5.9, waist: -4.2, hip: 0.2 },
   },
   // comprimentos: scripts/molde/avatar_comprimentos.py (avatar já posado)
   lengths: {
@@ -113,6 +122,8 @@ const AVATAR_CALIBRATION = {
       armLength: { arm: 13.4 },
       shoulder: { shoulder: 1.9 },
       weight: { shoulder: 0.5 },
+      male: { height: 7.0, inseam: 5.1, arm: 4.3, shoulder: 2.2 },
+      female: { height: -6.8, inseam: -5.0, arm: -4.4, shoulder: -2.1 },
     },
   },
 } as const;
@@ -121,7 +132,8 @@ const AVATAR_CALIBRATION = {
  * Pesos de altura, perna, braço e ombro que dão ao avatar essas medidas em
  * cm (null = medida não informada: o comprimento acompanha a altura).
  * Perna mexe na altura também, então altura e entrepernas são resolvidas
- * juntas (sistema 2×2).
+ * juntas (sistema 2×2). O corpo masculino/feminino já muda os comprimentos:
+ * isso é descontado antes.
  */
 function lengthMorphs(
   heightCm: number,
@@ -129,25 +141,32 @@ function lengthMorphs(
   armCm: number | null,
   shoulderCm: number | null,
   weightMorph: number,
+  body: AvatarBody,
 ) {
   const { base, gain } = AVATAR_CALIBRATION.lengths;
+  const g = body === "neutral" ? { height: 0, inseam: 0, arm: 0, shoulder: 0 } : gain[body];
   const a = gain.height.height;
   const b = gain.legLength.height;
   const c = gain.height.inseam;
   const d = gain.legLength.inseam;
-  const dH = heightCm - base.height;
+  const dH = heightCm - base.height - g.height;
   const legLength = inseamCm
-    ? clamp((a * (inseamCm - base.inseam) - c * dH) / (a * d - b * c), -1, 1)
+    ? clamp((a * (inseamCm - base.inseam - g.inseam) - c * dH) / (a * d - b * c), -1, 1)
     : 0;
   const height = clamp((dH - b * legLength) / a, -1, 1);
   const armLength = armCm
-    ? clamp((armCm - base.arm - height * gain.height.arm) / gain.armLength.arm, -1, 1)
+    ? clamp(
+        (armCm - base.arm - g.arm - height * gain.height.arm) / gain.armLength.arm,
+        -1,
+        1,
+      )
     : 0;
   // a shape key de ombro muda pouco (1,9 cm): até 2 ainda fica natural
   const shoulder = shoulderCm
     ? clamp(
         (shoulderCm -
           base.shoulder -
+          g.shoulder -
           height * gain.height.shoulder -
           weightMorph * gain.weight.shoulder) /
           gain.shoulder.shoulder,
@@ -163,13 +182,15 @@ const GIRTHS: Girth[] = ["chest", "waist", "hip"];
 
 /**
  * Pesos de peito/cintura/quadril que fazem o avatar ter exatamente essas
- * circunferências (cm), já descontando o que a altura e o peso corporal
- * acrescentam. Sistema linear 3×3, resolvido por Cramer.
+ * circunferências (cm), já descontando o que a altura, o peso corporal e o
+ * corpo masculino/feminino acrescentam. Sistema linear 3×3, resolvido por
+ * Cramer.
  */
 function girthMorphs(
   target: Record<Girth, number>,
   weightMorph: number,
   heightMorph: number,
+  body: AvatarBody,
 ): Record<Girth, number> {
   const { base, gain } = AVATAR_CALIBRATION;
   const rhs = GIRTHS.map(
@@ -177,7 +198,8 @@ function girthMorphs(
       target[m] -
       base[m] -
       heightMorph * gain.height[m] -
-      weightMorph * gain.weight[m],
+      weightMorph * gain.weight[m] -
+      (body === "neutral" ? 0 : gain[body][m]),
   );
   // linha = medida, coluna = shape key
   const A = GIRTHS.map((m) => GIRTHS.map((k) => gain[k][m]));
@@ -204,7 +226,10 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-export function buildAvatarParams(m: MeasurementInput): AvatarParams {
+export function buildAvatarParams(
+  m: MeasurementInput,
+  body: AvatarBody = "neutral",
+): AvatarParams {
   const height = safe(m.heightCm, REF.heightCm);
   const weight = safe(m.weightKg, REF.weightKg);
   const chest = safe(m.chestCm, REF.chestCm);
@@ -238,11 +263,14 @@ export function buildAvatarParams(m: MeasurementInput): AvatarParams {
     m.armLengthCm || null,
     m.shoulderCm || null,
     weightMorph,
+    body,
   );
   const morphs = {
     ...lengthsMorphs,
     weight: weightMorph,
-    ...girthMorphs({ chest, waist, hip }, weightMorph, lengthsMorphs.height),
+    ...girthMorphs({ chest, waist, hip }, weightMorph, lengthsMorphs.height, body),
+    male: body === "male" ? 1 : 0,
+    female: body === "female" ? 1 : 0,
   };
 
   // Avatar total: 1 unidade ≈ 1 metro

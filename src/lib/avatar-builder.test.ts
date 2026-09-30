@@ -39,6 +39,18 @@ describe("buildAvatarParams", () => {
     assert.ok(alta.hip < baixa.hip);
   });
 
+  it("homem e mulher: liga o corpo e desconta o que ele já muda", () => {
+    const neutro = buildAvatarParams(body).morphs;
+    const homem = buildAvatarParams(body, "male").morphs;
+    const mulher = buildAvatarParams(body, "female").morphs;
+    assert.deepEqual([neutro.male, neutro.female], [0, 0]);
+    assert.deepEqual([homem.male, homem.female], [1, 0]);
+    assert.deepEqual([mulher.male, mulher.female], [0, 1]);
+    // o corpo masculino já tem mais peito e é mais alto: as medidas compensam
+    assert.ok(homem.chest < neutro.chest && neutro.chest < mulher.chest);
+    assert.ok(homem.height < neutro.height && neutro.height < mulher.height);
+  });
+
   it("todos os pesos ficam dentro dos limites das shape keys", () => {
     const extremo = buildAvatarParams({
       heightCm: 210,
