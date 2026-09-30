@@ -18,10 +18,16 @@ Os arquivos de entrada "originais" são os de antes dos moldes, no commit
 
 ## 1. Avatar (`public/models/avatar_base.glb`)
 
+O primeiro passo precisa do MPFB instalado no Blender (Preferences → Get
+Extensions → MPFB; feito com a 2.0.17) e roda **sem** `--factory-startup`
+(que desligaria o MPFB):
+
 ```bash
+# shape keys "male" e "female": corpo masculino/feminino do MakeHuman
+/Applications/Blender.app/Contents/MacOS/Blender -b -P avatar_genero.py -- avatar_orig.glb avatar_g.glb
 # peito, cintura e quadril viram "faixas" em cm, e elas e o peso são
 # suavizados pela malha; imprime CALIBRACAO
-mb avatar_medidas.py -- avatar_orig.glb avatar_v2.glb
+mb avatar_medidas.py -- avatar_g.glb avatar_v2.glb
 # braços a 30° (pose padrão) + pesos dos braços para as roupas
 mb avatar_pose.py -- avatar_v2.glb avatar_v3.glb pesos.npz
 # altura, entrepernas, braço e ombros em cm; imprime CALIBRACAO lengths
@@ -76,8 +82,10 @@ mesmo script que roda na aba Scripting do Blender):
 mb manequim.py -- avatar_v3.glb manequim.glb
 ```
 
-Rodando tudo a partir dos originais, avatar, camiseta, moletom e manequim
-saem idênticos (byte a byte) aos do repositório.
+Rodando tudo a partir dos originais, avatar, camiseta e moletom saem
+idênticos (byte a byte) aos do repositório. O manequim sai com os mesmos
+vértices; só as normais variam até 0,03° (invisível) desde que o avatar
+ganhou as keys de gênero, então o do repositório foi mantido.
 
 ## Ferramentas de conferência
 

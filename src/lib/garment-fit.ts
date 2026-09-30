@@ -427,11 +427,14 @@ export function drape(
   const rows = Math.ceil((top - bottom) / DRAPE_ROW) + 1;
   const push = new Float32Array(C * rows).fill(-Infinity);
   const radius = new Float32Array(C * rows).fill(-Infinity);
+  // o mesmo raio no molde, antes do empurrão (dobras e espessura da peça)
+  const radiusBefore = new Float32Array(C * rows).fill(-Infinity);
   const col = new Float32Array(count);
   const row = new Float32Array(count);
   const ux = new Float32Array(count);
   const uz = new Float32Array(count);
   const pushed = new Float32Array(count);
+  const reach = new Float32Array(count);
   for (let i = 0; i < count; i++) {
     if (!weight[i]) continue;
     const rx = before[i * 3] - cx;
@@ -446,8 +449,10 @@ export function drape(
     col[i] = ((Math.atan2(rz, rx) + Math.PI) / (2 * Math.PI)) * C;
     row[i] = (top - before[i * 3 + 1]) / DRAPE_ROW;
     const cell = (Math.floor(col[i]) % C) * rows + Math.floor(row[i]);
+    reach[i] = len;
     push[cell] = Math.max(push[cell], pushed[i]);
     radius[cell] = Math.max(radius[cell], len + pushed[i]);
+    radiusBefore[cell] = Math.max(radiusBefore[cell], len);
   }
 
   // 2) quanto cada coluna foi empurrada decide o modelo: pouco (corpo perto
@@ -470,9 +475,9 @@ export function drape(
   fillEmptyColumns(radius, [hangPush, hangRadius], C, rows);
   smoothColumns(hangPush, C, rows);
   smoothColumns(hangRadius, C, rows);
-  // raio medido em cada célula, sem vazias: célula vazia fica com a vizinha
+  // raio do molde em cada célula, sem vazias: célula vazia fica com a vizinha
   // mais perto na coluna; coluna vazia, com a média das colunas do lado
-  const measured = radius.slice();
+  const measured = radiusBefore.slice();
   for (let c = 0; c < C; c++) {
     const g = c * rows;
     for (let r = 1; r < rows; r++)
@@ -496,19 +501,24 @@ export function drape(
       (g[a * rows + r0] * (1 - tr) + g[a * rows + r1] * tr) * (1 - tc) +
       (g[b * rows + r0] * (1 - tr) + g[b * rows + r1] * tr) * tc;
     const t = tension[a] * (1 - tc) + tension[b] * tc;
-    // esticado: até a reta, medido contra o raio da célula (o de fora), para
-    // o avesso andar junto e manter a espessura. O raio medido é interpolado
-    // como o caimento: só com o da própria célula, cada célula andava um
-    // tanto diferente e o tecido ficava "amassado", em degraus. Mas nunca
-    // acima do da linha do próprio vértice (entre as colunas), senão, logo
-    // abaixo do ponto mais largo, a média com a linha de cima o deixava
+    // esticado: até a reta, menos o quanto o vértice fica para dentro do
+    // lado de fora da peça no molde (o avesso e o fundo das dobras), para
+    // manter a espessura e as dobras. Medido no molde, e não depois do
+    // empurrão: logo abaixo do busto a pele cai rápido e a célula pegava o
+    // raio da parte de cima dela, deixando um vinco; e as marcas do corpo
+    // que o empurrão imprimiu no tecido iam junto para o caimento. O raio é
+    // interpolado como o caimento: só com o da própria célula, cada célula
+    // andava um tanto diferente e o tecido ficava "amassado", em degraus. Mas
+    // nunca acima do da linha do próprio vértice (entre as colunas), senão,
+    // logo abaixo do ponto mais largo, a média com a linha de cima o deixava
     // voltar para dentro.
     const own = Math.min(Math.floor(row[i]), rows - 1);
     const wall = Math.min(
       at(measured),
       measured[a * rows + own] * (1 - tc) + measured[b * rows + own] * tc,
     );
-    const taut = Math.max(0, at(hangRadius) - wall);
+    const inside = Math.max(0, wall - reach[i]);
+    const taut = Math.max(0, at(hangRadius) - inside - (reach[i] + pushed[i]));
     const extra =
       (t * taut + (1 - t) * Math.max(0, at(hangPush) - pushed[i])) * weight[i];
     if (extra <= 1e-4) continue;

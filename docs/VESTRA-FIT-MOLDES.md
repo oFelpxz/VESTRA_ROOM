@@ -31,6 +31,12 @@ O avatar usa as 8 medidas do perfil em cm: altura, peso, peito, cintura,
 quadril, ombros (de ombro a ombro), braço (do ombro ao pulso) e perna
 (entrepernas). Ombro, braço e perna não informados acompanham a altura.
 
+O bloco **Corpo** do provador troca o avatar entre **Homem** e **Mulher**
+(ombros, peito, cintura e quadril com a forma de cada corpo), mantendo as
+medidas do perfil. Sem nenhum marcado, o avatar é o corpo unissex; clicar de
+novo no marcado volta a ele. A escolha vale só na visita: não é salva no
+perfil (para salvar, o perfil precisaria de um campo novo no banco).
+
 Em desenvolvimento, o painel **"Simular corpo (dev)"** do provador troca
 essas medidas sem mexer no perfil salvo. Ele não aparece em produção.
 
@@ -40,6 +46,8 @@ essas medidas sem mexer no perfil salvo. Ele não aparece em produção.
 |---|---|
 | Avatar com medidas em cm e braços a 30° | `public/models/avatar_base.glb` |
 | Calibração das medidas (cm → shape keys) | `src/lib/avatar-builder.ts` (`AVATAR_CALIBRATION`) |
+| Corpo de homem e de mulher (shape keys `male` e `female`) | `avatar_base.glb`, gerado por `scripts/molde/avatar_genero.py` |
+| Botões Homem / Mulher | `src/components/viewer-3d/tryon-experience.tsx` |
 | Moletom moldado (tamanho M) | `public/models/hoodie-core-v3.glb` |
 | Camiseta moldada (tamanho M) | `public/models/boxy_tee_01.glb` |
 | Manequim de vitrine (avatar sem braços) | `public/models/manequim.glb` |
@@ -111,7 +119,7 @@ braço no admin, barra e manga passam a seguir a tabela sem mudar código.
 
 ### Peça maior não fica armada
 
-O molde tem a forma do corpo de referência (feminino, com busto). Num corpo
+O molde tem a forma do corpo de referência (o unissex). Num corpo
 mais raso, a peça ficava no ar com essa forma, como uma tenda. Agora:
 
 - **Frente e costas** pendem do ponto mais saliente do corpo acima delas
@@ -175,6 +183,19 @@ peito são 3 cm, e o peito errava até ~4 cm. Em 7 corpos (normal, magro,
 baixa, quadril 130 e 140, barriga, peito 118), peito, cintura e quadril
 ficam a até 0,5 cm do pedido.
 
+**Homem e mulher.** `avatar_genero.py` usa o MPFB (MakeHuman dentro do
+Blender) para criar as shape keys `male` e `female`: a diferença entre o
+corpo unissex (gênero 0,5 no MakeHuman) e o corpo masculino ou feminino
+completo, com as mesmas proporções. Elas mudam mais do que a forma: o
+masculino é ~7 cm mais alto e tem ~7 cm a mais de peito, e o feminino o
+contrário. A calibração mede quanto cada uma acrescenta em cada medida e o
+site desconta isso, como faz com altura e peso: com as mesmas medidas do
+perfil, os três corpos saem com a mesma altura, peito, cintura e quadril (a
+até 0,5 cm do pedido nos corpos de teste), só com formas diferentes. A
+exceção são os ombros: o corpo masculino já alarga 2,2 cm, e a shape key de
+ombro nem sempre consegue descontar tudo (num teste, 44 cm pedidos saíram
+46,5 cm no homem e 45,2 cm no unissex).
+
 `avatar_medidas.py` também **suaviza** o deslocamento de peso, peito,
 cintura e quadril pela malha (15 passadas). A faixa copiava os detalhes da
 pele, e o peso do MakeHuman veio irregular: com quadril de 130 cm já
@@ -221,6 +242,18 @@ raio medido é interpolado entre as células vizinhas, como a própria reta
 aspereza do tecido caiu cerca de 40% (camiseta no corpo com barriga ou
 quadril de 130 cm).
 
+Com o corpo de mulher apareceu um vinco logo abaixo do busto: a reta
+esticada é medida contra o raio que a peça tinha *depois* do empurrão, e a
+célula da grade logo abaixo do busto pegava o raio da parte de cima dela,
+já empurrada pelo busto; o tecido era puxado para dentro e ficava marcado.
+Agora esse raio é medido **no molde**, antes do empurrão (o que o molde
+tinha de folga e de dobra continua valendo). Isso também deixou de levar as
+marcas do corpo para o tecido: nos corpos com barriga ou quadril grande o
+tecido mudou até ~1 cm e ficou mais liso, e no corpo normal nada mudou
+(menos de 1,1 mm). Em 24 combinações (camiseta e moletom; normal, magro,
+barriga e quadril; unissex, homem e mulher) nenhum ponto ficou dentro da
+pele, e as dobras do moletom continuaram.
+
 O caimento não cria dobras: o tecido que sobra num tamanho maior aparece
 como largura, não como pregas.
 
@@ -228,7 +261,8 @@ como largura, não como pregas.
 
 Todo o processo roda no Blender sem interface. Rodando os scripts de
 `scripts/molde/` a partir dos arquivos originais, o avatar, as peças e o
-manequim saem idênticos, byte a byte, aos do repositório.
+manequim saem idênticos, byte a byte, aos do repositório (no manequim, só as
+normais variam até 0,03°, invisível; ver `scripts/molde/README.md`).
 
 ## Arquivos que mudam juntos
 
@@ -258,15 +292,20 @@ calibração, nomes de cor e o Web Worker. No navegador:
    - barriga: 110 kg, peito 112, cintura 120, quadril 112;
    - magro num GG: 178 cm, 58 kg, peito 84, cintura 68, quadril 86 (ver de
      lado: a frente cai rente ao peito).
-4. O console do navegador mostra o tempo do caimento e quantos pontos ainda
+4. No bloco **Corpo**, clicar em **Homem** e **Mulher**: o avatar muda de
+   forma, a peça acompanha e as medidas do perfil continuam as mesmas.
+   Clicar de novo no botão marcado volta ao corpo unissex; recarregando a
+   página, ele também volta.
+5. O console do navegador mostra o tempo do caimento e quantos pontos ainda
    encostam na pele.
 
 ## Limitações conhecidas
 
 - **Uma pose só** (braços a 30°); sem animação.
-- **Corpo base único** (feminino, 1,66 m). Corpos masculinos são aproximados,
-  e o busto cresce junto com o peito.
-- **Ombros mudam pouco:** a shape key de ombro só vai de −3,8 a +3,8 cm.
+- **Três corpos base:** o unissex (1,66 m, o padrão) e os corpos de homem e
+  de mulher do MakeHuman. A escolha não é salva no perfil.
+- **Ombros mudam pouco:** a shape key de ombro só vai de −3,8 a +3,8 cm; no
+  corpo de homem os ombros podem sair até ~2,5 cm mais largos que o pedido.
 - **Graduação por regra, não molde real por tamanho.** As regras são as de
   confecção e da tabela de medidas; a loja não tem as medidas da peça pronta
   de cada tamanho.
@@ -296,4 +335,6 @@ calibração, nomes de cor e o Web Worker. No navegador:
 
 ## Pendências
 
-- **Preencher quadril e braço** na tabela de medidas do Hoodie Core.
+- **Tabela de medidas do Hoodie Core:** os números são de exemplo (a peça
+  não existe na loja). Numa peça real, preencher tórax, cintura, quadril e
+  braço no admin.

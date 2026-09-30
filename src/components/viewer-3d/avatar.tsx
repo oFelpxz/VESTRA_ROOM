@@ -83,6 +83,10 @@ const MORPH_ALIASES: Record<string, MorphKey> = {
   legs: "legLength",
   perna: "legLength",
   inseam: "legLength",
+  male: "male",
+  masculino: "male",
+  female: "female",
+  feminino: "female",
 };
 
 export function canonicalMorph(name: string): MorphKey | null {
@@ -172,6 +176,8 @@ function GltfAvatar({
     shoulder,
     armLength,
     legLength,
+    male,
+    female,
   } = params.morphs;
   useEffect(() => {
     const root = rootRef.current;
@@ -185,6 +191,8 @@ function GltfAvatar({
       shoulder,
       armLength,
       legLength,
+      male,
+      female,
     };
     let matched = 0;
     root.traverse((obj) => {
@@ -217,6 +225,8 @@ function GltfAvatar({
     shoulder,
     armLength,
     legLength,
+    male,
+    female,
   ]);
 
   return (

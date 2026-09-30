@@ -13,6 +13,8 @@ const NO_MORPHS = {
   shoulder: 0,
   armLength: 0,
   legLength: 0,
+  male: 0,
+  female: 0,
 };
 
 /**
