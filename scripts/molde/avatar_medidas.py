@@ -27,6 +27,11 @@ FAIXAS = {
 }
 NIVEIS = {"chest": (1.24, 0.18), "waist": (1.05, 0.25), "hip": (0.90, 0.25)}
 PROTECAO = 0.04  # a faixa some de x0 até x0 + 4 cm (braços/mãos ficam fora)
+# Suavização do deslocamento de cada medida pela malha (passadas; cada uma
+# leva o vértice metade do caminho até a média dos vizinhos). A faixa copia
+# os detalhes da pele, e o peso veio irregular do MakeHuman: com medida alta
+# (quadril 140, barriga) apareciam gomos e vincos, e a roupa copiava.
+SUAVIZAR = 15
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=IN)
@@ -77,22 +82,50 @@ def set_key(name, dW):
     kb[name].data.foreach_set("co", (BL + dL).ravel())
 
 
+# vizinhos pela malha, com os vértices repetidos nas costuras da textura
+# juntos (senão cada lado da costura suaviza diferente e a pele abre)
+_, solda = np.unique(np.round(BL, 6), axis=0, return_inverse=True)
+solda = solda.ravel()
+arestas = np.array([e.vertices[:] for e in av.data.edges])
+a, b = solda[arestas[:, 0]], solda[arestas[:, 1]]
+arestas = np.unique(np.sort(np.stack([a, b], 1)[a != b], axis=1), axis=0)
+grau = np.bincount(arestas.ravel(), minlength=solda.max() + 1)[:, None]
+
+
+def suavizar(dW):
+    """Deslocamento suavizado pela malha (SUAVIZAR passadas)."""
+    cnt = np.bincount(solda)[:, None]
+    d = np.zeros((len(cnt), 3))
+    np.add.at(d, solda, dW)
+    d /= cnt
+    for _ in range(SUAVIZAR):
+        viz = np.zeros_like(d)
+        np.add.at(viz, arestas[:, 0], d[arestas[:, 1]])
+        np.add.at(viz, arestas[:, 1], d[arestas[:, 0]])
+        d = 0.5 * d + 0.5 * viz / np.maximum(grau, 1)
+    return d[solda]
+
+
+PW = np.array([d.co for d in kb["weight"].data]) @ R.T + T
+set_key("weight", suavizar(PW - BW))
+print("weight: suavizada")
+
 for name, (z0, sig, x0, lados, costas) in FAIXAS.items():
-    d = faixa(z0, sig, x0, lados, costas)
+    d = suavizar(faixa(z0, sig, x0, lados, costas))
     zc, xm = NIVEIS[name]
-    ganho = circ(BW + d, zc, xm) - circ(BW, zc, xm)  # cm por unidade
+    ganho = circ(BW + d, zc, xm, BW) - circ(BW, zc, xm)  # cm por unidade
     set_key(name, d * (GANHO_CM / ganho))
     print(f"{name}: faixa refeita, escala {GANHO_CM / ganho:.3f}")
 
-# calibração: circunferência base e quanto cada key muda cada nível (cm)
+# calibração: circunferência base e quanto cada key muda cada nível (cm).
+# Sempre na mesma faixa de pele: a altura sobe/desce cada medida e o peso
+# também desce o busto; medir numa altura fixa pegava outra parte do corpo e
+# o peito errava até ~4 cm.
 base = {n: round(circ(BW, z, x), 1) for n, (z, x) in NIVEIS.items()}
 ganhos = {}
-for k in ("weight", "chest", "waist", "hip"):
+for k in ("height", "weight", "chest", "waist", "hip"):
     P = np.array([d.co for d in kb[k].data]) @ R.T + T
-    ganhos[k] = {n: round(circ(P, z, x) - base[n], 1) for n, (z, x) in NIVEIS.items()}
-# a altura escala o corpo e sobe/desce cada medida: mede na mesma faixa de pele
-P = np.array([d.co for d in kb["height"].data]) @ R.T + T
-ganhos["height"] = {n: round(circ(P, z, x, BW) - base[n], 1) for n, (z, x) in NIVEIS.items()}
+    ganhos[k] = {n: round(circ(P, z, x, BW) - base[n], 1) for n, (z, x) in NIVEIS.items()}
 print("CALIBRACAO", json.dumps({"base": base, "ganhos": ganhos}))
 
 bpy.ops.object.select_all(action="DESELECT")

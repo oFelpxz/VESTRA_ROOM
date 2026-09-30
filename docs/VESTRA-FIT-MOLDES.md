@@ -49,6 +49,7 @@ essas medidas sem mexer no perfil salvo. Ele não aparece em produção.
 | Assentar, empurrar o tecido para fora do corpo e caimento | `src/lib/garment-fit.ts` (`settle`, `pushOut`, `drape`) |
 | Graduação por tamanho a partir da tabela de medidas | `src/lib/garment-fit.ts` (`sizeGrade`) |
 | Cor sobre a textura | `src/lib/garment-color.ts` (`tintMaterial`) |
+| Nome da cor → tom | `src/lib/color-names.ts` (`colorToHex`) |
 | Provador escolhe: peça moldada ou encaixe antigo | `src/components/viewer-3d/tryon-scene.tsx` |
 | Scripts do Blender que geram avatar e moldes | `scripts/molde/` (ver o README de lá) |
 
@@ -163,9 +164,24 @@ mais fino. Ombros, braço e perna também são calibrados em cm
 perna mais longa também deixa o corpo mais alto.
 
 Conferido no Blender em 5 corpos (de 1,55 m a 1,88 m): altura, entrepernas,
-braço e ombros ficam a até 1 cm do pedido; cintura e quadril a até 1,7 cm;
-peito a até ~3 cm (o busto do corpo base atrapalha). Antes, cintura e
-quadril saíam 4 a 6 cm maiores e braço e perna erravam até 7 cm.
+braço e ombros ficam a até 1 cm do pedido. Antes, cintura e quadril saíam 4
+a 6 cm maiores e braço e perna erravam até 7 cm.
+
+Todas as circunferências são medidas **na mesma faixa de pele** (os mesmos
+vértices do corpo de referência), não numa altura fixa: a altura sobe e
+desce cada medida, e o peso também desce o busto. Medindo o peso numa altura
+fixa, a calibração achava que ele aumentava o peito 7 cm, quando na faixa do
+peito são 3 cm, e o peito errava até ~4 cm. Em 7 corpos (normal, magro,
+baixa, quadril 130 e 140, barriga, peito 118), peito, cintura e quadril
+ficam a até 0,5 cm do pedido.
+
+`avatar_medidas.py` também **suaviza** o deslocamento de peso, peito,
+cintura e quadril pela malha (15 passadas). A faixa copiava os detalhes da
+pele, e o peso do MakeHuman veio irregular: com quadril de 130 cm já
+apareciam gomos e um vinco em volta do quadril, e a barriga do corpo pesado
+tinha calombos que a roupa copiava. Suavizado, a pele do tronco fica ~3,5×
+mais lisa nesses corpos. O corpo de referência (sem medidas) não muda: os
+moldes, os pesos dos braços e o manequim continuam idênticos.
 
 ### Braços abaixados (30°)
 
@@ -197,6 +213,14 @@ Os testes automáticos acharam dois defeitos, já corrigidos: uma célula vazia
 na grade (linha sem ponto) e uma coluna inteira vazia faziam o tecido logo
 abaixo do ponto mais largo voltar ~2 cm para dentro (um "vinco").
 
+No lado esticado, cada vértice andava até a reta medido contra o raio da
+própria célula da grade. Células vizinhas têm raios um pouco diferentes, e o
+tecido saía "amassado", com estrias e degraus, nos corpos grandes. Agora o
+raio medido é interpolado entre as células vizinhas, como a própria reta
+(sem passar do raio da linha do vértice, para não reabrir o vinco). A
+aspereza do tecido caiu cerca de 40% (camiseta no corpo com barriga ou
+quadril de 130 cm).
+
 O caimento não cria dobras: o tecido que sobra num tamanho maior aparece
 como largura, não como pregas.
 
@@ -224,7 +248,7 @@ A **Relugar T-Shirt** usa o mesmo modelo da Boxy Tee com outro arquivo:
 
 `npm test` roda os testes automáticos (sem navegador nem banco): graduação,
 empurrão (inclusive preso entre dois lados), assentamento, caimento, altura,
-calibração e o Web Worker. No navegador:
+calibração, nomes de cor e o Web Worker. No navegador:
 
 1. `npm run dev` e entrar com um cliente que tenha medidas no perfil.
 2. Abrir o provador do Hoodie Core e trocar P / M / G / GG.
@@ -252,11 +276,20 @@ calibração e o Web Worker. No navegador:
   molde encostava no braço, o que é pouco nas duas peças de hoje.
 - **Não há colisão tecido com tecido.** Em corpos muito grandes, o tronco
   pode atravessar a manga.
-- **Moletom:** dobra pequena na axila e punho embolado aproximado.
-- **Casos-limite do corpo:** quadril acima de ~130 cm leva a shape key de
-  quadril além de 1 e o avatar deforma (gomos e vinco em volta do quadril).
-  Corrigir pede refazer a shape key no Blender.
-- **Cor:** estampas coloridas viram um tom só (o da cor escolhida).
+- **Moletom:** dobra pequena na axila e punho embolado aproximado. O punho
+  não abraça o pulso: a manga do molde passa do pulso e cobre o começo da
+  mão, que é mais larga; corrigir pede encurtar a manga no Blender.
+- **Corpos muito pesados** (perto do máximo do painel): o braço encosta no
+  tronco e o tecido da axila fica colado na pele, ou alguns milímetros por
+  dentro, embaixo do braço. Com quadril grande, a mão também encosta no
+  quadril (braços a 30°).
+- **Aspereza que sobra:** nos corpos grandes o tecido ainda tem pequenas
+  ondulações onde é empurrado para fora do corpo.
+- **Cor:** estampas coloridas viram um tom só (o da cor escolhida). O nome
+  da cor vira um tom por uma lista (`src/lib/color-names.ts`): aceita nomes
+  compostos ("Azul Marinho"), a cor base de um nome fora da lista ("Rosa
+  Chiclete" → rosa) e o código da cor ("#6b1f2a"); o que não reconhece fica
+  cinza escuro.
 - **Desempenho:** a conta não trava mais a página, mas a peça nova demora de
   0,3 a 0,75 s para aparecer. Feito e testado para computador (o foco do
   projeto agora); não foi testado no celular.

@@ -429,7 +429,6 @@ export function drape(
   const radius = new Float32Array(C * rows).fill(-Infinity);
   const col = new Float32Array(count);
   const row = new Float32Array(count);
-  const cellOf = new Int32Array(count);
   const ux = new Float32Array(count);
   const uz = new Float32Array(count);
   const pushed = new Float32Array(count);
@@ -447,7 +446,6 @@ export function drape(
     col[i] = ((Math.atan2(rz, rx) + Math.PI) / (2 * Math.PI)) * C;
     row[i] = (top - before[i * 3 + 1]) / DRAPE_ROW;
     const cell = (Math.floor(col[i]) % C) * rows + Math.floor(row[i]);
-    cellOf[i] = cell;
     push[cell] = Math.max(push[cell], pushed[i]);
     radius[cell] = Math.max(radius[cell], len + pushed[i]);
   }
@@ -472,6 +470,17 @@ export function drape(
   fillEmptyColumns(radius, [hangPush, hangRadius], C, rows);
   smoothColumns(hangPush, C, rows);
   smoothColumns(hangRadius, C, rows);
+  // raio medido em cada célula, sem vazias: célula vazia fica com a vizinha
+  // mais perto na coluna; coluna vazia, com a média das colunas do lado
+  const measured = radius.slice();
+  for (let c = 0; c < C; c++) {
+    const g = c * rows;
+    for (let r = 1; r < rows; r++)
+      if (measured[g + r] === -Infinity) measured[g + r] = measured[g + r - 1];
+    for (let r = rows - 2; r >= 0; r--)
+      if (measured[g + r] === -Infinity) measured[g + r] = measured[g + r + 1];
+  }
+  fillEmptyColumns(radius, [measured], C, rows);
 
   // 3) leva cada vértice até o caimento da coluna dele
   let moved = 0;
@@ -487,9 +496,19 @@ export function drape(
       (g[a * rows + r0] * (1 - tr) + g[a * rows + r1] * tr) * (1 - tc) +
       (g[b * rows + r0] * (1 - tr) + g[b * rows + r1] * tr) * tc;
     const t = tension[a] * (1 - tc) + tension[b] * tc;
-    // esticado: até a reta, medido contra o raio da própria célula (o de
-    // fora), para o avesso andar junto e manter a espessura
-    const taut = Math.max(0, at(hangRadius) - radius[cellOf[i]]);
+    // esticado: até a reta, medido contra o raio da célula (o de fora), para
+    // o avesso andar junto e manter a espessura. O raio medido é interpolado
+    // como o caimento: só com o da própria célula, cada célula andava um
+    // tanto diferente e o tecido ficava "amassado", em degraus. Mas nunca
+    // acima do da linha do próprio vértice (entre as colunas), senão, logo
+    // abaixo do ponto mais largo, a média com a linha de cima o deixava
+    // voltar para dentro.
+    const own = Math.min(Math.floor(row[i]), rows - 1);
+    const wall = Math.min(
+      at(measured),
+      measured[a * rows + own] * (1 - tc) + measured[b * rows + own] * tc,
+    );
+    const taut = Math.max(0, at(hangRadius) - wall);
     const extra =
       (t * taut + (1 - t) * Math.max(0, at(hangPush) - pushed[i])) * weight[i];
     if (extra <= 1e-4) continue;

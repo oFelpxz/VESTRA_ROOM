@@ -95,15 +95,14 @@ const REF = {
  */
 const AVATAR_CALIBRATION = {
   // circunferências: scripts/molde/avatar_medidas.py (fita métrica virtual,
-  // antes de abaixar os braços)
+  // antes de abaixar os braços, sempre na mesma faixa de pele)
   base: { chest: 90.1, waist: 69.5, hip: 85.7 },
   gain: {
-    // a altura sobe/desce cada medida: medido na mesma faixa de pele
     height: { chest: 25.8, waist: 20.0, hip: 24.9 },
-    weight: { chest: 7.6, waist: 7.8, hip: 6.8 },
-    chest: { chest: 30.2, waist: 0.1, hip: 0 },
-    waist: { chest: 0.3, waist: 29.9, hip: 1.5 },
-    hip: { chest: 0, waist: 1.4, hip: 39.5 },
+    weight: { chest: 3.1, waist: 7.0, hip: 5.6 },
+    chest: { chest: 29.9, waist: 1.0, hip: 0 },
+    waist: { chest: 1.0, waist: 29.9, hip: 5.0 },
+    hip: { chest: 0, waist: 3.3, hip: 30.0 },
   },
   // comprimentos: scripts/molde/avatar_comprimentos.py (avatar já posado)
   lengths: {
@@ -113,7 +112,7 @@ const AVATAR_CALIBRATION = {
       legLength: { height: 18.5, inseam: 18.5 },
       armLength: { arm: 13.4 },
       shoulder: { shoulder: 1.9 },
-      weight: { shoulder: 0.8 },
+      weight: { shoulder: 0.5 },
     },
   },
 } as const;

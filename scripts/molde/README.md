@@ -19,7 +19,8 @@ Os arquivos de entrada "originais" são os de antes dos moldes, no commit
 ## 1. Avatar (`public/models/avatar_base.glb`)
 
 ```bash
-# peito, cintura e quadril viram "faixas" em cm; imprime CALIBRACAO
+# peito, cintura e quadril viram "faixas" em cm, e elas e o peso são
+# suavizados pela malha; imprime CALIBRACAO
 mb avatar_medidas.py -- avatar_orig.glb avatar_v2.glb
 # braços a 30° (pose padrão) + pesos dos braços para as roupas
 mb avatar_pose.py -- avatar_v2.glb avatar_v3.glb pesos.npz

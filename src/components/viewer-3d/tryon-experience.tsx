@@ -8,6 +8,7 @@ import {
   type FitPreference,
 } from "@/lib/fit-calculator";
 import { buildAvatarParams } from "@/lib/avatar-builder";
+import { colorToHex } from "@/lib/color-names";
 import { MOLDE_SIZE, sizeGrade } from "@/lib/garment-fit";
 import { TryOnScene } from "./tryon-scene";
 import { FitIndicator } from "./fit-indicator";
@@ -68,31 +69,6 @@ const SIM_FIELDS: { key: SimKey; label: string; min: number; max: number }[] = [
   { key: "armLengthCm", label: "Braço (cm)", min: 45, max: 72 },
   { key: "legLengthCm", label: "Perna (cm)", min: 62, max: 95 },
 ];
-
-// Pequena paleta para "cor visual" — mapeia nome → hex aproximado
-const COLOR_HEX: Record<string, string> = {
-  preto: "#1a1a1a",
-  branco: "#f4f1ea",
-  white: "#f4f1ea",
-  "off-white": "#ece6d8",
-  areia: "#cdb896",
-  cinza: "#9c9c9c",
-  azul: "#2a4a8a",
-  vermelho: "#a02a2a",
-  verde: "#2a7a3a",
-  bege: "#d4c4a8",
-  marrom: "#5a3a26",
-  rosa: "#d48aa8",
-  amarelo: "#e0b840",
-};
-
-function colorToHex(name: string): string {
-  const key = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  return COLOR_HEX[key] ?? "#3a3a3a";
-}
 
 export function TryOnExperience({
   productName,
