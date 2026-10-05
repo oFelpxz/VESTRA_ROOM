@@ -43,6 +43,7 @@ function fakeTx(orderStatus: OrderStatus, paymentStatus: string) {
     order: { status: orderStatus as string },
     payment: { status: paymentStatus },
     stock: 10,
+    couponUses: 3,
   };
   const tx = {
     order: {
@@ -57,6 +58,13 @@ function fakeTx(orderStatus: OrderStatus, paymentStatus: string) {
         db.stock += data.stockQuantity.increment;
       },
     },
+    coupon: {
+      updateMany: async ({ where, data }: { where: { usedCount: { gt: number } }; data: { usedCount: { decrement: number } } }) => {
+        if (!(db.couponUses > where.usedCount.gt)) return { count: 0 };
+        db.couponUses -= data.usedCount.decrement;
+        return { count: 1 };
+      },
+    },
     payment: {
       updateMany: async ({ where, data }: { where: { status: string }; data: { status: string } }) => {
         if (db.payment.status !== where.status) return { count: 0 };
@@ -68,11 +76,12 @@ function fakeTx(orderStatus: OrderStatus, paymentStatus: string) {
   return { db, tx: tx as never };
 }
 
-const order = (status: OrderStatus) => ({
+const order = (status: OrderStatus, couponId: string | null = null) => ({
   id: "o1",
   status,
   items: [{ productVariantId: "v1", quantity: 2 }],
   payment: { id: "p1" },
+  couponId,
 });
 
 describe("cancelOrderInTx", () => {
@@ -83,7 +92,7 @@ describe("cancelOrderInTx", () => {
       restock: true,
     });
     assert.equal(ok, true);
-    assert.deepEqual(db, { order: { status: "CANCELED" }, payment: { status: "REFUNDED" }, stock: 12 });
+    assert.deepEqual(db, { order: { status: "CANCELED" }, payment: { status: "REFUNDED" }, stock: 12, couponUses: 3 });
   });
 
   it("pagamento pendente vira falho", async () => {
@@ -113,7 +122,7 @@ describe("cancelOrderInTx", () => {
       restock: true,
     });
     assert.equal(ok, false);
-    assert.deepEqual(db, { order: { status: "SHIPPED" }, payment: { status: "PAID" }, stock: 10 });
+    assert.deepEqual(db, { order: { status: "SHIPPED" }, payment: { status: "PAID" }, stock: 10, couponUses: 3 });
   });
 
   it("cliente não cancela pedido em separação", async () => {
@@ -124,6 +133,35 @@ describe("cancelOrderInTx", () => {
     });
     assert.equal(ok, false);
     assert.equal(db.stock, 10);
+  });
+
+  it("pedido com cupom devolve o uso uma vez só, mesmo com clique duplo", async () => {
+    const { db, tx } = fakeTx("PAID", "PAID");
+    const opts = { allowedFrom: CUSTOMER_CANCELABLE, restock: true };
+    await Promise.all([
+      cancelOrderInTx(tx, order("PAID", "c1"), opts),
+      cancelOrderInTx(tx, order("PAID", "c1"), opts),
+    ]);
+    assert.equal(db.couponUses, 2);
+  });
+
+  it("não deixa o contador do cupom ficar negativo", async () => {
+    const { db, tx } = fakeTx("PAID", "PAID");
+    db.couponUses = 0;
+    await cancelOrderInTx(tx, order("PAID", "c1"), {
+      allowedFrom: CUSTOMER_CANCELABLE,
+      restock: true,
+    });
+    assert.equal(db.couponUses, 0);
+  });
+
+  it("pedido recusado não mexe no cupom", async () => {
+    const { db, tx } = fakeTx("PREPARING", "PAID");
+    await cancelOrderInTx(tx, order("PREPARING", "c1"), {
+      allowedFrom: CUSTOMER_CANCELABLE,
+      restock: true,
+    });
+    assert.equal(db.couponUses, 3);
   });
 
   it("Admin cancela enviado sem devolver estoque se a peça não voltou", async () => {

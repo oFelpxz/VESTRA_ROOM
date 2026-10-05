@@ -67,6 +67,7 @@ export async function cancelOrderInTx(
     status: OrderStatus;
     items: { productVariantId: string | null; quantity: number }[];
     payment: { id: string } | null;
+    couponId: string | null;
   },
   opts: { allowedFrom: readonly OrderStatus[]; restock: boolean },
 ) {
@@ -89,6 +90,15 @@ export async function cancelOrderInTx(
         });
       }
     }
+  }
+
+  // O cancelamento desfaz a compra inteira: o uso do cupom volta a ficar
+  // disponível. `gt: 0` evita contador negativo se alguém zerou na mão.
+  if (order.couponId) {
+    await tx.coupon.updateMany({
+      where: { id: order.couponId, usedCount: { gt: 0 } },
+      data: { usedCount: { decrement: 1 } },
+    });
   }
 
   // Pago → reembolsado; pendente → falhou. Lido no banco (não no objeto

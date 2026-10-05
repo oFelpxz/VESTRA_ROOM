@@ -139,6 +139,7 @@ export async function cancelOrderByAdminAction(
       status: true,
       items: { select: { productVariantId: true, quantity: true } },
       payment: { select: { id: true } },
+      couponId: true,
     },
   });
   if (!order) return { error: "Pedido não encontrado." };
