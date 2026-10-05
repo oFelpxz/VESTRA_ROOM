@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
 import { formatBRL, formatCep } from "@/lib/format";
-import { normalizePostalCode, quoteShippingOptions } from "@/lib/shipping";
+import { normalizePostalCode, quoteShippingOptionsLive } from "@/lib/shipping";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { CartItemRow } from "@/components/cart/cart-item-row";
 import { ShippingEstimator } from "@/components/cart/shipping-estimator";
@@ -53,12 +53,14 @@ export default async function CarrinhoPage({
   const cep = normalizePostalCode(cepInput);
 
   const shippingOptions = cep
-    ? quoteShippingOptions({ subtotal, itemCount, postalCode: cep })
+    ? await quoteShippingOptionsLive({ subtotal, itemCount, postalCode: cep })
     : [];
   const selectedMethod = cart?.shippingMethod ?? "ECONOMICO";
-  const selectedShipping = shippingOptions.find(
-    (o) => o.method === selectedMethod,
-  );
+  // Expresso pode não existir para o CEP (frete real): aí vale o Econômico,
+  // como no checkout e no pedido.
+  const selectedShipping =
+    shippingOptions.find((o) => o.method === selectedMethod) ??
+    shippingOptions[0];
 
   // Cupom aplicado é reavaliado a cada visita: se deixou de valer, fica
   // listado com o motivo e sem desconto.
@@ -176,7 +178,7 @@ export default async function CarrinhoPage({
                 cep={cep}
                 error={cepError}
                 options={shippingOptions}
-                selected={selectedMethod}
+                selected={selectedShipping?.method ?? selectedMethod}
               />
 
               <CouponField

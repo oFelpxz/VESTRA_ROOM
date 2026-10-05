@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
-import { quoteShippingFor } from "@/lib/shipping";
+import { quoteShippingForLive } from "@/lib/shipping";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { formatBRL, formatCep } from "@/lib/format";
 import { deleteAddressAction } from "@/lib/address-actions";
@@ -12,6 +12,7 @@ import { CheckoutStepper } from "@/components/checkout/checkout-stepper";
 import { OrderSummary } from "@/components/checkout/order-summary";
 import { AddressForm } from "@/components/checkout/address-form";
 import { PaymentStep } from "@/components/checkout/payment-step";
+import { stripeConfigured } from "@/lib/stripe";
 
 type Step = "address" | "review" | "payment";
 const STEPS: readonly string[] = ["address", "review", "payment"];
@@ -82,7 +83,7 @@ export default async function CheckoutPage({
     0,
   );
   const itemCount = items.reduce((s, i) => s + i.quantity, 0);
-  const shipping = quoteShippingFor(cart?.shippingMethod ?? "ECONOMICO", {
+  const shipping = await quoteShippingForLive(cart?.shippingMethod ?? "ECONOMICO", {
     subtotal,
     itemCount,
     postalCode: selectedAddress?.postalCode,
@@ -157,7 +158,11 @@ export default async function CheckoutPage({
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                 Método de pagamento
               </p>
-              <PaymentStep addressId={selectedAddress.id} savedMethods={savedMethods} />
+              <PaymentStep
+                addressId={selectedAddress.id}
+                savedMethods={savedMethods}
+                stripeOn={stripeConfigured()}
+              />
             </div>
           )}
         </div>

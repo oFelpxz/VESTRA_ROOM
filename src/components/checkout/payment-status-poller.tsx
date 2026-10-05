@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const PAYMENT_LABEL: Record<string, string> = {
+  PENDING: "pendente",
+  PAID: "pago",
+  FAILED: "não concluído",
+  REFUNDED: "reembolsado",
+};
+
 type Status = {
   orderStatus: string;
   paymentStatus: string | null;
@@ -74,7 +81,10 @@ export function PaymentStatusPoller({
               : "Aguardando confirmação..."}
         </p>
         <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-          Status atual · {status.paymentStatus ?? "desconhecido"}
+          Pagamento ·{" "}
+          {status.paymentStatus
+            ? (PAYMENT_LABEL[status.paymentStatus] ?? status.paymentStatus)
+            : "desconhecido"}
         </p>
       </div>
     </div>

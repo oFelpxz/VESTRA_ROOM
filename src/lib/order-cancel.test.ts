@@ -85,14 +85,14 @@ const order = (status: OrderStatus, couponId: string | null = null) => ({
 });
 
 describe("cancelOrderInTx", () => {
-  it("cancela, devolve estoque e reembolsa o que estava pago", async () => {
+  it("cancela e devolve estoque; o pagamento pago espera o estorno no gateway", async () => {
     const { db, tx } = fakeTx("PAID", "PAID");
     const ok = await cancelOrderInTx(tx, order("PAID"), {
       allowedFrom: CUSTOMER_CANCELABLE,
       restock: true,
     });
     assert.equal(ok, true);
-    assert.deepEqual(db, { order: { status: "CANCELED" }, payment: { status: "REFUNDED" }, stock: 12, couponUses: 3 });
+    assert.deepEqual(db, { order: { status: "CANCELED" }, payment: { status: "PAID" }, stock: 12, couponUses: 3 });
   });
 
   it("pagamento pendente vira falho", async () => {

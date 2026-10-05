@@ -77,6 +77,13 @@ export function MobileMenu({
                     Favoritos
                   </Link>
                   <Link
+                    href="/perfil/notificacoes"
+                    onClick={() => setOpen(false)}
+                    className="text-xs font-medium uppercase tracking-[0.15em] text-foreground/70"
+                  >
+                    Avisos
+                  </Link>
+                  <Link
                     href="/perfil"
                     onClick={() => setOpen(false)}
                     className="text-xs font-medium uppercase tracking-[0.15em] text-foreground/70"

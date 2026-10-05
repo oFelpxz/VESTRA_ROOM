@@ -4,23 +4,11 @@ import { auth } from "@/auth";
 import { getOrderById, cancelOrderAction } from "@/lib/order-actions";
 import { canCustomerCancel } from "@/lib/order-cancel";
 import { formatBRL, formatCep } from "@/lib/format";
-import { shippingMethodLabel } from "@/lib/shipping";
+import { orderShippingLabel } from "@/lib/shipping";
 import { OrderTimeline } from "@/components/profile/order-timeline";
 import { OrderRefresh } from "@/components/profile/order-refresh";
-
-const METHOD_LABEL: Record<string, string> = {
-  PIX: "PIX",
-  CREDIT_CARD: "Cartão de crédito",
-  DEBIT_CARD: "Débito",
-  BOLETO: "Boleto",
-};
-
-const PAYMENT_BADGE: Record<string, string> = {
-  PENDING: "bg-muted text-muted-foreground",
-  PAID: "bg-acid/30 text-foreground",
-  FAILED: "bg-destructive/10 text-destructive",
-  REFUNDED: "bg-destructive/10 text-destructive",
-};
+import { PaymentDetails } from "@/components/checkout/payment-details";
+import { syncOrderPayment } from "@/lib/payments";
 
 export default async function PedidoDetalhePage({
   params,
@@ -31,8 +19,14 @@ export default async function PedidoDetalhePage({
   if (!session?.user) redirect("/login");
 
   const { orderId } = await params;
-  const order = await getOrderById(orderId);
+  let order = await getOrderById(orderId);
   if (!order) notFound();
+  // Reconciliação com o Stripe: pagamento ainda pendente é conferido lá
+  // (no máximo a cada 10 s) antes de mostrar.
+  if (order.payment?.provider === "STRIPE" && order.payment.status === "PENDING") {
+    await syncOrderPayment(orderId);
+    order = (await getOrderById(orderId)) ?? order;
+  }
 
   const subtotal =
     Number(order.totalAmount) -
@@ -147,7 +141,7 @@ export default async function PedidoDetalhePage({
             )}
             <li className="flex items-baseline justify-between py-3">
               <span className="text-muted-foreground">
-                Frete · {shippingMethodLabel(order.shippingMethod)}
+                Frete · {orderShippingLabel(order)}
               </span>
               <span>
                 {Number(order.shippingAmount) === 0
@@ -196,33 +190,8 @@ export default async function PedidoDetalhePage({
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                 Pagamento
               </p>
-              <div className="mt-4 rounded-sm border border-border p-5 text-sm">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">
-                    {METHOD_LABEL[order.payment.method] ?? order.payment.method}
-                  </p>
-                  <span
-                    className={`rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${
-                      PAYMENT_BADGE[order.payment.status]
-                    }`}
-                  >
-                    {order.payment.status}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Provedor: {order.payment.provider}
-                </p>
-                {order.payment.paidAt && (
-                  <p className="text-xs text-muted-foreground">
-                    Pago em{" "}
-                    {order.payment.paidAt.toLocaleString("pt-BR")}
-                  </p>
-                )}
-                {order.payment.externalPaymentId && (
-                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                    ID: {order.payment.externalPaymentId}
-                  </p>
-                )}
+              <div className="mt-4">
+                <PaymentDetails payment={order.payment} orderStatus={order.status} />
               </div>
             </div>
           )}

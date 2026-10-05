@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, ShoppingBag, User, LogOut } from "lucide-react";
+import { Bell, Heart, ShoppingBag, User, LogOut } from "lucide-react";
 import { logoutAction } from "@/lib/auth-actions";
 import { MobileMenu } from "@/components/layout/mobile-menu";
 import { Logo } from "@/components/layout/logo";
@@ -18,10 +18,13 @@ export function HeaderClient({
   isLoggedIn,
   isAdmin,
   cartCount,
+  unreadCount = 0,
 }: {
   isLoggedIn: boolean;
   isAdmin: boolean;
   cartCount: number;
+  /** Avisos não lidos (pagamento, reembolso — item 20). */
+  unreadCount?: number;
 }) {
   const [scrolled, setScrolled] = useState(false);
 
@@ -68,6 +71,20 @@ export function HeaderClient({
         </nav>
 
         <div className="flex items-center gap-4">
+          {isLoggedIn && (
+            <Link
+              href="/perfil/notificacoes"
+              aria-label={`Avisos (${unreadCount} não lido${unreadCount === 1 ? "" : "s"})`}
+              className="relative hidden text-foreground/80 transition-colors hover:text-foreground md:block"
+            >
+              <Bell className="size-5" strokeWidth={1.5} />
+              {unreadCount > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-acid px-1 text-[10px] font-semibold leading-none text-foreground">
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
+          )}
           {isLoggedIn && (
             <Link
               href="/favoritos"

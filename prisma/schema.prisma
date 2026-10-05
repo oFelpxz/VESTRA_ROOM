@@ -86,6 +86,8 @@ enum PaymentMethod {
   CREDIT_CARD
   DEBIT_CARD
   BOLETO
+  /// Carteira digital (Google Pay / Link) pelo Stripe Checkout — item 17.
+  WALLET
 }
 
 enum PaymentStatus {
@@ -136,6 +138,7 @@ model User {
   orders             Order[]
   reviews            Review[]
   favorites          Favorite[]
+  notifications      Notification[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -430,6 +433,9 @@ model Order {
   couponId          String?
   coupon            Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
   shippingMethod    ShippingMethod @default(ECONOMICO)
+  /// Serviço cotado no Melhor Envio (item 18), ex.: "Correios · PAC". Null = tabela interna.
+  shippingService   String?
+  shippingDays      Int?
   trackingCode     String?
   items             OrderItem[]
   payment           Payment?
@@ -461,7 +467,31 @@ model Payment {
   status            PaymentStatus   @default(PENDING)
   amount            Decimal         @db.Decimal(10, 2)
   externalPaymentId String?
+  /// Stripe Checkout (item 16): sessão criada para este pagamento e o link
+  /// para o cliente voltar a ela enquanto estiver aberta.
+  checkoutSessionId String?         @unique
+  checkoutUrl       String?
+  /// Boleto (item 17): página da guia e vencimento.
+  boletoUrl         String?
+  dueAt             DateTime?
+  /// Reembolso (item 20): id do estorno no gateway; null = sem estorno ou manual.
+  refundId          String?
+  refundedAt        DateTime?
   paidAt            DateTime?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+}
+
+/// Avisos ao cliente dentro do site (item 20: reembolso; também pagamento).
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }

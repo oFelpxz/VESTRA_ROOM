@@ -3,16 +3,12 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { getOrderById } from "@/lib/order-actions";
 import { formatBRL, formatCep } from "@/lib/format";
-import { shippingMethodLabel } from "@/lib/shipping";
+import { orderShippingLabel } from "@/lib/shipping";
 import { OrderTimeline } from "@/components/profile/order-timeline";
 import { OrderStatusActions } from "@/components/admin/order-status-actions";
-
-const METHOD_LABEL: Record<string, string> = {
-  PIX: "PIX",
-  CREDIT_CARD: "Cartão de crédito",
-  DEBIT_CARD: "Débito",
-  BOLETO: "Boleto",
-};
+import { RefundActions } from "@/components/admin/refund-actions";
+import { PaymentDetails } from "@/components/checkout/payment-details";
+import { needsManualRefund } from "@/lib/payments";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING_PAYMENT: "Aguardando pagamento",
@@ -186,7 +182,7 @@ export default async function AdminPedidoDetalhePage({
               )}
               <li className="flex items-baseline justify-between py-3">
                 <span className="text-muted-foreground">
-                  Frete · {shippingMethodLabel(order.shippingMethod)}
+                  Frete · {orderShippingLabel(order)}
                 </span>
                 <span>
                   {Number(order.shippingAmount) === 0
@@ -227,24 +223,16 @@ export default async function AdminPedidoDetalhePage({
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                 Pagamento
               </p>
-              <div className="mt-4 rounded-sm border border-border p-5 text-sm">
-                <p className="font-medium">
-                  {METHOD_LABEL[order.payment.method] ?? order.payment.method}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Status: {order.payment.status} · {order.payment.provider}
-                </p>
-                {order.payment.paidAt && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Pago em{" "}
-                    {order.payment.paidAt.toLocaleString("pt-BR")}
-                  </p>
-                )}
-                {order.payment.externalPaymentId && (
-                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                    ID: {order.payment.externalPaymentId}
-                  </p>
-                )}
+              <div className="mt-4 flex flex-col gap-3">
+                <PaymentDetails payment={order.payment} orderStatus={order.status} />
+                {order.status === "CANCELED" &&
+                  order.payment.status === "PAID" &&
+                  session?.user?.role === "ADMIN" && (
+                    <RefundActions
+                      orderId={order.id}
+                      manualOnly={needsManualRefund(order.payment)}
+                    />
+                  )}
               </div>
             </div>
           )}

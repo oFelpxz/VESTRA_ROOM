@@ -8,6 +8,7 @@ type ProductCardProps = {
   slug?: string;
   name: string;
   price: string;
+  promotionalPrice?: string | null;
   tags?: string[];
   imageUrl?: string | null;
   modelUrl?: string | null;
@@ -20,6 +21,7 @@ export function ProductCard({
   slug,
   name,
   price,
+  promotionalPrice,
   tags = [],
   imageUrl,
   modelUrl,
@@ -88,7 +90,24 @@ export function ProductCard({
             <h3 className="text-[11px] font-medium uppercase tracking-[0.15em]">
               {name}
             </h3>
-            <p className="mt-1 text-[11px] text-muted-foreground">{price}</p>
+            {/* Mesmo padrão da página do produto e dos favoritos: com
+                promoção, o preço cheio aparece riscado ao lado. */}
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {promotionalPrice ? (
+                <span className="text-foreground">{promotionalPrice}</span>
+              ) : (
+                price
+              )}
+              {promotionalPrice && (
+                <>
+                  {" "}
+                  <s className="ml-1">
+                    <span className="sr-only">antes </span>
+                    {price}
+                  </s>
+                </>
+              )}
+            </p>
           </div>
           <span
             aria-hidden
