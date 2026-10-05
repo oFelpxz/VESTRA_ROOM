@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { measurementError } from "@/lib/measurement-limits";
 
 export type MeasurementFormState = {
   error?: string;
@@ -11,12 +12,12 @@ export type MeasurementFormState = {
 
 type Fit = "SLIM" | "REGULAR" | "OVERSIZED";
 
+/** Vazio = não informado (null). Texto inválido vira NaN e é recusado depois. */
 function parseNum(value: FormDataEntryValue | null): number | null {
   if (value === null) return null;
   const s = String(value).trim().replace(",", ".");
   if (s === "") return null;
-  const n = Number(s);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  return Number(s);
 }
 
 export async function saveMeasurementsAction(
@@ -53,6 +54,11 @@ export async function saveMeasurementsAction(
     fitPreference,
     acceptedTerms: true,
   };
+
+  // Antes, qualquer número passava (ex.: 1,75 em vez de 175) e o avatar saía
+  // deformado sem aviso.
+  const invalid = measurementError(data);
+  if (invalid) return { error: invalid };
 
   await prisma.measurementProfile.upsert({
     where: { userId: session.user.id },

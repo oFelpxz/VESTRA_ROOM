@@ -218,6 +218,57 @@ function girthMorphs(
   };
 }
 
+/**
+ * Medidas (cm) que o avatar terá com esses pesos, pela mesma calibração usada
+ * para calculá-los. Serve para conferir o avatar: dentro da faixa das shape
+ * keys deve bater com o pedido; fora dela, o peso é limitado e a medida para
+ * no máximo que o corpo consegue representar. A altura real é acertada pela
+ * malha em `shapeBody`; aqui é a estimativa da calibração.
+ */
+export function predictAvatarMeasurements(
+  morphs: AvatarParams["morphs"],
+): Record<Girth | "height" | "inseam" | "arm" | "shoulder", number> {
+  const { base, gain, lengths } = AVATAR_CALIBRATION;
+  const girth = (m: Girth) =>
+    base[m] +
+    morphs.height * gain.height[m] +
+    morphs.weight * gain.weight[m] +
+    morphs.chest * gain.chest[m] +
+    morphs.waist * gain.waist[m] +
+    morphs.hip * gain.hip[m] +
+    morphs.male * gain.male[m] +
+    morphs.female * gain.female[m];
+  const lg = lengths.gain;
+  const sex = (k: "height" | "inseam" | "arm" | "shoulder") =>
+    morphs.male * lg.male[k] + morphs.female * lg.female[k];
+  return {
+    chest: girth("chest"),
+    waist: girth("waist"),
+    hip: girth("hip"),
+    height:
+      lengths.base.height +
+      morphs.height * lg.height.height +
+      morphs.legLength * lg.legLength.height +
+      sex("height"),
+    inseam:
+      lengths.base.inseam +
+      morphs.height * lg.height.inseam +
+      morphs.legLength * lg.legLength.inseam +
+      sex("inseam"),
+    arm:
+      lengths.base.arm +
+      morphs.height * lg.height.arm +
+      morphs.armLength * lg.armLength.arm +
+      sex("arm"),
+    shoulder:
+      lengths.base.shoulder +
+      morphs.height * lg.height.shoulder +
+      morphs.shoulder * lg.shoulder.shoulder +
+      morphs.weight * lg.weight.shoulder +
+      sex("shoulder"),
+  };
+}
+
 function safe(value: number | null, fallback: number) {
   return value && value > 0 ? value : fallback;
 }

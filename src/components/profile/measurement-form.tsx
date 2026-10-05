@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MEASUREMENT_LIMITS } from "@/lib/measurement-limits";
 
 export type MeasurementInitial = {
   heightCm: number | null;
@@ -24,7 +25,7 @@ export type MeasurementInitial = {
   acceptedTerms: boolean;
 } | null;
 
-const fields: { name: keyof NonNullable<MeasurementInitial>; label: string }[] =
+const fields: { name: keyof typeof MEASUREMENT_LIMITS; label: string }[] =
   [
     { name: "heightCm", label: "Altura (cm)" },
     { name: "weightKg", label: "Peso aproximado (kg)" },
@@ -60,7 +61,8 @@ export function MeasurementForm({
               name={f.name}
               type="number"
               step="0.1"
-              min="0"
+              min={MEASUREMENT_LIMITS[f.name].min}
+              max={MEASUREMENT_LIMITS[f.name].max}
               inputMode="decimal"
               defaultValue={
                 initial && initial[f.name] != null
