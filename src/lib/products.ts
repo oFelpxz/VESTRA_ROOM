@@ -125,6 +125,10 @@ export async function getProducts(
   filters: ProductFilters = {},
 ): Promise<CatalogProduct[]> {
   const range = filters.preco ? PRICE_RANGES[filters.preco] : undefined;
+  const bounds = range && {
+    ...(range.min !== undefined ? { gte: range.min } : {}),
+    ...(range.max !== undefined ? { lte: range.max } : {}),
+  };
 
   const products = await prisma.product.findMany({
     where: {
@@ -142,12 +146,13 @@ export async function getProducts(
             },
           }
         : {}),
-      ...(range
+      // A faixa vale para o preço que o cliente paga: o promocional, se houver.
+      ...(bounds
         ? {
-            basePrice: {
-              ...(range.min !== undefined ? { gte: range.min } : {}),
-              ...(range.max !== undefined ? { lte: range.max } : {}),
-            },
+            OR: [
+              { promotionalPrice: bounds },
+              { promotionalPrice: null, basePrice: bounds },
+            ],
           }
         : {}),
       ...(filters.genero ? { gender: filters.genero as "MASCULINO" | "FEMININO" | "UNISSEX" } : {}),
