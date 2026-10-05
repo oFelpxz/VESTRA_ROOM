@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getOrderById, cancelOrderAction } from "@/lib/order-actions";
+import { canCustomerCancel } from "@/lib/order-cancel";
 import { formatBRL, formatCep } from "@/lib/format";
 import { shippingMethodLabel } from "@/lib/shipping";
 import { OrderTimeline } from "@/components/profile/order-timeline";
@@ -37,7 +38,7 @@ export default async function PedidoDetalhePage({
     Number(order.totalAmount) -
     Number(order.shippingAmount) +
     Number(order.discountAmount);
-  const canCancel = ["PENDING_PAYMENT", "PAID"].includes(order.status);
+  const canCancel = canCustomerCancel(order.status);
 
   return (
     <section className="mx-auto max-w-4xl px-4 py-12 md:px-6">

@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { quoteShippingFor } from "@/lib/shipping";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
+import { cancelOrderInTx, CUSTOMER_CANCELABLE } from "@/lib/order-cancel";
 
 /** Lançado dentro da transação para desfazer tudo quando o cupom deixa de valer no último instante. */
 class CouponUnavailableError extends Error {}
@@ -291,34 +292,14 @@ export async function cancelOrderAction(formData: FormData) {
     include: { items: true, payment: true },
   });
   if (!order || order.userId !== session.user.id) return;
-  if (!["PENDING_PAYMENT", "PAID"].includes(order.status)) return;
 
-  await prisma.$transaction(async (tx) => {
-    // Devolve estoque
-    for (const i of order.items) {
-      if (i.productVariantId) {
-        await tx.productVariant.update({
-          where: { id: i.productVariantId },
-          data: { stockQuantity: { increment: i.quantity } },
-        });
-      }
-    }
-    await tx.order.update({
-      where: { id: orderId },
-      data: { status: "CANCELED" },
-    });
-    if (order.payment && order.payment.status === "PAID") {
-      await tx.payment.update({
-        where: { id: order.payment.id },
-        data: { status: "REFUNDED" },
-      });
-    } else if (order.payment) {
-      await tx.payment.update({
-        where: { id: order.payment.id },
-        data: { status: "FAILED" },
-      });
-    }
-  });
+  // Cliente cancela só antes da separação; estoque sempre volta.
+  await prisma.$transaction((tx) =>
+    cancelOrderInTx(tx, order, {
+      allowedFrom: CUSTOMER_CANCELABLE,
+      restock: true,
+    }),
+  );
 
   revalidatePath(`/perfil/pedidos/${orderId}`);
   revalidatePath("/perfil/pedidos");

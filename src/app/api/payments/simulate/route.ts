@@ -34,20 +34,29 @@ export async function POST(request: Request) {
   // Espera 3s para simular processamento do gateway
   await new Promise((resolve) => setTimeout(resolve, 3000));
 
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: order.payment.id },
+  const paymentId = order.payment.id;
+
+  // Só confirma se o pedido ainda estiver aguardando pagamento: se o cliente
+  // cancelou durante a espera, o cancelamento vale e nada muda aqui.
+  const confirmed = await prisma.$transaction(async (tx) => {
+    const moved = await tx.order.updateMany({
+      where: { id: orderId, status: "PENDING_PAYMENT" },
+      data: { status: "PAID" },
+    });
+    if (moved.count === 0) return false;
+    await tx.payment.updateMany({
+      where: { id: paymentId, status: "PENDING" },
       data: {
         status: "PAID",
         paidAt: new Date(),
         externalPaymentId: `SIM-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
       },
-    }),
-    prisma.order.update({
-      where: { id: orderId },
-      data: { status: "PAID" },
-    }),
-  ]);
+    });
+    return true;
+  });
+  if (!confirmed) {
+    return NextResponse.json({ ok: true, alreadyProcessed: true });
+  }
 
   return NextResponse.json({ ok: true });
 }
