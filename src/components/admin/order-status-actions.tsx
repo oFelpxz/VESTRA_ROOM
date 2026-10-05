@@ -63,7 +63,10 @@ export function OrderStatusActions({
   const next = NEXT_BY_STATUS[status];
   const canCancel = isAdmin && canAdminCancel(status);
   const afterShipping = goodsLeftWarehouse(status);
-  const state = cancelState.error || cancelState.success ? cancelState : advanceState;
+  // Mostra só a mensagem do último formulário enviado; senão um erro antigo
+  // do cancelamento esconderia o resultado de um avanço feito depois.
+  const [lastAction, setLastAction] = useState<"advance" | "cancel">("advance");
+  const state = lastAction === "cancel" ? cancelState : advanceState;
 
   if (!next && !canCancel) {
     return (
@@ -78,7 +81,11 @@ export function OrderStatusActions({
   return (
     <div className="flex flex-col gap-3">
       {next && (
-        <form action={formAction} className="flex flex-col gap-3">
+        <form
+          action={formAction}
+          onSubmit={() => setLastAction("advance")}
+          className="flex flex-col gap-3"
+        >
           <input type="hidden" name="orderId" value={orderId} />
           <input type="hidden" name="newStatus" value={next.value} />
 
@@ -117,7 +124,9 @@ export function OrderStatusActions({
           onSubmit={(e) => {
             if (!window.confirm("Cancelar este pedido? Essa ação não pode ser desfeita.")) {
               e.preventDefault();
+              return;
             }
+            setLastAction("cancel");
           }}
           className="flex flex-col gap-3"
         >

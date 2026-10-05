@@ -21,9 +21,11 @@ type OrderStatus =
   | "REFUNDED";
 
 // Transições permitidas (não pula etapas). Cancelar não entra aqui: é só
-// do Admin, em cancelOrderByAdminAction (item 19).
+// do Admin, em cancelOrderByAdminAction (item 19). PENDING_PAYMENT → PAID
+// também não: só a confirmação do pagamento marca o pedido como pago, senão
+// o pedido ficaria pago com o Payment ainda PENDING.
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING_PAYMENT: ["PAID"],
+  PENDING_PAYMENT: [],
   PAID: ["PREPARING"],
   PREPARING: ["SHIPPED"],
   SHIPPED: ["DELIVERED"],
