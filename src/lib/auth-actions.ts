@@ -84,7 +84,7 @@ export async function logoutAction() {
 
 /**
  * Exclui a conta: anonimiza os dados pessoais do usuário (nome, e-mail,
- * telefone, senha) e apaga medidas/endereços/carrinho — mas mantém a linha
+ * telefone, senha) e apaga medidas/endereços/cartões salvos/carrinho — mas mantém a linha
  * de User e o histórico de Pedidos intactos (registro fiscal). Pedidos
  * antigos perdem apenas o endereço de entrega vinculado (dado pessoal),
  * via onDelete: SetNull.
@@ -111,6 +111,7 @@ export async function deleteAccountAction(
   await prisma.$transaction([
     prisma.measurementProfile.deleteMany({ where: { userId } }),
     prisma.address.deleteMany({ where: { userId } }),
+    prisma.savedPaymentMethod.deleteMany({ where: { userId } }),
     prisma.cart.deleteMany({ where: { userId } }),
     prisma.user.update({
       where: { id: userId },

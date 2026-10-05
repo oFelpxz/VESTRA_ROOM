@@ -4,11 +4,30 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { parseProductPrices } from "@/lib/product-prices";
 
 export type ProductFormState = {
   error?: string;
   success?: boolean;
+  /** Valores digitados, devolvidos no erro para o formulário não se apagar. */
+  values?: Record<string, string>;
 };
+
+const PRODUCT_FIELDS = [
+  "name",
+  "categoryId",
+  "brand",
+  "basePrice",
+  "promotionalPrice",
+  "description",
+  "availableForVirtualTryOn",
+];
+
+function productValues(formData: FormData): Record<string, string> {
+  return Object.fromEntries(
+    PRODUCT_FIELDS.map((f) => [f, String(formData.get(f) ?? "")]),
+  );
+}
 
 async function requireAdmin() {
   const session = await auth();
@@ -55,16 +74,18 @@ export async function createProductAction(
 ): Promise<ProductFormState> {
   await requireAdmin();
 
+  const values = productValues(formData);
   const name = str(formData.get("name"));
   const categoryId = str(formData.get("categoryId"));
-  const basePrice = decimal(formData.get("basePrice"));
 
-  if (!name) return { error: "Informe o nome do produto." };
-  if (!categoryId) return { error: "Selecione uma categoria." };
-  if (basePrice === null) return { error: "Informe um preço base válido." };
+  if (!name) return { error: "Informe o nome do produto.", values };
+  if (!categoryId) return { error: "Selecione uma categoria.", values };
+  const prices = parseProductPrices(values.basePrice, values.promotionalPrice);
+  if ("error" in prices) return { error: prices.error, values };
+  const { basePrice, promotionalPrice } = prices;
 
   const baseSlug = slugify(name);
-  if (!baseSlug) return { error: "Nome inválido." };
+  if (!baseSlug) return { error: "Nome inválido.", values };
 
   // Garante slug único
   let slug = baseSlug;
@@ -74,7 +95,6 @@ export async function createProductAction(
     slug = `${baseSlug}-${suffix}`;
   }
 
-  const promotionalPrice = decimal(formData.get("promotionalPrice"));
   const description = optionalStr(formData.get("description"));
   const brand = optionalStr(formData.get("brand"));
   const availableForVirtualTryOn =
@@ -107,21 +127,22 @@ export async function updateProductAction(
   const id = str(formData.get("id"));
   if (!id) return { error: "Produto não encontrado." };
 
+  const values = productValues(formData);
   const name = str(formData.get("name"));
   const categoryId = str(formData.get("categoryId"));
-  const basePrice = decimal(formData.get("basePrice"));
 
-  if (!name) return { error: "Informe o nome do produto." };
-  if (!categoryId) return { error: "Selecione uma categoria." };
-  if (basePrice === null) return { error: "Informe um preço base válido." };
+  if (!name) return { error: "Informe o nome do produto.", values };
+  if (!categoryId) return { error: "Selecione uma categoria.", values };
+  const prices = parseProductPrices(values.basePrice, values.promotionalPrice);
+  if ("error" in prices) return { error: prices.error, values };
 
   await prisma.product.update({
     where: { id },
     data: {
       name,
       categoryId,
-      basePrice,
-      promotionalPrice: decimal(formData.get("promotionalPrice")),
+      basePrice: prices.basePrice,
+      promotionalPrice: prices.promotionalPrice,
       description: optionalStr(formData.get("description")),
       brand: optionalStr(formData.get("brand")),
       availableForVirtualTryOn:

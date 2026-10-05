@@ -322,7 +322,8 @@ Estavam na tabela "Achados fora do escopo" de
 | `5f9966c` | Os erros do checkout não eram anunciados pelo leitor de tela | Mensagem dentro de uma região `aria-live` sempre presente, a mesma correção do atalho dos favoritos | Checagem de tipos e lint. **Falta conferir no navegador** com a conta de cliente (ex.: tentar finalizar com um item sem estoque) |
 
 Os demais achados daquela tabela não foram revistos nesta sprint. O filtro de
-preço do catálogo segue usando o preço cheio.
+preço do catálogo foi corrigido na Sprint 5 (`5f4d2c0`, ver
+[`SPRINT5-DECISOES.md`](SPRINT5-DECISOES.md)).
 
 ---
 
