@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 
 const initial: CheckoutState = {};
 
-type Method = "PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "BOLETO";
+type Method = "PIX" | "CREDIT_CARD" | "DEBIT_CARD" | "BOLETO" | "WALLET";
 
-const OPTIONS: { value: Method; label: string; desc: string }[] = [
+const SIMULATED_OPTIONS: { value: Method; label: string; desc: string }[] = [
   { value: "PIX", label: "PIX", desc: "Aprovação imediata (simulado)" },
   {
     value: "CREDIT_CARD",
@@ -26,6 +26,51 @@ const OPTIONS: { value: Method; label: string; desc: string }[] = [
   },
 ];
 
+/** Com Stripe (itens 16 e 17): só o PIX continua simulado. */
+const STRIPE_OPTIONS: { value: Method; label: string; desc: string }[] = [
+  { value: "PIX", label: "PIX", desc: "Aprovação imediata (simulado)" },
+  {
+    value: "CREDIT_CARD",
+    label: "Cartão de crédito",
+    desc: "À vista, na página segura do Stripe",
+  },
+  {
+    value: "DEBIT_CARD",
+    label: "Cartão de débito",
+    desc: "Na página segura do Stripe",
+  },
+  {
+    value: "BOLETO",
+    label: "Boleto",
+    desc: "Vence em 3 dias · confirmação em até 2 dias úteis",
+  },
+  {
+    value: "WALLET",
+    label: "Carteira digital",
+    desc: "Link, Google Pay ou Apple Pay",
+  },
+];
+
+/** O que o cliente vai encontrar no Stripe e os dados de teste para a demonstração. */
+const STRIPE_HINT: Partial<Record<Method, { text: string; test: string }>> = {
+  CREDIT_CARD: {
+    text: "Você vai para a página de pagamento do Stripe e volta para cá. O pedido só é confirmado quando o Stripe avisar a loja.",
+    test: "Cartão de teste: 4242 4242 4242 4242, validade futura, qualquer CVC.",
+  },
+  DEBIT_CARD: {
+    text: "Você vai para a página de pagamento do Stripe e volta para cá. O pedido só é confirmado quando o Stripe avisar a loja.",
+    test: "Débito de teste: 4000 0566 5566 5556, validade futura, qualquer CVC.",
+  },
+  BOLETO: {
+    text: "O Stripe pede CPF e endereço e gera o boleto. O pedido fica aguardando até o banco confirmar; se vencer sem pagamento, é cancelado e os itens voltam para a loja.",
+    test: "CPF de teste: 000.000.000-00. E-mail succeed_immediately@teste.com paga na hora; expire_immediately@teste.com vence sem pagar.",
+  },
+  WALLET: {
+    text: "Pague com o Link (carteira do Stripe) ou com Google Pay / Apple Pay, se o seu navegador tiver.",
+    test: "No Link de teste, use qualquer e-mail e o código 000000.",
+  },
+};
+
 type SavedMethod = {
   id: string;
   brand: string;
@@ -39,9 +84,12 @@ type SavedMethod = {
 export function PaymentStep({
   addressId,
   savedMethods = [],
+  stripeOn = false,
 }: {
   addressId: string;
   savedMethods?: SavedMethod[];
+  /** Loja com chave do Stripe: cartão, boleto e carteira são reais (teste). */
+  stripeOn?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     createOrderFromCartAction,
@@ -59,7 +107,7 @@ export function PaymentStep({
       <input type="hidden" name="paymentMethod" value={method} />
 
       <div className="flex flex-col gap-3">
-        {OPTIONS.map((opt) => {
+        {(stripeOn ? STRIPE_OPTIONS : SIMULATED_OPTIONS).map((opt) => {
           const selected = method === opt.value;
           return (
             <label
@@ -111,7 +159,16 @@ export function PaymentStep({
         </div>
       )}
 
-      {method === "CREDIT_CARD" && (
+      {stripeOn && STRIPE_HINT[method] && (
+        <div className="rounded-sm border border-dashed border-border p-6 text-sm">
+          <p>{STRIPE_HINT[method]!.text}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Modo de teste · {STRIPE_HINT[method]!.test}
+          </p>
+        </div>
+      )}
+
+      {!stripeOn && method === "CREDIT_CARD" && (
         <div className="rounded-sm border border-dashed border-border p-6">
           {savedMethods.length > 0 && (
             <div className="mb-4 flex flex-col gap-2">
@@ -199,7 +256,7 @@ export function PaymentStep({
         </div>
       )}
 
-      {method === "BOLETO" && (
+      {!stripeOn && method === "BOLETO" && (
         <div className="rounded-sm border border-dashed border-border p-6 text-sm">
           <p className="font-mono text-xs text-foreground/80">
             Código de barras simulado: 23793.38128 60082.901047 81100.000005 9
@@ -227,7 +284,11 @@ export function PaymentStep({
       )}
 
       <Button type="submit" disabled={pending} size="lg" className="w-fit">
-        {pending ? "Finalizando..." : "Finalizar pedido"}
+        {pending
+          ? "Finalizando..."
+          : stripeOn && method !== "PIX"
+            ? "Ir para o pagamento"
+            : "Finalizar pedido"}
       </Button>
     </form>
   );

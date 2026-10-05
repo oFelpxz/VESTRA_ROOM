@@ -3,29 +3,33 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getOrderById } from "@/lib/order-actions";
 import { formatBRL } from "@/lib/format";
-import { shippingMethodLabel } from "@/lib/shipping";
+import { orderShippingLabel } from "@/lib/shipping";
 import { PaymentStatusPoller } from "@/components/checkout/payment-status-poller";
+import { PaymentDetails } from "@/components/checkout/payment-details";
+import { syncOrderPayment } from "@/lib/payments";
 
 export const metadata = { title: "Pedido confirmado" };
 
-const METHOD_LABEL: Record<string, string> = {
-  PIX: "PIX",
-  CREDIT_CARD: "Cartão de crédito",
-  DEBIT_CARD: "Débito",
-  BOLETO: "Boleto",
-};
-
 export default async function CheckoutSucessoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ session_id?: string }>;
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
   const { orderId } = await params;
-  const order = await getOrderById(orderId);
+  const { session_id } = await searchParams;
+  let order = await getOrderById(orderId);
   if (!order) notFound();
+  // Volta do Stripe: confere a sessão na hora (reconciliação), sem esperar
+  // o webhook. A sessão consultada é a gravada no pedido, não a da URL.
+  if (session_id && order.payment?.status === "PENDING") {
+    await syncOrderPayment(orderId, { force: true });
+    order = (await getOrderById(orderId)) ?? order;
+  }
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-12 md:px-6">
@@ -76,7 +80,7 @@ export default async function CheckoutSucessoPage({
             )}
             <li className="flex items-baseline justify-between py-3">
               <span className="text-muted-foreground">
-                Frete · {shippingMethodLabel(order.shippingMethod)}
+                Frete · {orderShippingLabel(order)}
               </span>
               <span>
                 {Number(order.shippingAmount) === 0
@@ -99,13 +103,16 @@ export default async function CheckoutSucessoPage({
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
             Pagamento
           </p>
-          <div className="mt-4 rounded-sm border border-border p-5 text-sm">
-            <p className="font-medium">
-              {METHOD_LABEL[order.payment?.method ?? ""] ?? "—"}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Provedor: {order.payment?.provider ?? "—"}
-            </p>
+          <div className="mt-4">
+            {order.payment ? (
+              <PaymentDetails
+                payment={order.payment}
+                orderStatus={order.status}
+                showIds={false}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">—</p>
+            )}
           </div>
 
           {order.shippingAddress && (

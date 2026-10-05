@@ -101,14 +101,11 @@ export async function cancelOrderInTx(
     });
   }
 
-  // Pago → reembolsado; pendente → falhou. Lido no banco (não no objeto
-  // carregado antes) porque a confirmação do pagamento pode ter chegado
-  // nesse meio-tempo. O estorno no gateway entra no item 20.
+  // Pendente → falhou. Lido no banco (não no objeto carregado antes) porque
+  // a confirmação do pagamento pode ter chegado nesse meio-tempo. Pagamento
+  // já pago continua PAID aqui: só vira REFUNDED quando o estorno no gateway
+  // for aceito (item 20, `refundOrderPayment` em src/lib/payments.ts).
   if (order.payment) {
-    await tx.payment.updateMany({
-      where: { id: order.payment.id, status: "PAID" },
-      data: { status: "REFUNDED" },
-    });
     await tx.payment.updateMany({
       where: { id: order.payment.id, status: "PENDING" },
       data: { status: "FAILED" },

@@ -8,6 +8,7 @@ import {
   cancelOrderInTx,
   shouldRestock,
 } from "@/lib/order-cancel";
+import { afterOrderCanceled, refundOrderPayment } from "@/lib/payments";
 
 export type LogisticsState = { error?: string; success?: boolean };
 
@@ -156,12 +157,43 @@ export async function cancelOrderByAdminAction(
     };
   }
 
+  // Estorno no gateway (item 20). Se falhar, o cancelamento continua valendo
+  // e a página do pedido mostra o botão para tentar o estorno de novo.
+  await afterOrderCanceled(orderId, "admin");
+
   revalidatePath("/admin/pedidos");
   revalidatePath(`/admin/pedidos/${orderId}`);
   revalidatePath("/admin/estoque");
   revalidatePath(`/perfil/pedidos/${orderId}`);
   revalidatePath("/perfil/pedidos");
   return { success: true };
+}
+
+/**
+ * Estorno de pedido cancelado que ainda consta como pago (item 20): nova
+ * tentativa depois de uma falha no gateway, ou — com `manual` — registro de
+ * um reembolso feito fora do gateway (boleto pago não tem estorno no Stripe).
+ */
+export async function refundOrderAction(
+  _prev: LogisticsState,
+  formData: FormData,
+): Promise<LogisticsState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { error: "Só o Administrador pode reembolsar pedidos." };
+  }
+
+  const orderId = str(formData.get("orderId"));
+  if (!orderId) return { error: "Pedido inválido." };
+  const manual = formData.get("manual") === "on";
+
+  const result = await refundOrderPayment(orderId, { manual });
+
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${orderId}`);
+  revalidatePath(`/perfil/pedidos/${orderId}`);
+  revalidatePath("/perfil/pedidos");
+  return result.ok ? { success: true } : { error: result.error };
 }
 
 /**
