@@ -268,28 +268,35 @@ export function PaymentStep({
         </div>
       )}
 
-      {state.error && (
-        <div className="rounded-sm bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <p className="font-semibold">{state.error}</p>
-          {state.unavailable && state.unavailable.length > 0 && (
-            <ul className="mt-2 list-disc pl-5 text-xs">
-              {state.unavailable.map((u, i) => (
-                <li key={i}>
-                  {u.name} · {u.color} · Tam {u.size} → {u.available} disponível(is)
-                </li>
-              ))}
-            </ul>
+      {/* Região sempre presente: o leitor de tela só anuncia o que muda
+          dentro de uma região "ao vivo" que já existia na página. Fica no
+          mesmo bloco do botão para não somar espaço quando está vazia. */}
+      <div>
+        <div aria-live="polite">
+          {state.error && (
+            <div className="mb-6 rounded-sm bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <p className="font-semibold">{state.error}</p>
+              {state.unavailable && state.unavailable.length > 0 && (
+                <ul className="mt-2 list-disc pl-5 text-xs">
+                  {state.unavailable.map((u, i) => (
+                    <li key={i}>
+                      {u.name} · {u.color} · Tam {u.size} → {u.available} disponível(is)
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
-      )}
 
-      <Button type="submit" disabled={pending} size="lg" className="w-fit">
-        {pending
-          ? "Finalizando..."
-          : stripeOn && method !== "PIX"
-            ? "Ir para o pagamento"
-            : "Finalizar pedido"}
-      </Button>
+        <Button type="submit" disabled={pending} size="lg" className="w-fit">
+          {pending
+            ? "Finalizando..."
+            : stripeOn && method !== "PIX"
+              ? "Ir para o pagamento"
+              : "Finalizar pedido"}
+        </Button>
+      </div>
     </form>
   );
 }
