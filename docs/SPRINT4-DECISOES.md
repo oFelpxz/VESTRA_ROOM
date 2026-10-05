@@ -282,6 +282,9 @@ Documentado à parte em [`SPRINT4-3D05.md`](SPRINT4-3D05.md). Resumo:
 | `b50d9ef` | Itens 16, 17, 18 e 20: Stripe, Melhor Envio, reembolso e avisos |
 | `770e914` | Guia das chaves de teste |
 | `6eb5131` | Correções achadas nos testes de ponta a ponta |
+| `16f3d79` | Lista de pedidos do painel em português |
+| `4f76aa5` | Roteiro da apresentação ([`SPRINT4-ROTEIRO-APRESENTACAO.md`](SPRINT4-ROTEIRO-APRESENTACAO.md)) |
+| `03a4a47`, `a8598ba`, `5f9966c` | Três achados antigos da Sprint 3 (ver abaixo) |
 
 - **Nenhuma chave no GitHub.** As chaves ficam só no `.env` de cada um, que não
   sobe para o repositório. O GitGuardian (verificação automática de chaves
@@ -306,6 +309,20 @@ Documentado à parte em [`SPRINT4-3D05.md`](SPRINT4-3D05.md). Resumo:
 | Testes 05/10 | A tela de confirmação dizia "aguardando a confirmação do pagamento" mesmo quando o pagamento já tinha sido confirmado. | Baixa |
 | Testes 05/10 | "Meus pedidos" mostrava `CREDIT_CARD · PAID` em vez de "Cartão de crédito · Pago". | Baixa |
 | Testes 05/10 | A lista de pedidos do painel tinha o mesmo problema (`WALLET · PAID`). Agora mostra "Carteira digital · Pago". | Baixa |
+
+### Achados antigos da Sprint 3, corrigidos agora
+
+Estavam na tabela "Achados fora do escopo" de
+[`SPRINT3-DECISOES.md`](SPRINT3-DECISOES.md). Um commit para cada:
+
+| Commit | Achado | Correção | Como foi conferido |
+|---|---|---|---|
+| `03a4a47` | O card do catálogo mostrava só o preço cheio, mesmo com promoção | O card mostra o promocional e o cheio riscado, como a página do produto e os favoritos. Para leitor de tela: "R$ 149,00 antes R$ 189,00" | Promoção simulada só no código, sem gravar no banco: o card da Boxy Tee 01 mostrou os dois preços e os outros cards ficaram iguais |
+| `a8598ba` | Com todas as variações esgotadas, o botão pedia "Selecione cor e tamanho" | O botão diz **"Esgotado"** (também para o visitante, que via "Entrar para comprar") | Estoque zerado só na tela, sem gravar no banco: o Knit Beanie mostrou "Esgotado" e o Hoodie Core continuou com "Selecione cor e tamanho" |
+| `5f9966c` | Os erros do checkout não eram anunciados pelo leitor de tela | Mensagem dentro de uma região `aria-live` sempre presente, a mesma correção do atalho dos favoritos | Checagem de tipos e lint. **Falta conferir no navegador** com a conta de cliente (ex.: tentar finalizar com um item sem estoque) |
+
+Os demais achados daquela tabela não foram revistos nesta sprint. O filtro de
+preço do catálogo segue usando o preço cheio.
 
 ---
 
