@@ -38,6 +38,10 @@ export function ProductPurchase({
       v.stockQuantity > 0,
   );
 
+  // Nenhuma variação com estoque: avisa que esgotou em vez de pedir uma
+  // escolha impossível.
+  const soldOut = !variants.some((v) => v.stockQuantity > 0);
+
   const colorAvailable = (color: string) =>
     variants.some((v) => v.color === color && v.stockQuantity > 0);
 
@@ -144,7 +148,15 @@ export function ProductPurchase({
         </p>
       )}
 
-      {isLoggedIn ? (
+      {soldOut ? (
+        <button
+          type="button"
+          disabled
+          className="inline-flex h-12 items-center justify-center rounded-sm bg-foreground px-8 text-xs font-semibold uppercase tracking-[0.15em] text-background disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Esgotado
+        </button>
+      ) : isLoggedIn ? (
         <button
           type="submit"
           disabled={!selectedVariant || pending}
