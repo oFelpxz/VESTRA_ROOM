@@ -12,7 +12,7 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   WALLET: "Carteira digital",
 };
 
-const STATUS_LABEL: Record<string, string> = {
+export const PAYMENT_STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendente",
   PAID: "Pago",
   FAILED: "Não concluído",
@@ -70,7 +70,7 @@ export function PaymentDetails({
             STATUS_BADGE[payment.status] ?? ""
           }`}
         >
-          {STATUS_LABEL[payment.status] ?? payment.status}
+          {PAYMENT_STATUS_LABEL[payment.status] ?? payment.status}
         </span>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">

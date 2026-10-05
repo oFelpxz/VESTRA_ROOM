@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { listMyOrders } from "@/lib/order-actions";
 import { formatBRL } from "@/lib/format";
+import {
+  PAYMENT_METHOD_LABEL,
+  PAYMENT_STATUS_LABEL,
+} from "@/components/checkout/payment-details";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING_PAYMENT: "Aguardando pagamento",
@@ -143,7 +147,8 @@ export default async function MeusPedidosPage({
                     </p>
                     {o.payment && (
                       <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                        {o.payment.method} · {o.payment.status}
+                        {PAYMENT_METHOD_LABEL[o.payment.method] ?? o.payment.method} ·{" "}
+                        {PAYMENT_STATUS_LABEL[o.payment.status] ?? o.payment.status}
                       </p>
                     )}
                   </div>

@@ -61,6 +61,15 @@ describe("checkoutSessionParams", () => {
     assert.equal(p.expires_at, Math.floor(base.now.getTime() / 1000) + 3600);
   });
 
+  it("e-mail vai preenchido; no boleto de teste fica livre para o cenário", () => {
+    assert.equal(checkoutSessionParams({ ...base, method: "BOLETO" }).customer_email, base.customerEmail);
+    assert.equal(
+      checkoutSessionParams({ ...base, method: "CREDIT_CARD", testMode: true }).customer_email,
+      base.customerEmail,
+    );
+    assert.equal(checkoutSessionParams({ ...base, method: "BOLETO", testMode: true }).customer_email, undefined);
+  });
+
   it("boleto vence em 3 dias", () => {
     const p = checkoutSessionParams({ ...base, method: "BOLETO" });
     assert.deepEqual(p.payment_method_types, ["boleto"]);

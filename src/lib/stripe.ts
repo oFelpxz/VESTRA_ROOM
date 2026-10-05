@@ -14,6 +14,11 @@ export function stripeConfigured() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
 }
 
+/** Chave do sandbox (sk_test_): nenhum dinheiro de verdade. */
+export function stripeTestMode() {
+  return Boolean(process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_"));
+}
+
 export class StripeError extends Error {
   constructor(
     message: string,

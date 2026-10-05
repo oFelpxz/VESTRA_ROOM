@@ -41,7 +41,9 @@ export default async function CheckoutSucessoPage({
       </h1>
       <p className="mt-3 max-w-lg text-sm text-muted-foreground">
         Recebemos seu pedido <strong className="font-mono text-foreground">#{order.id.slice(-8).toUpperCase()}</strong>{" "}
-        e estamos aguardando a confirmação do pagamento.
+        {order.payment?.status === "PAID"
+          ? "e o pagamento já foi confirmado."
+          : "e estamos aguardando a confirmação do pagamento."}
       </p>
 
       <div className="mt-8">

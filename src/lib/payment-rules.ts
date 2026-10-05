@@ -66,6 +66,8 @@ export function checkoutSessionParams(input: {
   baseUrl: string;
   now: Date;
   methodTypes?: string[];
+  /** Chave de teste: o boleto deixa o e-mail livre (ver abaixo). */
+  testMode?: boolean;
 }) {
   const code = shortOrderCode(input.orderId);
   const page = `${input.baseUrl}/checkout/sucesso/${input.orderId}`;
@@ -73,7 +75,10 @@ export function checkoutSessionParams(input: {
     mode: "payment",
     locale: "pt-BR",
     client_reference_id: input.orderId,
-    customer_email: input.customerEmail,
+    // No sandbox, o resultado do boleto de teste depende do e-mail digitado
+    // (succeed_immediately@..., expire_immediately@...), então ele fica livre.
+    customer_email:
+      input.testMode && input.method === "BOLETO" ? undefined : input.customerEmail,
     metadata: { orderId: input.orderId },
     payment_intent_data: { metadata: { orderId: input.orderId } },
     payment_method_types: input.methodTypes ?? stripeMethodTypes(input.method),

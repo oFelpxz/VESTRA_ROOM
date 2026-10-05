@@ -6,6 +6,7 @@ import {
   expireCheckoutSession,
   retrieveCheckoutSession,
   stripeConfigured,
+  stripeTestMode,
   StripeError,
   type StripeCheckoutSession,
 } from "@/lib/stripe";
@@ -55,6 +56,7 @@ export async function startStripeCheckout(input: {
     customerEmail: input.customerEmail,
     baseUrl: input.baseUrl,
     now: new Date(),
+    testMode: stripeTestMode(),
   };
 
   let session: StripeCheckoutSession;
