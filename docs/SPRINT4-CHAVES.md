@@ -30,16 +30,18 @@ MELHOR_ENVIO_TOKEN=eyJ...
 
 ### 1.2 Pegar a chave secreta (`STRIPE_SECRET_KEY`)
 
-1. No painel do Stripe, confira que está em **modo de teste** (o painel mostra
-   "Test mode", "Modo de teste" ou "Sandbox", em laranja, no topo).
-2. Abra <https://dashboard.stripe.com/test/apikeys>.
-3. Na linha **Secret key / Chave secreta**, clique em **Reveal / Revelar** e
-   copie. Ela começa com `sk_test_`.
-   - Se começar com `sk_live_`, você está no modo real. Volte ao passo 1.
+1. O modo de teste agora se chama **Área restrita** (Sandbox). Clique no nome
+   da conta, no canto superior esquerdo, e entre na área restrita da loja. O
+   topo mostra a faixa "Você está testando em uma área restrita".
+2. Vá em **Desenvolvedores → Chaves de API**, aba **Chaves secretas**.
+3. Na chave da lista, clique em **⋯ → Revelar chave** (ou em **Criar chave
+   secreta**) e copie. Ela começa com `sk_test_`.
+   - Se começar com `sk_live_`, você está fora da área restrita. Volte ao
+     passo 1.
 
 ### 1.3 Ligar o boleto
 
-1. Abra <https://dashboard.stripe.com/test/settings/payment_methods>.
+1. Dentro da área restrita, clique na engrenagem ⚙️ → **Formas de pagamento**.
 2. Procure **Boleto** e deixe **ativado**. Confira também **Cards / Cartões**
    e **Link** (a carteira digital do Stripe) ativados.
 
@@ -54,7 +56,8 @@ a loja rodando no seu Mac.
    brew install stripe/stripe-cli/stripe
    ```
 
-2. Faça login (abre o navegador; clique em **Allow access / Permitir**):
+2. Faça login (abre o navegador). Se perguntar o ambiente, escolha a
+   **Área restrita** da loja e clique em **Allow access / Permitir**:
 
    ```bash
    stripe login
@@ -64,7 +67,7 @@ a loja rodando no seu Mac.
    testa a loja:
 
    ```bash
-   stripe listen --forward-to localhost:3000/api/webhooks/stripe
+   stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired --forward-to localhost:3000/api/webhooks/stripe
    ```
 
 4. Ele mostra uma linha assim:
@@ -72,6 +75,7 @@ a loja rodando no seu Mac.
    Copie o `whsec_...`. Esse é o `STRIPE_WEBHOOK_SECRET`.
    - O `whsec_` continua o mesmo nas próximas vezes que você rodar o
      `stripe listen` no mesmo computador.
+   - O Stripe CLI 1.53+ exige o `--events`: são os 4 avisos que a loja usa.
 
 ---
 
