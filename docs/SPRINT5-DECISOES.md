@@ -67,6 +67,17 @@ nos atalhos do painel.
 | `1d63866` | Variante com estoque 0 aparecia como "Baixo" na tela de Estoque. Status do modelo 3D em inglês (VALIDATED, PENDING) na lista de modelos e na página do produto | Selo **"Esgotado"** para estoque 0; status em português (Validado, Pendente...) | Estoque simulado só na tela: uma variante com 0 mostrou "Esgotado" e uma com 1 mostrou "Baixo". Lista de modelos e página do Hoodie Core mostraram "Validado" |
 | `6702237` | — | Item 24 (acima) | 16 testes automáticos (período e CSV). No navegador: os números de 90 dias bateram com o painel (R$ 2.258,41 em 9 vendas); os três CSVs abriram com BOM, `;` e acentos; subtotal − desconto + frete = total em todos os pedidos; sem login, o CSV redireciona para o login; tela sem rolagem lateral no celular |
 | `3c5d3c2` | Excluir a conta não apagava os **cartões salvos** do cliente (nome impresso, final e validade) | Os cartões são apagados junto com medidas, endereços e sacola, na mesma transação | Só checagem de tipos e lint: testar exigiria excluir uma conta no banco compartilhado |
+| `7549a14` | O caso "produto em promoção" do filtro de preço (`5f4d2c0`) não tinha sido testado | A regra da faixa foi separada em `price-filter.ts` e ganhou teste. `?preco=constructor` e `?preco=__proto__` passam a ser ignorados | 5 testes automáticos: peça de R$ 400 em promoção por R$ 180 aparece em "Até R$ 200" e não em "R$ 350+". O catálogo abriu normal com e sem filtro |
+
+## Preparação para os próximos itens
+
+Feito antes das decisões do grupo, sem mexer no banco e sem mudar nada que
+o cliente vê.
+
+| Commit | Para qual item | O que já existe |
+|---|---|---|
+| `79dd790` | 22 (reembolso de devolução) | `computePartialRefund` (`src/lib/partial-refund.ts`) calcula quanto devolver quando volta só parte do pedido: preço pago pelas peças, menos a parte do cupom delas, frete da ida opcional e nunca mais do que falta devolver. Duas devoluções separadas somam exatamente o mesmo que devolver tudo. `createRefund` agora aceita um valor (estorno parcial no Stripe); sem valor, continua estornando tudo. 14 testes automáticos, sem chamar o Stripe de verdade |
+| `88f976b` | 25 (configurações) | As regras da loja ficam em `src/lib/store-settings.ts`: frete grátis (R$ 300), tabela própria de frete, CEP de origem, prazo do boleto (3 dias), tempo da página de pagamento (60 min) e limite de estoque baixo das variantes novas (5). Os valores não mudaram; o item 25 vai trocar esse arquivo por uma leitura do banco |
 
 ---
 
@@ -107,9 +118,11 @@ com a data da última atualização.
 | 22.8 | Reembolso | Usa o fluxo da Sprint 4: cartão estorna pelo Stripe; PIX e boleto o Admin devolve por fora e registra |
 
 **Detalhe técnico:** o reembolso da Sprint 4 devolve o **pedido inteiro**.
-Devolver uma peça só precisa de **reembolso parcial** (o Stripe aceita, mas
-o código ainda não faz). Também é preciso decidir se o frete da ida é
-devolvido; a sugestão é devolver só no arrependimento e no defeito.
+Devolver uma peça só precisa de **reembolso parcial**: o cálculo e o
+estorno parcial no Stripe já estão prontos (`79dd790`, ver "Preparação para
+os próximos itens"). Para usar, falta guardar quanto já foi devolvido de
+cada pagamento (campo novo, migration). Também é preciso decidir se o frete
+da ida é devolvido; a sugestão é devolver só no arrependimento e no defeito.
 
 ### Item 24 — falta o relatório de trocas
 
@@ -133,7 +146,9 @@ padrão e parâmetros do provador.
 | 25.8 | Tolerância do indicador de caimento (Justo / Ideal / Folgado) | Não há um número: o indicador usa a faixa mín–máx de cada tamanho na tabela de medidas | Criar uma folga em cm (sugestão: 2 cm) e deixar editável. **Conversar com a Equipe 3D** |
 
 **Detalhe técnico:** as configurações vão numa tabela nova de uma linha só
-(migration). Quem pode mexer: só o Admin, como o cronograma pede ("nenhum dos
+(migration). As regras que já existem no código estão juntas em
+`src/lib/store-settings.ts` (`88f976b`); a tabela nova começa com esses
+valores. Quem pode mexer: só o Admin, como o cronograma pede ("nenhum dos
 dois acessa financeiro, clientes ou configurações").
 
 ### Pergunta solta
