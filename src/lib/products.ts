@@ -19,6 +19,7 @@ export type CatalogProduct = {
   slug: string;
   name: string;
   price: string;
+  promotionalPrice: string | null;
   tags: string[];
   imageUrl: string | null;
   modelUrl: string | null;
@@ -172,6 +173,9 @@ export async function getProducts(
         slug: p.slug,
         name: p.name,
         price: formatBRL(Number(p.basePrice)),
+        promotionalPrice: p.promotionalPrice
+          ? formatBRL(Number(p.promotionalPrice))
+          : null,
         tags,
         imageUrl: p.images[0]?.url ?? null,
         modelUrl: p.has3DModel
