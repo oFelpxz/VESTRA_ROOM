@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { MODEL_3D_STATUS_LABEL } from "@/lib/model-3d-status";
 import {
   publishProductAction,
   unpublishProductAction,
@@ -173,7 +174,7 @@ export default async function EditarProdutoPage({
         title="Modelo 3D"
         subtitle={
           product.model3D
-            ? `${product.model3D.status} · v${product.model3D.version}`
+            ? `${MODEL_3D_STATUS_LABEL[product.model3D.status] ?? product.model3D.status} · v${product.model3D.version}`
             : "Nenhum modelo associado"
         }
       >
@@ -191,7 +192,8 @@ export default async function EditarProdutoPage({
                 <p className="mt-1 text-xs text-muted-foreground">
                   Status atual:{" "}
                   <strong className="font-semibold uppercase tracking-wide text-foreground">
-                    {product.model3D.status}
+                    {MODEL_3D_STATUS_LABEL[product.model3D.status] ??
+                      product.model3D.status}
                   </strong>
                   {product.has3DModel
                     ? " — disponível na loja"

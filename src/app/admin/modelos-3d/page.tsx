@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { MODEL_3D_STATUS_LABEL } from "@/lib/model-3d-status";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: "Pendentes",
@@ -121,7 +122,7 @@ export default async function AdminModelos3DPage({
                     <span
                       className={`rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] ${STATUS_BADGE[m.status]}`}
                     >
-                      {m.status}
+                      {MODEL_3D_STATUS_LABEL[m.status] ?? m.status}
                     </span>
                     <span className="rounded-sm border border-foreground/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground/70">
                       v{m.version}

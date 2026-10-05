@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { MODEL_3D_STATUS_LABEL } from "@/lib/model-3d-status";
 import {
   validateModel3DAction,
   rejectModel3DAction,
@@ -19,13 +20,6 @@ const STATUS_BADGE: Record<string, string> = {
   VALIDATED: "bg-acid/30 text-foreground",
   REJECTED: "bg-destructive/10 text-destructive",
   OPTIMIZED: "bg-foreground text-background",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pendente",
-  VALIDATED: "Validado",
-  REJECTED: "Rejeitado",
-  OPTIMIZED: "Otimizado",
 };
 
 export default async function Modelo3DRevisaoPage({
@@ -74,7 +68,7 @@ export default async function Modelo3DRevisaoPage({
                   <span
                     className={`rounded-sm px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] ${STATUS_BADGE[model.status]}`}
                   >
-                    {STATUS_LABEL[model.status]}
+                    {MODEL_3D_STATUS_LABEL[model.status]}
                   </span>
                   <span className="rounded-sm border border-foreground/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-foreground/70">
                     v{model.version}
