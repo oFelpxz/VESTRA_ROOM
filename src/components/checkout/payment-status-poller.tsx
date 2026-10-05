@@ -18,8 +18,12 @@ export function PaymentStatusPoller({
   const router = useRouter();
   const [status, setStatus] = useState<Status>(initial);
 
+  // Para de consultar quando o pagamento sai de PENDING: pago, ou o pedido
+  // foi cancelado durante a espera (pagamento FAILED/REFUNDED).
+  const settled = status.paymentStatus !== null && status.paymentStatus !== "PENDING";
+
   useEffect(() => {
-    if (status.paymentStatus === "PAID") return;
+    if (settled) return;
 
     const interval = setInterval(async () => {
       try {
@@ -30,7 +34,7 @@ export function PaymentStatusPoller({
         if (!res.ok) return;
         const data = (await res.json()) as Status;
         setStatus(data);
-        if (data.paymentStatus === "PAID") {
+        if (data.paymentStatus && data.paymentStatus !== "PENDING") {
           router.refresh();
         }
       } catch {
@@ -39,9 +43,10 @@ export function PaymentStatusPoller({
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [orderId, status.paymentStatus, router]);
+  }, [orderId, settled, router]);
 
   const paid = status.paymentStatus === "PAID";
+  const canceled = status.orderStatus === "CANCELED" || status.orderStatus === "REFUNDED";
 
   return (
     <div
@@ -53,12 +58,20 @@ export function PaymentStatusPoller({
     >
       <span
         className={`inline-block size-2 rounded-full ${
-          paid ? "bg-acid" : "animate-pulse bg-muted-foreground"
+          paid
+            ? "bg-acid"
+            : canceled
+              ? "bg-destructive"
+              : "animate-pulse bg-muted-foreground"
         }`}
       />
       <div className="flex-1">
         <p className="text-sm font-medium">
-          {paid ? "Pagamento confirmado" : "Aguardando confirmação..."}
+          {canceled
+            ? "Pedido cancelado"
+            : paid
+              ? "Pagamento confirmado"
+              : "Aguardando confirmação..."}
         </p>
         <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
           Status atual · {status.paymentStatus ?? "desconhecido"}

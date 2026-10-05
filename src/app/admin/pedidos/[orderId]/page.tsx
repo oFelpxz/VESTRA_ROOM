@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { getOrderById } from "@/lib/order-actions";
 import { formatBRL, formatCep } from "@/lib/format";
 import { shippingMethodLabel } from "@/lib/shipping";
@@ -39,7 +40,7 @@ export default async function AdminPedidoDetalhePage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const order = await getOrderById(orderId);
+  const [session, order] = await Promise.all([auth(), getOrderById(orderId)]);
   if (!order) notFound();
 
   const subtotal =
@@ -216,6 +217,7 @@ export default async function AdminPedidoDetalhePage({
                 orderId={order.id}
                 status={order.status as never}
                 trackingCode={order.trackingCode}
+                isAdmin={session?.user?.role === "ADMIN"}
               />
             </div>
           </div>
