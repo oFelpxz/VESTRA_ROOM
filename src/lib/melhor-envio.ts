@@ -6,9 +6,11 @@
  * nunca trava por causa do frete.
  */
 
+import { STORE_SETTINGS } from "@/lib/store-settings";
+
 const DEFAULT_BASE_URL = "https://sandbox.melhorenvio.com.br";
-/** CEP de onde a loja envia (Av. Paulista, SP), se o .env não disser outro. */
-const DEFAULT_FROM_CEP = "01310100";
+/** CEP de onde a loja envia, se o .env não disser outro. */
+const DEFAULT_FROM_CEP = STORE_SETTINGS.fromPostalCode;
 
 /**
  * O cadastro de produto não tem peso nem medidas: cada peça vai como um

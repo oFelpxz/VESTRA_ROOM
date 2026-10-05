@@ -4,6 +4,7 @@ import type {
   StripeCheckoutSession,
   StripePaymentIntent,
 } from "@/lib/stripe";
+import { STORE_SETTINGS } from "@/lib/store-settings";
 
 /**
  * Regras do pagamento pelo Stripe (itens 16, 17 e 20). Funções sem acesso
@@ -27,14 +28,14 @@ export function usesStripe(method: PayMethod, stripeOn: boolean) {
 }
 
 /** Dias corridos até o boleto vencer (o Stripe aceita de 0 a 60). */
-export const BOLETO_DAYS = 3;
+export const BOLETO_DAYS = STORE_SETTINGS.boletoDays;
 
 /**
  * Tempo para o cliente concluir a página de pagamento do Stripe. Depois disso
  * a sessão expira, o pedido é cancelado e o estoque reservado volta.
  * (O Stripe aceita de 30 min a 24 h.)
  */
-export const CHECKOUT_TTL_MIN = 60;
+export const CHECKOUT_TTL_MIN = STORE_SETTINGS.checkoutTtlMin;
 
 /** Formas de pagamento oferecidas na página do Stripe para cada escolha. */
 export function stripeMethodTypes(method: PayMethod): string[] {

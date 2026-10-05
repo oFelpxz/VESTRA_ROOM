@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { parseProductPrices } from "@/lib/product-prices";
+import { STORE_SETTINGS } from "@/lib/store-settings";
 
 export type ProductFormState = {
   error?: string;
@@ -255,6 +256,7 @@ export async function addVariantAction(
       size,
       price,
       stockQuantity,
+      lowStockThreshold: STORE_SETTINGS.lowStockThreshold,
       status: "ACTIVE",
     },
   });

@@ -3,6 +3,7 @@ import {
   quoteCarriers,
   type CarrierService,
 } from "@/lib/melhor-envio";
+import { STORE_SETTINGS } from "@/lib/store-settings";
 
 /**
  * Frete da loja.
@@ -14,6 +15,7 @@ import {
  *  - senão: R$ 15 fixo + R$ 2 por item
  *
  * Nos dois casos o Econômico é grátis a partir de R$ 300 (a loja paga).
+ * Os valores ficam em `STORE_SETTINGS` (src/lib/store-settings.ts).
  */
 
 export type ShippingInput = {
@@ -29,9 +31,9 @@ export type ShippingQuote = {
   reason?: string;
 };
 
-const FREE_THRESHOLD = 300;
-const FIXED_BASE = 15;
-const PER_ITEM = 2;
+const FREE_THRESHOLD = STORE_SETTINGS.freeShippingFrom;
+const FIXED_BASE = STORE_SETTINGS.shippingTable.economyBase;
+const PER_ITEM = STORE_SETTINGS.shippingTable.economyPerItem;
 
 export function calculateShipping({
   subtotal,
@@ -81,8 +83,8 @@ export type ShippingOption = ShippingQuote & {
   service: string | null;
 };
 
-const EXPRESS_BASE = 25;
-const EXPRESS_PER_ITEM = 3;
+const EXPRESS_BASE = STORE_SETTINGS.shippingTable.expressBase;
+const EXPRESS_PER_ITEM = STORE_SETTINGS.shippingTable.expressPerItem;
 
 /** Lê a modalidade vinda de formulário. Qualquer valor desconhecido vira ECONOMICO. */
 export function parseShippingMethod(value?: string | null): ShippingMethod {
