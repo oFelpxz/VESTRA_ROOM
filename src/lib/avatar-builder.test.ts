@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildAvatarParams } from "./avatar-builder";
+import {
+  buildAvatarParams,
+  predictAvatarMeasurements,
+  type AvatarBody,
+  type MeasurementInput,
+} from "./avatar-builder";
+import { MEASUREMENT_LIMITS, type MeasurementField } from "./measurement-limits";
 
 const body = {
   heightCm: 175,
@@ -65,6 +71,90 @@ describe("buildAvatarParams", () => {
     for (const [k, v] of Object.entries(extremo)) {
       assert.ok(Number.isFinite(v), k);
       assert.ok(v >= -2 && v <= 2, `${k} = ${v}`);
+    }
+  });
+});
+
+/**
+ * Validação do 3D-05: o avatar gerado pelas medidas tem as medidas pedidas.
+ * Casos-limite registrados em docs/SPRINT4-3D05.md.
+ */
+const BODIES: AvatarBody[] = ["neutral", "male", "female"];
+
+const CASES: Record<string, MeasurementInput> = {
+  normal: { heightCm: 175, weightKg: 75, chestCm: 96, waistCm: 82, hipCm: 100, shoulderCm: 45, armLengthCm: 60, legLengthCm: 80 },
+  "baixa 1,50": { heightCm: 150, weightKg: 48, chestCm: 82, waistCm: 64, hipCm: 88, shoulderCm: 37, armLengthCm: 48, legLengthCm: 66 },
+  "alto 2,00": { heightCm: 200, weightKg: 95, chestCm: 108, waistCm: 90, hipCm: 106, shoulderCm: 52, armLengthCm: 70, legLengthCm: 94 },
+  magro: { heightCm: 178, weightKg: 58, chestCm: 84, waistCm: 68, hipCm: 86, shoulderCm: 42, armLengthCm: 60, legLengthCm: 82 },
+  pesado: { heightCm: 175, weightKg: 130, chestCm: 125, waistCm: 120, hipCm: 125, shoulderCm: 50, armLengthCm: 60, legLengthCm: 78 },
+  "quadril 130": { heightCm: 165, weightKg: 80, chestCm: 96, waistCm: 78, hipCm: 130, shoulderCm: 42, armLengthCm: 56, legLengthCm: 76 },
+  "muito alto 2,20": { heightCm: 220, weightKg: 110, chestCm: 115, waistCm: 95, hipCm: 110, shoulderCm: 55, armLengthCm: 78, legLengthCm: 104 },
+  "muito baixo 1,20": { heightCm: 120, weightKg: 35, chestCm: 70, waistCm: 58, hipCm: 72, shoulderCm: 32, armLengthCm: 40, legLengthCm: 52 },
+};
+
+describe("3D-05 · avatar com as medidas do cliente", () => {
+  for (const body of BODIES) {
+    for (const [name, m] of Object.entries(CASES)) {
+      it(`${body} · ${name}: altura, circunferências, braço e perna a até 0,5 cm`, () => {
+        const got = predictAvatarMeasurements(buildAvatarParams(m, body).morphs);
+        const pairs: [string, number | null, number][] = [
+          ["altura", m.heightCm, got.height],
+          ["peito", m.chestCm, got.chest],
+          ["cintura", m.waistCm, got.waist],
+          ["quadril", m.hipCm, got.hip],
+          ["braço", m.armLengthCm, got.arm],
+          ["perna", m.legLengthCm, got.inseam],
+        ];
+        for (const [label, want, value] of pairs) {
+          assert.ok(Math.abs(value - want!) <= 0.5, `${label}: pediu ${want}, saiu ${value.toFixed(1)}`);
+        }
+      });
+    }
+  }
+
+  it("ombros: a shape key muda pouco, então ombro estreito sai até 4 cm mais largo", () => {
+    for (const body of BODIES) {
+      for (const m of Object.values(CASES)) {
+        const got = predictAvatarMeasurements(buildAvatarParams(m, body).morphs);
+        const diff = got.shoulder - m.shoulderCm!;
+        assert.ok(diff > -0.5 && diff <= 4.1, `${body}: pediu ${m.shoulderCm}, saiu ${got.shoulder.toFixed(1)}`);
+      }
+    }
+  });
+
+  it("acima do que o corpo alcança, a medida para no máximo (nunca passa do pedido)", () => {
+    const enorme = { ...CASES.pesado, weightKg: 150, chestCm: 160, waistCm: 150, hipCm: 160 };
+    for (const body of BODIES) {
+      const got = predictAvatarMeasurements(buildAvatarParams(enorme, body).morphs);
+      for (const k of ["chest", "waist", "hip"] as const) {
+        const want = enorme[`${k}Cm`];
+        assert.ok(got[k] <= want + 0.5 && got[k] >= want - 5, `${body} ${k}: ${got[k].toFixed(1)}`);
+      }
+    }
+  });
+
+  it("perfil vazio ou com zeros vira o corpo de referência, sem quebrar", () => {
+    const vazio = Object.fromEntries(
+      Object.keys(MEASUREMENT_LIMITS).map((k) => [k, null]),
+    ) as MeasurementInput;
+    const zeros = Object.fromEntries(
+      Object.keys(MEASUREMENT_LIMITS).map((k) => [k, 0]),
+    ) as MeasurementInput;
+    assert.deepEqual(buildAvatarParams(vazio).morphs, buildAvatarParams(zeros).morphs);
+    assert.equal(buildAvatarParams(vazio).totalHeight, 1.7);
+  });
+
+  it("nos limites aceitos pelo perfil, todos os pesos são números dentro das faixas", () => {
+    const fields = Object.keys(MEASUREMENT_LIMITS) as MeasurementField[];
+    for (const edge of ["min", "max"] as const) {
+      const m = Object.fromEntries(
+        fields.map((f) => [f, MEASUREMENT_LIMITS[f][edge]]),
+      ) as MeasurementInput;
+      for (const body of BODIES) {
+        for (const [k, v] of Object.entries(buildAvatarParams(m, body).morphs)) {
+          assert.ok(Number.isFinite(v) && v >= -2 && v <= 2, `${edge} ${body} ${k} = ${v}`);
+        }
+      }
     }
   });
 });
