@@ -164,12 +164,26 @@ export function cancelPaymentIntent(id: string) {
   );
 }
 
-/** Estorno total. A chave de idempotência impede estorno em dobro. */
-export function createRefund(paymentIntentId: string, idempotencyKey: string) {
+/**
+ * Estorno. Sem `amountCents`, devolve tudo; com, só esse valor (reembolso
+ * parcial, ver `computePartialRefund`). A chave de idempotência impede
+ * estorno em dobro — num parcial, use uma chave por devolução, senão a
+ * segunda devolução do mesmo pedido repete a resposta da primeira.
+ */
+export async function createRefund(
+  paymentIntentId: string,
+  idempotencyKey: string,
+  amountCents?: number,
+) {
+  const badAmount =
+    amountCents !== undefined && (!Number.isInteger(amountCents) || amountCents <= 0);
+  if (badAmount) {
+    throw new StripeError("Valor do estorno inválido.", 0);
+  }
   return stripeRequest<StripeRefund>(
     "POST",
     "/refunds",
-    { payment_intent: paymentIntentId },
+    { payment_intent: paymentIntentId, amount: amountCents },
     idempotencyKey,
   );
 }
