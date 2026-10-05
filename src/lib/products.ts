@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { formatBRL } from "@/lib/format";
 import { resolveModelUrl } from "@/lib/storage";
 import { sortSizes } from "@/lib/sizes";
+import { priceRangeWhere } from "@/lib/price-filter";
 
 export type ProductFilters = {
   categoria?: string;
@@ -80,18 +81,7 @@ export type ProductDetail = {
   reviews: { average: number | null; count: number; items: ReviewItem[] };
 };
 
-// Faixas de preço (presets usados nos filtros).
-const PRICE_RANGES: Record<string, { min?: number; max?: number }> = {
-  "ate-200": { max: 200 },
-  "200-350": { min: 200, max: 350 },
-  "350-mais": { min: 350 },
-};
-
-export const PRICE_OPTIONS = [
-  { value: "ate-200", label: "Até R$ 200" },
-  { value: "200-350", label: "R$ 200 – 350" },
-  { value: "350-mais", label: "R$ 350+" },
-];
+export { PRICE_OPTIONS } from "@/lib/price-filter";
 
 export async function getCategories() {
   return prisma.category.findMany({ orderBy: { name: "asc" } });
@@ -124,11 +114,7 @@ export const GENDER_LABEL: Record<string, string> = {
 export async function getProducts(
   filters: ProductFilters = {},
 ): Promise<CatalogProduct[]> {
-  const range = filters.preco ? PRICE_RANGES[filters.preco] : undefined;
-  const bounds = range && {
-    ...(range.min !== undefined ? { gte: range.min } : {}),
-    ...(range.max !== undefined ? { lte: range.max } : {}),
-  };
+  const priceWhere = priceRangeWhere(filters.preco);
 
   const products = await prisma.product.findMany({
     where: {
@@ -146,15 +132,7 @@ export async function getProducts(
             },
           }
         : {}),
-      // A faixa vale para o preço que o cliente paga: o promocional, se houver.
-      ...(bounds
-        ? {
-            OR: [
-              { promotionalPrice: bounds },
-              { promotionalPrice: null, basePrice: bounds },
-            ],
-          }
-        : {}),
+      ...(priceWhere ?? {}),
       ...(filters.genero ? { gender: filters.genero as "MASCULINO" | "FEMININO" | "UNISSEX" } : {}),
       ...(filters.colecao ? { collection: filters.colecao } : {}),
       ...(filters.material ? { material: filters.material } : {}),
