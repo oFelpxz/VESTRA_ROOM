@@ -22,7 +22,7 @@
 | 18 | Frete real por CEP (Melhor Envio, sandbox) | ✅ Testado em todas as compras |
 | 19 | Cancelar pedido (cliente e Admin) com estoque de volta | ✅ Testado no banco real |
 | 20 | Reembolso com aviso ao cliente | ✅ Testado (cartão automático, boleto manual) |
-| 28 | Dashboard do Admin e visão do Operador | ✅ Testado na visão do Admin |
+| 28 | Dashboard do Admin e visão do Operador | ✅ Testado nas visões do Admin, do Operador e da Equipe 3D |
 | 3D-05 | Avatar gerado pelas medidas, validado em casos-limite | ✅ Ver [`SPRINT4-3D05.md`](SPRINT4-3D05.md) |
 
 Resultados detalhados em "Roteiro de testes → Resultados".
@@ -305,6 +305,7 @@ Documentado à parte em [`SPRINT4-3D05.md`](SPRINT4-3D05.md). Resumo:
 | Testes 05/10 | O boleto de teste não deixava escolher o cenário "vencido", porque o e-mail vinha preenchido. | Baixa |
 | Testes 05/10 | A tela de confirmação dizia "aguardando a confirmação do pagamento" mesmo quando o pagamento já tinha sido confirmado. | Baixa |
 | Testes 05/10 | "Meus pedidos" mostrava `CREDIT_CARD · PAID` em vez de "Cartão de crédito · Pago". | Baixa |
+| Testes 05/10 | A lista de pedidos do painel tinha o mesmo problema (`WALLET · PAID`). Agora mostra "Carteira digital · Pago". | Baixa |
 
 ---
 
@@ -378,10 +379,16 @@ Testes anteriores do mesmo dia (antes do Stripe):
 | Admin cancela pedido Enviado sem marcar "a peça voltou" | ✅ Pediu confirmação, cancelou e o estoque ficou em 7 |
 | Dashboard do Admin | ✅ 7 vendas somando R$ 1.833,55, igual à soma dos pedidos pagos na lista de pedidos |
 
-**Não testado no navegador:** as visões do Operador e da Equipe 3D no
-dashboard, e a recusa de cancelamento pelo Operador, porque precisam do login
-dessas contas. As regras de permissão estão cobertas pelos testes automáticos e
-são conferidas no servidor.
+Visões por papel (05/10/2026, contas de teste do seed `estoque@vestra.room` e
+`modelador@vestra.room`, sem gravar nada no banco):
+
+| Teste | Resultado |
+|---|---|
+| Painel do Operador | ✅ Só logística: 7 pedidos hoje, 9 a despachar, 0 em trânsito, 0 com estoque baixo. Nenhum valor de faturamento |
+| Operador abre um pedido pago | ✅ Só aparece "Iniciar preparação"; não há botão de cancelar |
+| Operador abre Clientes, Cupons, Produtos ou Modelos 3D pelo endereço | ✅ Volta para o painel; só Pedidos e Estoque abrem |
+| Painel da Equipe 3D | ✅ Só o provador: 5 produtos com 3D de 13 ativos, 0 pendentes. Sem faturamento nem pedidos |
+| Equipe 3D abre Pedidos, um pedido, Clientes, Estoque ou Cupons pelo endereço | ✅ Volta para o painel; só Modelos 3D abre |
 
 **Pedidos de teste que ficaram no banco** (conta do Admin): os 7 pedidos acima,
 mais #JNGCKP39 e #RYQ5AAEZ (testes de cancelamento). Todos cancelados ou pagos
