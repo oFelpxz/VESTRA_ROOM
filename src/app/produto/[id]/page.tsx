@@ -21,10 +21,10 @@ export async function generateMetadata({
   const { id } = await params;
   const product = await getProductDetail(id);
   if (!product) {
-    return { title: "Produto não encontrado | VESTRA ROOM" };
+    return { title: "Produto não encontrado" };
   }
   return {
-    title: `${product.name} | VESTRA ROOM`,
+    title: product.name,
     description:
       product.description ??
       "Peça VESTRA ROOM com visualização 3D e provador virtual VESTRA FIT.",

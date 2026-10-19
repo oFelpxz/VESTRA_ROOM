@@ -27,20 +27,12 @@
 | 25 | Configurações da loja | ✅ Feito com as sugestões 25.1 a 25.8 (`/admin/configuracoes`, `/trocas`, `/privacidade`) |
 | 3D-06 | Vestir a peça no avatar com indicador de caimento por região | ✅ Seis regiões e cinco classes. Ver "Provador e looks" |
 | 3D-07 | Trocar tamanho e cor; comparar 2 tamanhos lado a lado | ✅ |
-| 3D-08 | Recomendar tamanho (estimativa) e validar o provador de ponta a ponta | ✅ Recomendação feita. ⏳ A validação no navegador depende de o banco voltar e de a migration ser aplicada |
+| 3D-08 | Recomendar tamanho (estimativa) e validar o provador de ponta a ponta | ✅ Recomendação feita e provador validado no navegador em 19/10 (ver "Teste no navegador") |
 
 **Migration nova:** `20261019120000_sprint5_trocas_configuracoes_looks`
 (trocas, fotos das trocas, looks, configurações da loja, data da entrega do
 pedido e valor já devolvido de cada pagamento). Aplicar com
 `npx prisma migrate deploy` (nunca `migrate dev` no banco compartilhado).
-
----|---|---|
-| 15 | Salvar looks (combinação de peças no provador) | ⏳ Grupo decidiu: **uma peça de cima + uma de baixo, sem camadas**. Depende de a Equipe 3D entregar uma parte de baixo com molde |
-| 21 | Cliente pede troca ou devolução | ⏳ Esperando as decisões abaixo |
-| 22 | Admin aprova ou nega a troca | ⏳ Esperando as decisões abaixo |
-| 24 | Relatórios por período com CSV | ✅ Vendas e estoque feitos (`6702237`). O de **trocas** fica para depois do item 21 |
-| 25 | Configurações da loja | ⏳ Esperando as decisões abaixo |
-| 3D-06, 3D-07, 3D-08 | Provador | ⏳ Equipe 3D |
 
 ---
 
@@ -90,8 +82,8 @@ nos atalhos do painel.
 ### Correções de pagamento, checkout e endereço (19/10, Supabase fora do ar)
 
 Feitas enquanto o banco estava pausado: conferidas com checagem de tipos,
-lint e testes automáticos (214 passando). **Falta o teste no navegador**
-quando o Supabase voltar (roteiro abaixo da tabela).
+lint e testes automáticos (214 passando). Testadas no navegador em 19/10,
+depois que o banco voltou (ver "Teste no navegador").
 
 | Problema | Correção |
 |---|---|
@@ -114,10 +106,12 @@ aparece na mensagem, mas **não é salvo**: o endereço não tem campo de bairro
 (precisaria de migração). A consulta sai do navegador e leva só o CEP; a
 política de privacidade passou a citar os dois serviços. 11 testes.
 
-Roteiro para quando o banco voltar:
+Roteiro para quando o banco voltar (itens 1, 2 e 4 testados em 19/10; o 3
+e o 5 ficaram de fora, ver abaixo):
 
 1. Endereço novo no checkout: digitar `01310-100` → rua, cidade e UF
-   preenchidas; digitar `99999-999` → "Não achamos esse CEP"; salvar com
+   preenchidas; digitar `00000-000` → "Não achamos esse CEP" (o
+   `99999-999` existe: é de Sarandi/PR); salvar com
    CEP incompleto → erro e os campos continuam preenchidos.
 2. Editar um endereço no perfil: os dados antigos aparecem; trocar o CEP.
 3. PIX: o pedido vira Pago em ~3 s na página de sucesso. Fechar a aba logo
@@ -126,6 +120,67 @@ Roteiro para quando o banco voltar:
 5. Só se o grupo topar mexer num produto de teste: desativar uma peça que
    está na sacola de um cliente de teste → o checkout mostra ela como
    indisponível (depois, reativar).
+
+## Teste no navegador (19/10)
+
+Feito no `npm run dev` local, com o banco compartilhado, depois de aplicar a
+migration com `migrate deploy`. Contas de teste criadas para isso (as senhas
+ficam só no computador de quem testou, fora do Git):
+
+- Cliente: `teste.cliente.claude@example.com`
+- Admin: `teste.admin.claude@example.com` (promovido a Admin por script)
+
+Ficaram no banco: o pedido de teste **#5DZK6HBG** (1 peça, R$ 312,88, pago
+com cartão de teste do Stripe e já reembolsado) e a devolução **#TJNVUTX2**.
+O estoque da peça voltou ao que era (8 → 9 com o recebimento).
+
+| O que | Resultado |
+|---|---|
+| Login com `?next=` (checkout, perfil) | ✅ Volta para a página de antes |
+| `/trocas` e `/privacidade` | ✅ Abrem; `/trocas` mostra os prazos das configurações |
+| CEP: `01310-100`, `00000-000`, CEP incompleto | ✅ Preenche; mostra "Não achamos esse CEP"; erro sem apagar os campos |
+| Endereço: salvar, editar, trocar o CEP | ✅ |
+| Medidas e provador (3D-06 a 3D-08) | ✅ Tamanho sugerido M; comparar com G (×1,08) |
+| Looks (item 15) | ✅ Salvar, abrir de novo e pôr o look inteiro na sacola |
+| Checkout com cartão (Stripe, modo teste) | ✅ Endereço padrão já escolhido; pagamento aprovado; pedido Pago; página "Pagamento confirmado" |
+| Admin: Em preparação → Enviado → Entregue | ✅ Enviado exige código de rastreio |
+| Cliente pede devolução (item 21) | ✅ Prazos certos: arrependimento até 26/10, tamanho/cor até 18/11, defeito até 17/01/2027 |
+| Admin aprova, recebe e devolve o valor (item 22) | ✅ Estoque voltou (peça em bom estado); estorno de R$ 312,88 com frete no Stripe; pagamento "Reembolsado" |
+| Avisos do cliente | ✅ Pagamento confirmado, devolução recebida, aprovada, peça recebida e reembolso |
+| Configurações (item 25) | ✅ Arrependimento 5 dias é recusado (mínimo 7); troca 31 dias salvou e apareceu em `/trocas` na hora. Tudo voltou aos valores de antes |
+| Relatórios (item 24) | ✅ Vendas, trocas (1 devolução, 12,5%, R$ 312,88) e estoque; os 4 CSVs baixam |
+
+**Não testado:** o PIX simulado (precisaria de um segundo pedido) e a
+peça desativada na sacola (mexeria num produto do grupo).
+
+### Corrigido durante o teste
+
+| Problema | Correção |
+|---|---|
+| A foto provisória do catálogo (`public/models/placeholder.png`) era um SVG com nome de PNG e não aparecia | Trocada por um PNG de verdade |
+| Em telas baixas (≤ ~880 px de altura), o menu lateral do Admin cortava **Configurações**, **Voltar à loja** e **Sair** | O menu rola sozinho (`src/app/admin/layout.tsx`) |
+| O aviso de pagamento promete avisar quando o pedido sair, mas **Enviado** e **Entregue** não geravam aviso | Os dois geram aviso, com o código de rastreio no Enviado, na mesma transação da mudança (`src/lib/logistics-actions.ts`). Conferido com checagem de tipos; no navegador precisaria de outro pedido |
+| Títulos da aba repetidos ("Endereços \| VESTRA ROOM \| VESTRA ROOM") em endereços, formas de pagamento e na página do produto; páginas do Admin sem título | Sufixo só no layout; Admin aparece como "Admin \| VESTRA ROOM" |
+
+### Para o grupo decidir
+
+Achados do teste que mexem em produto ou em regra; nada foi alterado.
+
+- Só Track Jacket, Hoodie Core, Tech Vest e Boxy Tee 01 têm tabela de
+  medidas; **nenhuma peça de baixo tem**, então o provador não sugere
+  tamanho para elas.
+- O Hoodie Core tem as cores **"Branco"** e **"White"** (aparecem duplicadas
+  na troca de cor).
+- Um produto se chama **"Relugar T-Shirt"** (erro de digitação?).
+- O frete aparece como "Econômico · Correios SEDEX" (SEDEX não é o
+  econômico).
+- Pedido reembolsado **continua no faturamento** do relatório de vendas:
+  mostrar o valor bruto ou o líquido (descontando devoluções)?
+- A página de sucesso diz "PEDIDO ENVIADO", que pode ser confundido com o
+  status Enviado (a peça ainda não saiu).
+- O Admin pode cancelar um pedido já entregue (decisão do item 19); o
+  bloqueio só existe com devolução em aberto.
+- O bairro continua sem ser salvo (precisaria de migração).
 
 ## Preparação para os próximos itens
 

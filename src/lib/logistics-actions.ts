@@ -9,6 +9,8 @@ import {
   shouldRestock,
 } from "@/lib/order-cancel";
 import { afterOrderCanceled, refundOrderPayment } from "@/lib/payments";
+import { notifyInTx } from "@/lib/notifications";
+import { shortOrderCode } from "@/lib/payment-rules";
 
 export type LogisticsState = { error?: string; success?: boolean };
 
@@ -72,7 +74,7 @@ export async function advanceOrderStatusAction(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { status: true, trackingCode: true },
+    select: { status: true, trackingCode: true, userId: true },
   });
   if (!order) return { error: "Pedido não encontrado." };
 
@@ -96,14 +98,32 @@ export async function advanceOrderStatusAction(
 
   // Condicionado ao status lido: se o pedido foi cancelado nesse meio-tempo,
   // não volta a andar.
-  const moved = await prisma.order.updateMany({
-    where: { id: orderId, status: current },
-    data: {
-      status: next,
-      ...(trackingCode ? { trackingCode } : {}),
-      // Item 21: os prazos de troca contam a partir da entrega.
-      ...(next === "DELIVERED" ? { deliveredAt: new Date() } : {}),
-    },
+  const moved = await prisma.$transaction(async (tx) => {
+    const r = await tx.order.updateMany({
+      where: { id: orderId, status: current },
+      data: {
+        status: next,
+        ...(trackingCode ? { trackingCode } : {}),
+        // Item 21: os prazos de troca contam a partir da entrega.
+        ...(next === "DELIVERED" ? { deliveredAt: new Date() } : {}),
+      },
+    });
+    // Item 20: o aviso de pagamento promete avisar quando o pedido sair.
+    if (r.count > 0 && (next === "SHIPPED" || next === "DELIVERED")) {
+      const code = shortOrderCode(orderId);
+      const tracking = trackingCode ?? order.trackingCode;
+      await notifyInTx(tx, {
+        userId: order.userId,
+        title:
+          next === "SHIPPED" ? `Pedido enviado · Pedido #${code}` : `Pedido entregue · Pedido #${code}`,
+        body:
+          next === "SHIPPED"
+            ? `Seu pedido saiu para entrega. Código de rastreio: ${tracking}.`
+            : "Esperamos que goste! Se algo não serviu, a troca ou devolução é pela página do pedido.",
+        href: `/perfil/pedidos/${orderId}`,
+      });
+    }
+    return r;
   });
   if (moved.count === 0) {
     return { error: "O pedido mudou de status. Atualize a página." };
