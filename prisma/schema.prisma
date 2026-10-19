@@ -119,28 +119,62 @@ enum ShippingMethod {
   EXPRESSO
 }
 
+/// Item 21: motivo da troca ou devolução — decide o prazo.
+enum ReturnReason {
+  /// Tamanho não serviu (30 dias)
+  SIZE
+  /// Cor diferente do esperado (30 dias)
+  COLOR
+  /// Defeito (90 dias, foto obrigatória)
+  DEFECT
+  /// Não gostei — arrependimento (7 dias)
+  REGRET
+  /// Outro, com texto (7 dias)
+  OTHER
+}
+
+/// Item 21: o que o cliente quer — outra peça do mesmo modelo ou o dinheiro.
+enum ReturnKind {
+  EXCHANGE
+  REFUND
+}
+
+/// Item 22: Aberto → Aprovado/Negado → Peça recebida → Concluído.
+enum ReturnStatus {
+  OPEN
+  APPROVED
+  DENIED
+  RECEIVED
+  COMPLETED
+  /// Cancelado pelo cliente (só enquanto Aberto) ou encerrado pelo Admin
+  /// antes de a peça chegar.
+  CANCELED
+}
+
 // ---------------------------------------------------------------------------
 // Usuário e perfil
 // ---------------------------------------------------------------------------
 
 model User {
-  id                 String              @id @default(cuid())
-  name               String
-  email              String              @unique
-  passwordHash       String
-  phone              String?
-  role               UserRole            @default(CUSTOMER)
-  status             UserStatus          @default(ACTIVE)
-  measurementProfile MeasurementProfile?
-  addresses          Address[]
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  phone               String?
+  role                UserRole             @default(CUSTOMER)
+  status              UserStatus           @default(ACTIVE)
+  measurementProfile  MeasurementProfile?
+  addresses           Address[]
   savedPaymentMethods SavedPaymentMethod[]
-  carts              Cart[]
-  orders             Order[]
-  reviews            Review[]
-  favorites          Favorite[]
-  notifications      Notification[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  carts               Cart[]
+  orders              Order[]
+  reviews             Review[]
+  favorites           Favorite[]
+  notifications       Notification[]
+  returnRequests      ReturnRequest[]
+  savedLooks          SavedLook[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 }
 
 model MeasurementProfile {
@@ -207,20 +241,23 @@ model Product {
 }
 
 model ProductVariant {
-  id                 String        @id @default(cuid())
-  productId          String
-  product            Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku                String        @unique
-  color              String
-  size               String
-  price              Decimal?      @db.Decimal(10, 2)
-  stockQuantity      Int           @default(0)
-  lowStockThreshold  Int           @default(5)
-  status             VariantStatus @default(ACTIVE)
-  cartItems          CartItem[]
-  orderItems         OrderItem[]
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  id                String          @id @default(cuid())
+  productId         String
+  product           Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku               String          @unique
+  color             String
+  size              String
+  price             Decimal?        @db.Decimal(10, 2)
+  stockQuantity     Int             @default(0)
+  lowStockThreshold Int             @default(5)
+  status            VariantStatus   @default(ACTIVE)
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  exchangeRequests  ReturnRequest[]
+  looksAsTop        SavedLook[]     @relation("LookTop")
+  looksAsBottom     SavedLook[]     @relation("LookBottom")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model ProductImage {
@@ -234,20 +271,20 @@ model ProductImage {
 }
 
 model Model3D {
-  id             String             @id @default(cuid())
-  productId      String             @unique
-  product        Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id             String           @id @default(cuid())
+  productId      String           @unique
+  product        Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   fileUrl        String
-  format         Model3DFormat      @default(GLB)
+  format         Model3DFormat    @default(GLB)
   textureUrl     String?
-  version        Int                @default(1)
+  version        Int              @default(1)
   fileSizeMb     Float?
-  status         Model3DStatus      @default(PENDING)
+  status         Model3DStatus    @default(PENDING)
   /// Tamanhos (ProductVariant.size) com simulação 3D validada — vazio = todos.
-  availableSizes String[]           @default([])
+  availableSizes String[]         @default([])
   versions       Model3DVersion[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 }
 
 /// Histórico de versões do Model3D — permite reverter para um upload anterior.
@@ -302,23 +339,23 @@ model SizeChart {
 }
 
 model SizeChartMeasure {
-  id              String    @id @default(cuid())
-  sizeChartId     String
-  sizeChart       SizeChart @relation(fields: [sizeChartId], references: [id], onDelete: Cascade)
-  size            String
-  chestMinCm      Float?
-  chestMaxCm      Float?
-  waistMinCm      Float?
-  waistMaxCm      Float?
-  hipMinCm        Float?
-  hipMaxCm        Float?
-  heightMinCm     Float?
-  heightMaxCm     Float?
-  armLengthMinCm  Float?
-  armLengthMaxCm  Float?
-  legLengthMinCm  Float?
-  legLengthMaxCm  Float?
-  createdAt       DateTime  @default(now())
+  id             String    @id @default(cuid())
+  sizeChartId    String
+  sizeChart      SizeChart @relation(fields: [sizeChartId], references: [id], onDelete: Cascade)
+  size           String
+  chestMinCm     Float?
+  chestMaxCm     Float?
+  waistMinCm     Float?
+  waistMaxCm     Float?
+  hipMinCm       Float?
+  hipMaxCm       Float?
+  heightMinCm    Float?
+  heightMaxCm    Float?
+  armLengthMinCm Float?
+  armLengthMaxCm Float?
+  legLengthMinCm Float?
+  legLengthMaxCm Float?
+  createdAt      DateTime  @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -366,17 +403,17 @@ model SavedPaymentMethod {
 // ---------------------------------------------------------------------------
 
 model Cart {
-  id        String     @id @default(cuid())
-  userId    String
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    CartStatus @default(ACTIVE)
-  couponId  String?
-  coupon    Coupon?    @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         CartStatus     @default(ACTIVE)
+  couponId       String?
+  coupon         Coupon?        @relation(fields: [couponId], references: [id], onDelete: SetNull)
   /// Modalidade escolhida no carrinho — o checkout e o pedido leem daqui.
   shippingMethod ShippingMethod @default(ECONOMICO)
-  items     CartItem[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  items          CartItem[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 model CartItem {
@@ -421,26 +458,29 @@ model Coupon {
 // ---------------------------------------------------------------------------
 
 model Order {
-  id                String      @id @default(cuid())
+  id                String          @id @default(cuid())
   userId            String
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status            OrderStatus @default(PENDING_PAYMENT)
-  totalAmount       Decimal     @db.Decimal(10, 2)
-  shippingAmount   Decimal     @default(0) @db.Decimal(10, 2)
-  discountAmount   Decimal     @default(0) @db.Decimal(10, 2)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status            OrderStatus     @default(PENDING_PAYMENT)
+  totalAmount       Decimal         @db.Decimal(10, 2)
+  shippingAmount    Decimal         @default(0) @db.Decimal(10, 2)
+  discountAmount    Decimal         @default(0) @db.Decimal(10, 2)
   shippingAddressId String?
-  shippingAddress   Address?    @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+  shippingAddress   Address?        @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
   couponId          String?
-  coupon            Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  shippingMethod    ShippingMethod @default(ECONOMICO)
+  coupon            Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  shippingMethod    ShippingMethod  @default(ECONOMICO)
   /// Serviço cotado no Melhor Envio (item 18), ex.: "Correios · PAC". Null = tabela interna.
   shippingService   String?
   shippingDays      Int?
-  trackingCode     String?
+  trackingCode      String?
+  /// Item 21: quando chegou ao cliente — os prazos de troca contam daqui.
+  deliveredAt       DateTime?
   items             OrderItem[]
   payment           Payment?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  returnRequests    ReturnRequest[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
 
 model OrderItem {
@@ -455,6 +495,7 @@ model OrderItem {
   quantity         Int
   unitPrice        Decimal         @db.Decimal(10, 2)
   totalPrice       Decimal         @db.Decimal(10, 2)
+  returnRequests   ReturnRequest[]
   createdAt        DateTime        @default(now())
 }
 
@@ -477,6 +518,9 @@ model Payment {
   /// Reembolso (item 20): id do estorno no gateway; null = sem estorno ou manual.
   refundId          String?
   refundedAt        DateTime?
+  /// Item 22: soma de tudo que já foi devolvido deste pagamento (devoluções
+  /// parciais e reembolso do cancelamento).
+  refundedAmount    Decimal         @default(0) @db.Decimal(10, 2)
   paidAt            DateTime?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
@@ -494,4 +538,113 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Trocas e devoluções (itens 21 e 22)
+// ---------------------------------------------------------------------------
+
+model ReturnRequest {
+  id                String          @id @default(cuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId       String
+  orderItem         OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quantity          Int
+  reason            ReturnReason
+  /// Texto do cliente (obrigatório em "Outro").
+  reasonText        String?
+  /// O que o cliente pediu.
+  kind              ReturnKind
+  /// Troca: tamanho/cor pedidos (mesmo produto).
+  exchangeVariantId String?
+  exchangeVariant   ProductVariant? @relation(fields: [exchangeVariantId], references: [id], onDelete: SetNull)
+  exchangeColor     String?
+  exchangeSize      String?
+  status            ReturnStatus    @default(OPEN)
+  /// O que o Admin aprovou: troca sem estoque só pode virar devolução.
+  approvedKind      ReturnKind?
+  /// Aprovado: instruções de envio. Negado: justificativa. O cliente vê.
+  adminMessage      String?
+  /// A peça nova da troca saiu do estoque na aprovação.
+  stockReserved     Boolean         @default(false)
+  /// Peça devolvida em bom estado (volta ao estoque).
+  goodCondition     Boolean?
+  /// Reembolso desta devolução.
+  refundAmount      Decimal?        @db.Decimal(10, 2)
+  refundShipping    Boolean         @default(false)
+  refundId          String?
+  refundedAt        DateTime?
+  /// Troca: rastreio da peça nova.
+  trackingCode      String?
+  photos            ReturnPhoto[]
+  answeredAt        DateTime?
+  receivedAt        DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([orderItemId])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// Fotos do pedido de troca, na pasta privada do Storage (só o dono e o Admin).
+model ReturnPhoto {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  /// Caminho do objeto no bucket privado (não é URL).
+  path            String
+  contentType     String
+  sizeBytes       Int
+  createdAt       DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Looks salvos (item 15): uma peça de cima + uma de baixo
+// ---------------------------------------------------------------------------
+
+model SavedLook {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  topVariantId    String?
+  topVariant      ProductVariant? @relation("LookTop", fields: [topVariantId], references: [id], onDelete: SetNull)
+  bottomVariantId String?
+  bottomVariant   ProductVariant? @relation("LookBottom", fields: [bottomVariantId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Configurações da loja (item 25) — uma linha só, id "default"
+// ---------------------------------------------------------------------------
+
+model StoreSettings {
+  id                String   @id @default("default")
+  storeName         String   @default("VESTRA ROOM")
+  /// Fictício (projeto acadêmico).
+  cnpj              String   @default("00.000.000/0001-00")
+  email             String   @default("contato@vestraroom.com.br")
+  phone             String   @default("(11) 4000-0000")
+  /// Para onde o cliente envia a peça da troca.
+  returnAddress     String   @default("VESTRA ROOM — Trocas\nAv. Paulista, 1000, sala 10\nBela Vista, São Paulo/SP\nCEP 01310-100")
+  /// Textos das páginas /trocas e /privacidade. Vazio = texto padrão.
+  returnPolicy      String?
+  privacyPolicy     String?
+  regretDays        Int      @default(7)
+  exchangeDays      Int      @default(30)
+  defectDays        Int      @default(90)
+  boletoDays        Int      @default(3)
+  freeShippingFrom  Decimal  @default(300) @db.Decimal(10, 2)
+  lowStockThreshold Int      @default(5)
+  /// Folga do indicador de caimento (cm).
+  fitToleranceCm    Float    @default(2)
+  updatedAt         DateTime @updatedAt
 }

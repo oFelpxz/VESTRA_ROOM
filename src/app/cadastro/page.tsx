@@ -60,6 +60,14 @@ export default function CadastroPage() {
             </p>
           )}
 
+          <p className="text-xs text-muted-foreground">
+            Ao criar a conta, você concorda com a nossa{" "}
+            <Link href="/privacidade" className="underline hover:text-foreground">
+              política de privacidade
+            </Link>
+            .
+          </p>
+
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? "Criando..." : "Criar conta"}
           </Button>

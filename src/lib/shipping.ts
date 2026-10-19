@@ -15,13 +15,16 @@ import { STORE_SETTINGS } from "@/lib/store-settings";
  *  - senão: R$ 15 fixo + R$ 2 por item
  *
  * Nos dois casos o Econômico é grátis a partir de R$ 300 (a loja paga).
- * Os valores ficam em `STORE_SETTINGS` (src/lib/store-settings.ts).
+ * O valor do frete grátis vem das configurações da loja (item 25), passado
+ * por quem chama; a tabela própria fica em `STORE_SETTINGS`.
  */
 
 export type ShippingInput = {
   subtotal: number;
   itemCount: number;
   postalCode?: string | null;
+  /** Frete grátis a partir de (item 25); sem valor, o padrão da loja. */
+  freeShippingFrom?: number;
 };
 
 export type ShippingQuote = {
@@ -39,13 +42,14 @@ export function calculateShipping({
   subtotal,
   itemCount,
   postalCode,
+  freeShippingFrom = FREE_THRESHOLD,
 }: ShippingInput): ShippingQuote {
-  if (subtotal >= FREE_THRESHOLD) {
+  if (subtotal >= freeShippingFrom) {
     return {
       amount: 0,
       free: true,
       estimatedDays: 5,
-      reason: `Frete grátis acima de R$ ${FREE_THRESHOLD}.`,
+      reason: `Frete grátis acima de ${brl(freeShippingFrom)}.`,
     };
   }
 
@@ -122,10 +126,11 @@ export function quoteShippingOptions(input: ShippingInput): ShippingOption[] {
 export function optionsFromCarriers(
   services: CarrierService[],
   subtotal: number,
+  freeShippingFrom: number = FREE_THRESHOLD,
 ): ShippingOption[] {
   const picked = pickModalities(services);
   if (!picked) return [];
-  const free = subtotal >= FREE_THRESHOLD;
+  const free = subtotal >= freeShippingFrom;
   const options: ShippingOption[] = [
     {
       method: "ECONOMICO",
@@ -134,7 +139,7 @@ export function optionsFromCarriers(
       amount: free ? 0 : round2(picked.ECONOMICO.price),
       free,
       estimatedDays: picked.ECONOMICO.days,
-      reason: free ? `Frete grátis acima de R$ ${FREE_THRESHOLD}.` : undefined,
+      reason: free ? `Frete grátis acima de ${brl(freeShippingFrom)}.` : undefined,
     },
   ];
   if (picked.EXPRESSO) {
@@ -148,6 +153,15 @@ export function optionsFromCarriers(
     });
   }
   return options;
+}
+
+/** "R$ 300" ou "R$ 249,90" — sem centavos quando o valor é redondo. */
+function brl(n: number) {
+  return n.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+  });
 }
 
 function round2(n: number) {
@@ -165,7 +179,9 @@ export async function quoteShippingOptionsLive(
       itemCount: input.itemCount,
       subtotal: input.subtotal,
     });
-    const options = services ? optionsFromCarriers(services, input.subtotal) : [];
+    const options = services
+      ? optionsFromCarriers(services, input.subtotal, input.freeShippingFrom)
+      : [];
     if (options.length > 0) return options;
   }
   return quoteShippingOptions(input);

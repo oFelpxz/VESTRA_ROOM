@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
 import { quoteShippingForLive } from "@/lib/shipping";
+import { getStoreSettings } from "@/lib/store-settings-db";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { formatBRL, formatCep } from "@/lib/format";
 import { deleteAddressAction } from "@/lib/address-actions";
@@ -87,6 +88,7 @@ export default async function CheckoutPage({
     subtotal,
     itemCount,
     postalCode: selectedAddress?.postalCode,
+    freeShippingFrom: (await getStoreSettings()).freeShippingFrom,
   });
 
   const couponEvaluation = cart?.coupon

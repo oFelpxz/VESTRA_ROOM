@@ -39,7 +39,9 @@ const SHORTCUT_DESCRIPTION: Record<string, string> = {
   "/admin/modelos-3d": "Upload, revisão e validação dos arquivos .glb",
   "/admin/categorias": "Criar, listar e remover categorias de produtos",
   "/admin/medidas": "Definir medidas por tamanho de cada produto",
-  "/admin/relatorios": "Vendas por período e estoque, com download em CSV",
+  "/admin/relatorios": "Vendas, trocas por período e estoque, com download em CSV",
+  "/admin/trocas": "Aprovar ou negar trocas e devoluções dos clientes",
+  "/admin/configuracoes": "Dados da loja, políticas, prazos e provador",
 };
 
 /** Variantes ativas abaixo do limite de cada uma (mesma regra da tela de Estoque). */

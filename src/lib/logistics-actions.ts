@@ -101,6 +101,8 @@ export async function advanceOrderStatusAction(
     data: {
       status: next,
       ...(trackingCode ? { trackingCode } : {}),
+      // Item 21: os prazos de troca contam a partir da entrega.
+      ...(next === "DELIVERED" ? { deliveredAt: new Date() } : {}),
     },
   });
   if (moved.count === 0) {
@@ -144,6 +146,17 @@ export async function cancelOrderByAdminAction(
     },
   });
   if (!order) return { error: "Pedido não encontrado." };
+
+  // Item 22: com troca ou devolução em andamento, o reembolso do
+  // cancelamento somaria com o da devolução. Encerre a troca antes.
+  const activeReturns = await prisma.returnRequest.count({
+    where: { orderId, status: { in: ["OPEN", "APPROVED", "RECEIVED"] } },
+  });
+  if (activeReturns > 0) {
+    return {
+      error: "Este pedido tem troca ou devolução em andamento. Resolva em Trocas antes de cancelar.",
+    };
+  }
 
   const canceled = await prisma.$transaction((tx) =>
     cancelOrderInTx(tx, order, {

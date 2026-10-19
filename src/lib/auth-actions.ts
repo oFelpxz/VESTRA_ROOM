@@ -113,6 +113,7 @@ export async function deleteAccountAction(
     prisma.address.deleteMany({ where: { userId } }),
     prisma.savedPaymentMethod.deleteMany({ where: { userId } }),
     prisma.cart.deleteMany({ where: { userId } }),
+    prisma.savedLook.deleteMany({ where: { userId } }),
     prisma.user.update({
       where: { id: userId },
       data: {

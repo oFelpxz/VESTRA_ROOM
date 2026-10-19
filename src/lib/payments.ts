@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getStoreSettings } from "@/lib/store-settings-db";
 import {
   cancelPaymentIntent,
   createCheckoutSession,
@@ -57,6 +58,7 @@ export async function startStripeCheckout(input: {
     baseUrl: input.baseUrl,
     now: new Date(),
     testMode: stripeTestMode(),
+    boletoDays: (await getStoreSettings()).boletoDays,
   };
 
   let session: StripeCheckoutSession;
@@ -260,6 +262,7 @@ export async function refundOrderPayment(
           provider: true,
           method: true,
           amount: true,
+          refundedAmount: true,
           externalPaymentId: true,
         },
       },
@@ -267,6 +270,10 @@ export async function refundOrderPayment(
   });
   const payment = order?.payment;
   if (!order || !payment) return { ok: false, error: "Pedido sem pagamento." };
+  // Devoluções de peças (item 22) já podem ter devolvido parte do valor: o
+  // estorno sem valor do Stripe devolve só o que falta, e o aviso também.
+  const remaining =
+    Math.round((Number(payment.amount) - Number(payment.refundedAmount)) * 100) / 100;
   if (payment.status !== "PAID") return { ok: true, refunded: false };
   if (order.status !== "CANCELED") {
     return { ok: false, error: "Só pedido cancelado pode ser reembolsado." };
@@ -317,11 +324,12 @@ export async function refundOrderPayment(
       paymentId: payment.id,
       refundId,
       now: new Date(),
+      paidAmount: Number(payment.amount),
     });
     if (done) {
       await notifyInTx(tx, {
         userId: order.userId,
-        title: `Reembolso de ${formatBRL(Number(payment.amount))} · Pedido #${code}`,
+        title: `Reembolso de ${formatBRL(remaining)} · Pedido #${code}`,
         body: opts.manual
           ? "A loja devolveu o valor do boleto por transferência."
           : payment.method === "PIX" || payment.provider === "SIMULATED"

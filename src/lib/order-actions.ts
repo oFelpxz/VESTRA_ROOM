@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { quoteShippingForLive } from "@/lib/shipping";
+import { getStoreSettings } from "@/lib/store-settings-db";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { cancelOrderInTx, CUSTOMER_CANCELABLE } from "@/lib/order-cancel";
 import { PAY_METHODS, usesStripe, type PayMethod } from "@/lib/payment-rules";
@@ -144,6 +145,7 @@ export async function createOrderFromCartAction(
     subtotal,
     itemCount,
     postalCode: address.postalCode,
+    freeShippingFrom: (await getStoreSettings()).freeShippingFrom,
   });
 
   // Cupom: revalidado aqui. Se deixou de valer, bloqueia em vez de cobrar

@@ -27,7 +27,10 @@ export function usesStripe(method: PayMethod, stripeOn: boolean) {
   return stripeOn && method !== "PIX";
 }
 
-/** Dias corridos até o boleto vencer (o Stripe aceita de 0 a 60). */
+/**
+ * Dias corridos até o boleto vencer (o Stripe aceita de 0 a 60). Padrão: o
+ * Admin muda em Configurações (item 25) e quem chama passa `boletoDays`.
+ */
 export const BOLETO_DAYS = STORE_SETTINGS.boletoDays;
 
 /**
@@ -69,6 +72,8 @@ export function checkoutSessionParams(input: {
   methodTypes?: string[];
   /** Chave de teste: o boleto deixa o e-mail livre (ver abaixo). */
   testMode?: boolean;
+  /** Configurações da loja (item 25); sem valor, `BOLETO_DAYS`. */
+  boletoDays?: number;
 }) {
   const code = shortOrderCode(input.orderId);
   const page = `${input.baseUrl}/checkout/sucesso/${input.orderId}`;
@@ -85,7 +90,7 @@ export function checkoutSessionParams(input: {
     payment_method_types: input.methodTypes ?? stripeMethodTypes(input.method),
     payment_method_options:
       input.method === "BOLETO"
-        ? { boleto: { expires_after_days: BOLETO_DAYS } }
+        ? { boleto: { expires_after_days: input.boletoDays ?? BOLETO_DAYS } }
         : undefined,
     // Um item só, com o total do pedido: desconto do cupom e frete já estão
     // calculados pela loja e o Stripe cobra exatamente esse valor.
@@ -221,11 +226,23 @@ export async function markPaidInTx(
  */
 export async function markRefundedInTx(
   tx: Prisma.TransactionClient,
-  input: { orderId: string; paymentId: string; refundId: string | null; now: Date },
+  input: {
+    orderId: string;
+    paymentId: string;
+    refundId: string | null;
+    now: Date;
+    /** Valor pago: depois do reembolso total, tudo foi devolvido. */
+    paidAmount?: number;
+  },
 ): Promise<boolean> {
   const done = await tx.payment.updateMany({
     where: { id: input.paymentId, status: "PAID" },
-    data: { status: "REFUNDED", refundId: input.refundId, refundedAt: input.now },
+    data: {
+      status: "REFUNDED",
+      refundId: input.refundId,
+      refundedAt: input.now,
+      ...(input.paidAmount != null ? { refundedAmount: input.paidAmount } : {}),
+    },
   });
   if (done.count === 0) return false;
   await tx.order.updateMany({

@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { formatBRL } from "@/lib/format";
 import { spDayKey } from "@/lib/dashboard";
 import { formatDay, parseReportRange, type ReportRange } from "@/lib/reports";
+import { REASON_LABEL, RETURN_REASONS, STATUS_LABEL as RETURN_STATUS_LABEL } from "@/lib/returns";
 import {
+  getReturnsReport,
   getSalesReport,
   getStockReport,
   ORDER_STATUS_LABEL,
@@ -34,7 +36,15 @@ export default async function AdminRelatoriosPage({
 
   const now = new Date();
   const range = parseReportRange(sp.de, sp.ate, now);
-  const [sales, stock] = await Promise.all([getSalesReport(range), getStockReport()]);
+  const [sales, stock, returns] = await Promise.all([
+    getSalesReport(range),
+    getStockReport(),
+    getReturnsReport(range),
+  ]);
+  const rs = returns.summary;
+  // Peças devolvidas sobre peças vendidas no mesmo período (aproximação:
+  // a devolução pode ser de uma venda de antes do período).
+  const returnRate = sales.summary.units > 0 ? rs.units / sales.summary.units : null;
   const today = spDayKey(now);
   const stockAlerts = stock.rows
     .filter((r) => r.situation !== "OK")
@@ -46,7 +56,7 @@ export default async function AdminRelatoriosPage({
         Relatórios
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Vendas por período e estoque atual, com download em CSV (abre no Excel
+        Vendas e trocas por período e estoque atual, com download em CSV (abre no Excel
         e no Google Planilhas).
       </p>
 
@@ -180,6 +190,86 @@ export default async function AdminRelatoriosPage({
             )}
           </>
         )}
+      </Section>
+
+      {/* Trocas e devoluções */}
+      <Section
+        title={`Trocas e devoluções · ${formatDay(range.from)} a ${formatDay(range.to)}`}
+        action={<Download href={csvHref("devolucoes", range)}>Trocas e devoluções (CSV)</Download>}
+      >
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <Stat label="Pedidos de troca" value={rs.requests} />
+          <Stat
+            label="Taxa de devolução"
+            value={returnRate === null ? "—" : `${(returnRate * 100).toFixed(1).replace(".", ",")}%`}
+          />
+          <Stat
+            label="Aprovados"
+            value={rs.approvalRate === null ? "—" : `${Math.round(rs.approvalRate * 100)}%`}
+          />
+          <Stat label="Valor devolvido" value={formatBRL(rs.refunded)} />
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Pela data do pedido de troca. Taxa = peças pedidas de volta ÷ peças vendidas no período.
+          Tempo médio até a resposta:{" "}
+          {rs.avgAnswerHours === null
+            ? "—"
+            : `${rs.avgAnswerHours.toString().replace(".", ",")} h`}
+          {" "}· trocas concluídas: {rs.exchanges} · negados: {rs.denied}.
+        </p>
+
+        {rs.requests === 0 ? (
+          <Empty>Nenhum pedido de troca no período.</Empty>
+        ) : (
+          <div className="mt-6 grid gap-6 md:grid-cols-3">
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Por motivo
+              </h3>
+              <ul className="mt-3 divide-y divide-border border-y border-border text-sm">
+                {RETURN_REASONS.map((r) => (
+                  <li key={r} className="flex items-baseline gap-3 py-2.5">
+                    <span className="flex-1">{REASON_LABEL[r]}</span>
+                    <span className="font-medium">{rs.byReason[r]}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Por status
+              </h3>
+              <ul className="mt-3 divide-y divide-border border-y border-border text-sm">
+                {(Object.keys(rs.byStatus) as (keyof typeof rs.byStatus)[])
+                  .filter((s) => rs.byStatus[s] > 0)
+                  .map((s) => (
+                    <li key={s} className="flex items-baseline gap-3 py-2.5">
+                      <span className="flex-1">{RETURN_STATUS_LABEL[s]}</span>
+                      <span className="font-medium">{rs.byStatus[s]}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                Peças mais devolvidas
+              </h3>
+              <ol className="mt-3 divide-y divide-border border-y border-border text-sm">
+                {returns.products.slice(0, 5).map((p) => (
+                  <li key={p.name} className="flex items-baseline gap-3 py-2.5">
+                    <span className="flex-1 truncate">{p.name}</span>
+                    <span className="text-muted-foreground">{p.units} un.</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        )}
+        <p className="mt-4 text-xs">
+          <Link href="/admin/trocas" className="underline underline-offset-4 hover:text-foreground">
+            Ver pedidos de troca →
+          </Link>
+        </p>
       </Section>
 
       {/* Estoque */}
