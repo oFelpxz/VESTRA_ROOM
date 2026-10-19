@@ -37,7 +37,7 @@ export default async function CheckoutSucessoPage({
         VESTRA ROOM
       </p>
       <h1 className="font-heading mt-2 text-4xl font-bold uppercase tracking-tight md:text-5xl">
-        Pedido enviado
+        Pedido recebido
       </h1>
       <p className="mt-3 max-w-lg text-sm text-muted-foreground">
         Recebemos seu pedido <strong className="font-mono text-foreground">#{order.id.slice(-8).toUpperCase()}</strong>{" "}
