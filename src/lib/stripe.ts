@@ -122,7 +122,11 @@ export type StripeCheckoutSession = {
   payment_intent: string | StripePaymentIntent | null;
 };
 
-export type StripeRefund = { id: string; status: string };
+export type StripeRefund = {
+  id: string;
+  status: string;
+  metadata?: Record<string, string> | null;
+};
 
 export type StripeEvent = {
   id: string;
@@ -169,11 +173,13 @@ export function cancelPaymentIntent(id: string) {
  * parcial, ver `computePartialRefund`). A chave de idempotência impede
  * estorno em dobro — num parcial, use uma chave por devolução, senão a
  * segunda devolução do mesmo pedido repete a resposta da primeira.
+ * Prefira `refundOnce`, que também deixa tentar de novo depois de um erro.
  */
 export async function createRefund(
   paymentIntentId: string,
   idempotencyKey: string,
   amountCents?: number,
+  metadata?: Record<string, string>,
 ) {
   const badAmount =
     amountCents !== undefined && (!Number.isInteger(amountCents) || amountCents <= 0);
@@ -183,8 +189,47 @@ export async function createRefund(
   return stripeRequest<StripeRefund>(
     "POST",
     "/refunds",
-    { payment_intent: paymentIntentId, amount: amountCents },
+    { payment_intent: paymentIntentId, amount: amountCents, metadata },
     idempotencyKey,
+  );
+}
+
+/** Estornos já feitos de um pagamento (os 100 mais recentes bastam para a loja). */
+export function listRefunds(paymentIntentId: string) {
+  return stripeRequest<{ data: StripeRefund[] }>("GET", "/refunds", {
+    payment_intent: paymentIntentId,
+    limit: 100,
+  });
+}
+
+const REFUND_GONE = ["failed", "canceled"];
+
+/**
+ * Estorna uma vez só por `ref` (ex.: `refund-<pagamento>` ou `return-<troca>`).
+ *
+ * Com uma chave de idempotência fixa, o Stripe guarda a resposta por 24 h —
+ * inclusive a de erro —, e o Admin não conseguia tentar de novo depois de uma
+ * falha. Agora a loja procura antes um estorno com essa `ref` que deu certo
+ * (ou está andando) e devolve ele; se não houver, pede um novo com a chave
+ * `ref` + minuto atual: o clique duplo cai no mesmo minuto, e a nova tentativa
+ * depois de um erro passa.
+ */
+export async function refundOnce(
+  paymentIntentId: string,
+  ref: string,
+  amountCents?: number,
+  now = Date.now(),
+) {
+  const { data } = await listRefunds(paymentIntentId);
+  const existing = data.find(
+    (r) => r.metadata?.vestra_ref === ref && !REFUND_GONE.includes(r.status),
+  );
+  if (existing) return existing;
+  return createRefund(
+    paymentIntentId,
+    `${ref}-${Math.floor(now / 60_000)}`,
+    amountCents,
+    { vestra_ref: ref },
   );
 }
 

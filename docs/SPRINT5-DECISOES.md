@@ -87,6 +87,46 @@ nos atalhos do painel.
 | `3c5d3c2` | Excluir a conta não apagava os **cartões salvos** do cliente (nome impresso, final e validade) | Os cartões são apagados junto com medidas, endereços e sacola, na mesma transação | Só checagem de tipos e lint: testar exigiria excluir uma conta no banco compartilhado |
 | `7549a14` | O caso "produto em promoção" do filtro de preço (`5f4d2c0`) não tinha sido testado | A regra da faixa foi separada em `price-filter.ts` e ganhou teste. `?preco=constructor` e `?preco=__proto__` passam a ser ignorados | 5 testes automáticos: peça de R$ 400 em promoção por R$ 180 aparece em "Até R$ 200" e não em "R$ 350+". O catálogo abriu normal com e sem filtro |
 
+### Correções de pagamento, checkout e endereço (19/10, Supabase fora do ar)
+
+Feitas enquanto o banco estava pausado: conferidas com checagem de tipos,
+lint e testes automáticos (214 passando). **Falta o teste no navegador**
+quando o Supabase voltar (roteiro abaixo da tabela).
+
+| Problema | Correção |
+|---|---|
+| **Corrida de estoque** (era o C6 do `STATUS-FASE2.md`): o estoque era conferido fora da transação e baixado "às cegas"; dois clientes comprando a última peça ao mesmo tempo deixavam o estoque negativo | A baixa só acontece se ainda houver estoque (`updateMany` com `stockQuantity >= quantidade`). O segundo cliente recebe "Uma das peças da sua sacola acabou de esgotar…" e nada é gravado |
+| Peça **desativada** (ou em rascunho) que já estava na sacola ainda podia ser comprada; e dava para colocar na sacola uma variante ativa de produto desativado | Checkout e "adicionar à sacola" exigem variante **e** produto ativos; no checkout ela aparece na lista de indisponíveis com 0 |
+| Quantidade quebrada (`1.5`) vinda do formulário da sacola derrubava a gravação | Arredondada para baixo |
+| **PIX simulado podia ficar pendente para sempre**: o checkout disparava uma chamada "solta" para `/api/payments/simulate`, que na Vercel pode morrer junto com a resposta ou ir para o endereço errado (`NEXT_PUBLIC_BASE_URL`) | O pagamento simulado é aprovado quando alguém olha o pedido (a página de sucesso consulta a cada 2 s, e a página do pedido também) e ele já tem 3 s. `NEXT_PUBLIC_BASE_URL` deixou de ser usado para isso |
+| `POST /api/payments/simulate` **sem login** marcava como pago qualquer pedido simulado (era o C1) | Rota removida; fica só a consulta (GET), que exige ser o dono do pedido |
+| **Estorno não podia ser repetido**: com chave de idempotência fixa, o Stripe guarda até a resposta de erro por 24 h; depois de uma falha, o Admin recebia o mesmo erro ao tentar de novo (no cancelamento e na devolução) | `refundOnce`: procura antes um estorno dessa devolução/pedido que deu certo (pela `metadata.vestra_ref`) e devolve ele; se não houver, pede um novo com a chave do minuto. Clique duplo continua sem estornar em dobro. 4 testes |
+| **Login ignorava o `?next=`**: quem entrava pelo checkout, pelo provador ou pelos favoritos caía no perfil | Volta para a página de antes (também o `callbackUrl` que o NextAuth manda para /perfil e /admin). Só aceita caminho da loja: `//site.com` e `https://…` não viram redirecionamento para fora. 5 testes |
+| Depois de um erro (ex.: CEP com 7 dígitos), os formulários de endereço e o de login **apagavam o que tinha sido digitado** | Endereço: campos controlados, enviados sem o reset do React. Login: o e-mail volta preenchido |
+
+**Novo: preenchimento do endereço pelo CEP.** No checkout e no perfil, o CEP
+veio para o topo do formulário, com máscara `00000-000`. Com os 8 dígitos, a
+loja consulta o ViaCEP (e a BrasilAPI, se ele estiver fora), preenche rua,
+cidade e UF e põe o cursor no fim da rua para o cliente digitar o número. Se
+o cliente já tinha digitado a rua, ela não é apagada. CEP inexistente ou
+serviço fora mostram uma mensagem e o cliente preenche à mão. O bairro
+aparece na mensagem, mas **não é salvo**: o endereço não tem campo de bairro
+(precisaria de migração). A consulta sai do navegador e leva só o CEP; a
+política de privacidade passou a citar os dois serviços. 11 testes.
+
+Roteiro para quando o banco voltar:
+
+1. Endereço novo no checkout: digitar `01310-100` → rua, cidade e UF
+   preenchidas; digitar `99999-999` → "Não achamos esse CEP"; salvar com
+   CEP incompleto → erro e os campos continuam preenchidos.
+2. Editar um endereço no perfil: os dados antigos aparecem; trocar o CEP.
+3. PIX: o pedido vira Pago em ~3 s na página de sucesso. Fechar a aba logo
+   depois de finalizar e abrir o pedido no perfil: ele aparece Pago.
+4. Sair, abrir `/checkout`, entrar: volta para o checkout.
+5. Só se o grupo topar mexer num produto de teste: desativar uma peça que
+   está na sacola de um cliente de teste → o checkout mostra ela como
+   indisponível (depois, reativar).
+
 ## Preparação para os próximos itens
 
 Feito antes das decisões do grupo, sem mexer no banco e sem mudar nada que
@@ -290,6 +330,7 @@ dois acessa financeiro, clientes ou configurações").
 3. **Com quem compartilhamos, só o necessário:**
    - Stripe (pagamento);
    - Melhor Envio e transportadoras (entrega);
+   - ViaCEP e BrasilAPI (só o CEP digitado, para preencher o endereço);
    - Supabase (armazenamento);
    - Vercel (hospedagem do site).
 4. **Medidas do corpo:** só você vê. A equipe da loja não tem acesso a elas,

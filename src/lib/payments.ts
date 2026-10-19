@@ -3,7 +3,7 @@ import { getStoreSettings } from "@/lib/store-settings-db";
 import {
   cancelPaymentIntent,
   createCheckoutSession,
-  createRefund,
+  refundOnce,
   expireCheckoutSession,
   retrieveCheckoutSession,
   stripeConfigured,
@@ -195,22 +195,72 @@ export async function syncCheckoutSession(session: StripeCheckoutSession) {
 const lastSync = new Map<string, number>();
 const SYNC_EVERY_MS = 10_000;
 
+/** Tempo que o gateway simulado "leva" para aprovar (PIX, ou a loja sem Stripe). */
+export const SIMULATED_APPROVAL_MS = 3_000;
+
 /**
- * Reconciliação: confere no Stripe um pagamento que ainda consta como
- * pendente. `force` ignora o intervalo mínimo (volta do cliente do Stripe).
+ * Gateway simulado: aprova o pagamento quando ele já tem mais de 3 s.
+ *
+ * Antes, o checkout disparava um POST "solto" para `/api/payments/simulate`
+ * que esperava 3 s; na Vercel essa chamada pode morrer junto com a resposta
+ * (ou ir para o endereço errado) e o pedido ficava pendente para sempre. Agora
+ * a aprovação acontece quando alguém olha o pedido (a página de sucesso
+ * consulta a cada 2 s), e só depois que o pedido existe há 3 s.
+ */
+async function confirmSimulatedPayment(payment: {
+  id: string;
+  orderId: string;
+  createdAt: Date;
+  order: { userId: string };
+}) {
+  const now = new Date();
+  if (now.getTime() - payment.createdAt.getTime() < SIMULATED_APPROVAL_MS) return;
+  const orderId = payment.orderId;
+  // Só confirma se o pedido ainda estiver aguardando pagamento: se o cliente
+  // cancelou antes, o cancelamento vale e nada muda aqui.
+  await prisma.$transaction(async (tx) => {
+    const result = await markPaidInTx(tx, {
+      orderId,
+      paymentId: payment.id,
+      externalPaymentId: `SIM-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
+      method: null,
+      now,
+      allowLate: false,
+    });
+    if (result !== "paid") return;
+    await notifyInTx(tx, {
+      userId: payment.order.userId,
+      title: `Pagamento confirmado · Pedido #${shortOrderCode(orderId)}`,
+      body: "Pagamento simulado aprovado. Avisamos quando o pedido for enviado.",
+      href: orderHref(orderId),
+    });
+  });
+}
+
+/**
+ * Reconciliação de um pagamento que ainda consta como pendente: o simulado
+ * é aprovado depois de 3 s; o do Stripe é conferido no próprio Stripe.
+ * `force` ignora o intervalo mínimo (volta do cliente do Stripe).
  */
 export async function syncOrderPayment(orderId: string, opts: { force?: boolean } = {}) {
-  if (!stripeConfigured()) return;
   const payment = await prisma.payment.findUnique({
     where: { orderId },
-    select: { provider: true, status: true, checkoutSessionId: true },
+    select: {
+      id: true,
+      orderId: true,
+      createdAt: true,
+      provider: true,
+      status: true,
+      checkoutSessionId: true,
+      order: { select: { userId: true } },
+    },
   });
-  if (
-    !payment ||
-    payment.provider !== "STRIPE" ||
-    payment.status !== "PENDING" ||
-    !payment.checkoutSessionId
-  ) {
+  if (!payment || payment.status !== "PENDING") return;
+  if (payment.provider === "SIMULATED") {
+    await confirmSimulatedPayment(payment);
+    return;
+  }
+  if (payment.provider !== "STRIPE" || !payment.checkoutSessionId || !stripeConfigured()) {
     return;
   }
 
@@ -294,9 +344,9 @@ export async function refundOrderPayment(
       return { ok: false, error: "Pagamento sem identificador do Stripe." };
     }
     try {
-      // A chave de idempotência faz um segundo pedido (clique duplo, nova
-      // tentativa) devolver o mesmo estorno em vez de estornar de novo.
-      const refund = await createRefund(payment.externalPaymentId, `refund-${payment.id}`);
+      // Um estorno por pagamento: o clique duplo devolve o mesmo estorno, e
+      // depois de um erro dá para tentar de novo (ver `refundOnce`).
+      const refund = await refundOnce(payment.externalPaymentId, `refund-${payment.id}`);
       if (refund.status === "failed" || refund.status === "canceled") {
         return { ok: false, error: "O Stripe recusou o estorno." };
       }

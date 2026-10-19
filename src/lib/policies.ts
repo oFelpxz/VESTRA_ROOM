@@ -58,6 +58,7 @@ Não vendemos seus dados e não usamos suas medidas para publicidade.
 Só o necessário para a loja funcionar:
 - Stripe (pagamento).
 - Melhor Envio e transportadoras (entrega).
+- ViaCEP e BrasilAPI (só o CEP digitado, para preencher o endereço).
 - Supabase (armazenamento).
 - Vercel (hospedagem do site).
 

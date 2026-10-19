@@ -21,7 +21,7 @@ import {
   type ReturnKind,
   type ReturnStatus,
 } from "@/lib/returns";
-import { createRefund, StripeError } from "@/lib/stripe";
+import { refundOnce, StripeError } from "@/lib/stripe";
 import { deleteModelObject, storageConfigured, uploadModelObject } from "@/lib/storage";
 import { getStoreSettings } from "@/lib/store-settings-db";
 
@@ -510,9 +510,10 @@ async function completeRefund(
       return { error: "Pagamento sem identificador do Stripe." };
     }
     try {
-      // Uma chave por devolução: a segunda devolução do mesmo pedido não
-      // repete a primeira, e o clique duplo não estorna duas vezes.
-      const r = await createRefund(payment.externalPaymentId, `return-${req.id}`, refund.cents);
+      // Um estorno por devolução: a segunda devolução do mesmo pedido não
+      // repete a primeira, o clique duplo não estorna duas vezes e, depois de
+      // um erro, dá para tentar de novo (ver `refundOnce`).
+      const r = await refundOnce(payment.externalPaymentId, `return-${req.id}`, refund.cents);
       if (r.status === "failed" || r.status === "canceled") {
         return { error: "O Stripe recusou o estorno." };
       }

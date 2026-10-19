@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import {
   createRefund,
+  refundOnce,
   encodeStripeForm,
   verifyStripeSignature,
 } from "./stripe";
@@ -103,5 +104,64 @@ describe("createRefund", () => {
       await assert.rejects(createRefund("pi_1", "k", cents));
     }
     assert.equal(sent.length, 0);
+  });
+});
+
+describe("refundOnce", () => {
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.STRIPE_SECRET_KEY;
+  let calls: { url: string; method: string; body: string; key?: string }[] = [];
+  let existing: { id: string; status: string; metadata?: Record<string, string> }[] = [];
+
+  beforeEach(() => {
+    calls = [];
+    existing = [];
+    process.env.STRIPE_SECRET_KEY = "sk_test_teste";
+    globalThis.fetch = (async (url: string, init: RequestInit) => {
+      const headers = init.headers as Record<string, string>;
+      calls.push({
+        url,
+        method: String(init.method),
+        body: String(init.body),
+        key: headers["Idempotency-Key"],
+      });
+      if (init.method === "GET") return new Response(JSON.stringify({ data: existing }));
+      return new Response(JSON.stringify({ id: "re_novo", status: "succeeded" }));
+    }) as typeof fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = realKey;
+  });
+
+  it("já estornado com essa ref: devolve o mesmo, sem estornar de novo", async () => {
+    existing = [{ id: "re_velho", status: "succeeded", metadata: { vestra_ref: "return-a" } }];
+    const r = await refundOnce("pi_1", "return-a", 9000);
+    assert.equal(r.id, "re_velho");
+    assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+  });
+
+  it("estorno anterior falhou: pede um novo, com a ref e a chave do minuto", async () => {
+    existing = [{ id: "re_falhou", status: "failed", metadata: { vestra_ref: "return-a" } }];
+    const r = await refundOnce("pi_1", "return-a", 9000, 120_000);
+    assert.equal(r.id, "re_novo");
+    const post = calls.find((c) => c.method === "POST")!;
+    assert.equal(post.key, "return-a-2");
+    assert.equal(
+      decodeURIComponent(post.body),
+      "payment_intent=pi_1&amount=9000&metadata[vestra_ref]=return-a",
+    );
+  });
+
+  it("estorno de outra devolução não conta", async () => {
+    existing = [{ id: "re_b", status: "succeeded", metadata: { vestra_ref: "return-b" } }];
+    const r = await refundOnce("pi_1", "return-a", 9000);
+    assert.equal(r.id, "re_novo");
+  });
+
+  it("procura só os estornos desse pagamento", async () => {
+    await refundOnce("pi_1", "refund-p");
+    assert.ok(calls[0].url.endsWith("/refunds?payment_intent=pi_1&limit=100"));
   });
 });
