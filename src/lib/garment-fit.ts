@@ -667,19 +667,24 @@ const mid = (min?: number | null, max?: number | null) =>
  * confecção (+2 cm e +1,2 cm por tamanho). Sem tabela (ou sem M), usa uma
  * progressão padrão.
  */
-export function sizeGrade(size: string | null, chart: SizeRow[]): Grade {
-  if (!size) return MOLDE_GRADE;
-  const row = chart.find((r) => r.size === size);
-  const ref = chart.find((r) => r.size === MOLDE_SIZE);
-
-  // quantos tamanhos acima (+) ou abaixo (-) do M: pela tabela, em ordem de
-  // peito, ou pela ordem padrão
+/**
+ * Quantos tamanhos acima (+) ou abaixo (-) do M: pela tabela, em ordem de
+ * peito, ou pela ordem padrão.
+ */
+export function sizeSteps(size: string, chart: SizeRow[]): number {
   const byChest = [...chart].sort(
     (a, b) => (mid(a.chestMinCm, a.chestMaxCm) ?? 0) - (mid(b.chestMinCm, b.chestMaxCm) ?? 0),
   );
   let order = byChest.map((r) => r.size);
   if (!order.includes(size) || !order.includes(MOLDE_SIZE)) order = DEFAULT_ORDER;
-  const steps = order.includes(size) ? order.indexOf(size) - order.indexOf(MOLDE_SIZE) : 0;
+  return order.includes(size) ? order.indexOf(size) - order.indexOf(MOLDE_SIZE) : 0;
+}
+
+export function sizeGrade(size: string | null, chart: SizeRow[]): Grade {
+  if (!size) return MOLDE_GRADE;
+  const row = chart.find((r) => r.size === size);
+  const ref = chart.find((r) => r.size === MOLDE_SIZE);
+  const steps = sizeSteps(size, chart);
 
   const ratio = (a: number | null, b: number | null) => (a && b ? a / b : null);
   const chest =

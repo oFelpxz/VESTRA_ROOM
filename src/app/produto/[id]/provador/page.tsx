@@ -3,20 +3,28 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getProductDetail } from "@/lib/products";
+import { getStoreSettings } from "@/lib/store-settings-db";
+import { garmentKind } from "@/lib/fit-regions";
+import { companionKind } from "@/lib/looks";
+import { getLookCompanions, getOpenLook } from "@/lib/look-data";
 import { TryOnExperience } from "@/components/viewer-3d/tryon-experience";
 
 export const metadata = { title: "Provador virtual | VESTRA FIT" };
 
 export default async function ProvadorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ look?: string | string[] }>;
 }) {
   const { id } = await params;
+  const { look } = await searchParams;
   const session = await auth();
 
   if (!session?.user?.id) {
-    redirect(`/login?next=/produto/${id}/provador`);
+    const back = `/produto/${id}/provador${typeof look === "string" ? `?look=${look}` : ""}`;
+    redirect(`/login?next=${encodeURIComponent(back)}`);
   }
 
   const userId = session.user.id;
@@ -52,6 +60,13 @@ export default async function ProvadorPage({
   }
 
   const sizeRows = product.sizeChart?.rows ?? [];
+  const kind = garmentKind(product.categorySlug);
+  const companion = companionKind(kind);
+  const [settings, companions, openLook] = await Promise.all([
+    getStoreSettings(),
+    companion ? getLookCompanions(companion) : [],
+    typeof look === "string" ? getOpenLook(look, userId, product.id) : null,
+  ]);
 
   return (
     <TryOnExperience
@@ -73,6 +88,10 @@ export default async function ProvadorPage({
         fitPreference: profile.fitPreference,
       }}
       sizeChart={sizeRows}
+      kind={kind}
+      toleranceCm={settings.fitToleranceCm}
+      companions={companions}
+      openLook={openLook}
     />
   );
 }

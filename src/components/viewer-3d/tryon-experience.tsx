@@ -4,14 +4,20 @@ import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { addToCartAction, type CartActionState } from "@/lib/cart-actions";
 import {
-  calculateFit,
+  overallFit,
+  recommendSize,
+  regionFits,
+  type BodyMeasures,
   type FitPreference,
-} from "@/lib/fit-calculator";
+  type GarmentKind,
+} from "@/lib/fit-regions";
 import { buildAvatarParams, type AvatarBody } from "@/lib/avatar-builder";
 import { colorToHex } from "@/lib/color-names";
 import { MOLDE_SIZE, sizeGrade } from "@/lib/garment-fit";
+import type { LookProduct, OpenLook } from "@/lib/look-data";
 import { TryOnScene } from "./tryon-scene";
-import { FitIndicator } from "./fit-indicator";
+import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
+import { LookBuilder } from "./look-builder";
 
 const initialState: CartActionState = {};
 
@@ -70,6 +76,19 @@ const SIM_FIELDS: { key: SimKey; label: string; min: number; max: number }[] = [
   { key: "legLengthCm", label: "Perna (cm)", min: 62, max: 95 },
 ];
 
+/** Caimento por região de um tamanho e o resumo dele. */
+function sizeFit(
+  size: string | null,
+  body: BodyMeasures,
+  chart: SizeRow[],
+  kind: GarmentKind,
+  toleranceCm: number,
+) {
+  const row = chart.find((r) => r.size === size);
+  const regions = row ? regionFits(body, row, chart, kind, toleranceCm) : [];
+  return { regions, overall: overallFit(regions) };
+}
+
 export function TryOnExperience({
   productName,
   productId: _productId,
@@ -79,6 +98,10 @@ export function TryOnExperience({
   garmentUrl,
   profile,
   sizeChart,
+  kind,
+  toleranceCm,
+  companions,
+  openLook,
 }: {
   productName: string;
   productId: string;
@@ -88,16 +111,31 @@ export function TryOnExperience({
   garmentUrl: string | null;
   profile: UserProfile;
   sizeChart: SizeRow[];
+  /** Tipo de peça, pela categoria (decide as regiões do caimento). */
+  kind: GarmentKind;
+  /** Folga do indicador de caimento (configurações da loja, 25.8). */
+  toleranceCm: number;
+  /** Peças que completam um look (item 15). */
+  companions: LookProduct[];
+  /** Look aberto pelo `?look=`. */
+  openLook: OpenLook | null;
 }) {
+  const lookVariant = variants.find((v) => v.id === openLook?.ownVariantId);
   const [selectedColor, setSelectedColor] = useState<string | null>(
-    colors[0] ?? null,
+    lookVariant?.color ?? colors[0] ?? null,
   );
-  // Começa no tamanho do molde (M), se a peça tiver; senão, no do meio.
-  const [selectedSize, setSelectedSize] = useState<string | null>(
-    sizes.includes(MOLDE_SIZE)
+  // Começa no look aberto, senão no tamanho sugerido, senão no molde (M) ou
+  // no do meio.
+  const [selectedSize, setSelectedSize] = useState<string | null>(() => {
+    if (lookVariant) return lookVariant.size;
+    const rec = recommendSize(profile, sizeChart, sizes, kind, profile.fitPreference, toleranceCm);
+    if (rec) return rec.size;
+    return sizes.includes(MOLDE_SIZE)
       ? MOLDE_SIZE
-      : (sizes[Math.floor(sizes.length / 2)] ?? null),
-  );
+      : (sizes[Math.floor(sizes.length / 2)] ?? null);
+  });
+  // 3D-07: segundo tamanho, lado a lado
+  const [compareSize, setCompareSize] = useState<string | null>(null);
   const [preference, setPreference] = useState<FitPreference>(
     profile.fitPreference,
   );
@@ -135,33 +173,31 @@ export function TryOnExperience({
     [selectedSize, sizeChart],
   );
 
-  // Linha da SizeChart correspondente ao tamanho selecionado
-  const currentSizeRow = useMemo(
-    () => sizeChart.find((r) => r.size === selectedSize),
-    [sizeChart, selectedSize],
+  const compareGrade = useMemo(
+    () => sizeGrade(compareSize, sizeChart),
+    [compareSize, sizeChart],
   );
 
-  // Cálculo do caimento
-  const fitResult = useMemo(() => {
-    if (!currentSizeRow) {
-      return {
-        label: "IDEAL" as const,
-        score: 0,
-        details: [],
-      };
-    }
-    return calculateFit(
-      {
-        chestCm: body.chestCm,
-        waistCm: body.waistCm,
-        hipCm: body.hipCm,
-        armLengthCm: body.armLengthCm,
-        legLengthCm: body.legLengthCm,
-      },
-      currentSizeRow,
-      preference,
-    );
-  }, [body, currentSizeRow, preference]);
+  // 3D-06: caimento por região
+  const fit = useMemo(
+    () => sizeFit(selectedSize, body, sizeChart, kind, toleranceCm),
+    [body, selectedSize, sizeChart, kind, toleranceCm],
+  );
+  const compareFit = useMemo(
+    () => (compareSize ? sizeFit(compareSize, body, sizeChart, kind, toleranceCm) : null),
+    [body, compareSize, sizeChart, kind, toleranceCm],
+  );
+
+  // 3D-08: tamanho sugerido (estimativa), pela preferência desta tentativa
+  const recommendation = useMemo(
+    () => recommendSize(body, sizeChart, sizes, kind, preference, toleranceCm),
+    [body, sizeChart, sizes, kind, preference, toleranceCm],
+  );
+
+  // Variante da cor + tamanho escolhidos, mesmo sem estoque (para o look)
+  const lookOwnVariant = variants.find(
+    (v) => v.color === selectedColor && v.size === selectedSize,
+  );
 
   const selectedVariant = variants.find(
     (v) =>
@@ -186,13 +222,30 @@ export function TryOnExperience({
   return (
     <div className="grid h-[calc(100vh-4rem)] grid-cols-1 lg:grid-cols-[1fr_360px]">
       {/* Cena 3D */}
-      <div className="relative bg-muted">
-        <TryOnScene
-          avatarParams={avatarParams}
-          garmentUrl={garmentUrl}
-          selectedColor={selectedColor ? colorToHex(selectedColor) : undefined}
-          garmentGrade={garmentGrade}
-        />
+      <div
+        className={`relative grid bg-muted ${compareSize ? "grid-cols-2 divide-x divide-border" : ""}`}
+      >
+        {[
+          { size: selectedSize, grade: garmentGrade, overall: fit.overall },
+          ...(compareSize && compareFit
+            ? [{ size: compareSize, grade: compareGrade, overall: compareFit.overall }]
+            : []),
+        ].map((scene, i) => (
+          <div key={i} className="relative min-h-0">
+            <TryOnScene
+              avatarParams={avatarParams}
+              garmentUrl={garmentUrl}
+              selectedColor={selectedColor ? colorToHex(selectedColor) : undefined}
+              garmentGrade={scene.grade}
+            />
+            {compareSize && (
+              <div className="pointer-events-none absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-2 rounded-sm bg-background/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.15em]">
+                Tam {scene.size}
+                {scene.overall && <FitPill fit={scene.overall} />}
+              </div>
+            )}
+          </div>
+        ))}
 
         <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/60">
           <span className="inline-block size-1.5 rounded-full bg-acid" />
@@ -215,7 +268,27 @@ export function TryOnExperience({
         </div>
 
         {/* Caimento */}
-        <FitIndicator result={fitResult} />
+        <SizeSuggestion
+          recommendation={recommendation}
+          selectedSize={selectedSize}
+          onUse={(s) => {
+            setSelectedSize(s);
+            if (compareSize === s) setCompareSize(null);
+          }}
+        />
+        {compareSize && compareFit && selectedSize ? (
+          <FitCompare
+            a={{ size: selectedSize, regions: fit.regions }}
+            b={{ size: compareSize, regions: compareFit.regions }}
+          />
+        ) : (
+          <FitIndicator
+            size={selectedSize}
+            overall={fit.overall}
+            regions={fit.regions}
+            kind={kind}
+          />
+        )}
 
         {SIMULATE && (
           <details className="rounded-sm border border-dashed border-border p-3 text-xs">
@@ -372,7 +445,10 @@ export function TryOnExperience({
                   <button
                     key={s}
                     type="button"
-                    onClick={() => setSelectedSize(active ? null : s)}
+                    onClick={() => {
+                      setSelectedSize(active ? null : s);
+                      if (compareSize === s) setCompareSize(null);
+                    }}
                     disabled={!enabled}
                     className={`flex h-11 min-w-11 items-center justify-center rounded-sm border px-3 text-sm transition-colors ${
                       active
@@ -385,6 +461,46 @@ export function TryOnExperience({
                 );
               })}
             </div>
+
+            {/* 3D-07: comparar com outro tamanho (provar não depende de estoque) */}
+            {selectedSize && sizes.length > 1 && (
+              <div className="mt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                  Comparar lado a lado com
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {sizes
+                    .filter((s) => s !== selectedSize)
+                    .map((s) => {
+                      const active = compareSize === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setCompareSize(active ? null : s)}
+                          className={`flex h-9 min-w-9 items-center justify-center rounded-sm border px-2.5 text-xs transition-colors ${
+                            active
+                              ? "border-foreground bg-foreground text-background"
+                              : "border-dashed border-foreground/30 hover:border-foreground"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  {compareSize && (
+                    <button
+                      type="button"
+                      onClick={() => setCompareSize(null)}
+                      className="px-2 text-[10px] font-semibold uppercase tracking-[0.15em] underline underline-offset-4"
+                    >
+                      Sair da comparação
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -423,6 +539,24 @@ export function TryOnExperience({
                 : "Selecione cor e tamanho"}
           </button>
         </form>
+
+        {/* Item 15: look com uma peça de cima e uma de baixo */}
+        {(kind === "top" || kind === "bottom") && (
+          <LookBuilder
+            role={kind}
+            ownVariantId={lookOwnVariant?.id ?? null}
+            ownLabel={
+              selectedColor && selectedSize
+                ? `${productName} (${selectedColor}, ${selectedSize})`
+                : productName
+            }
+            companions={companions}
+            body={body}
+            preference={preference}
+            toleranceCm={toleranceCm}
+            openLook={openLook}
+          />
+        )}
       </aside>
     </div>
   );

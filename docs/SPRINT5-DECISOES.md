@@ -9,14 +9,32 @@
 > (PR #11). O PR da Sprint 5 deve usar essa branch como base enquanto o #11
 > não for mergeado.
 >
-> Este documento tem duas partes: o que já foi feito, e as **decisões que o
-> grupo precisa tomar** antes dos itens 21, 22 e 25 (com rascunhos das
-> políticas de troca e de privacidade, para o grupo revisar).
+> **Branch dos itens:** `feat/sprint5-itens`, criada em cima de
+> `feat/sprint5`. O PR dela usa `feat/sprint5` como base.
+>
+> Este documento tem três partes: o que já foi feito, as **decisões** dos
+> itens 21, 22 e 25 (o grupo aprovou **todas as sugestões** em 19/10) e os
+> rascunhos das políticas de troca e de privacidade.
 
 ## Itens da sprint
 
 | Item | Descrição | Situação |
 |---|---|---|
+| 15 | Salvar looks (combinação de peças no provador) | ✅ Uma peça de cima + uma de baixo, com nome. Abrir de novo no provador e pôr o look inteiro na sacola. Ver "Provador e looks" |
+| 21 | Cliente pede troca ou devolução | ✅ Feito com as sugestões 21.1 a 21.9 |
+| 22 | Admin aprova ou nega a troca | ✅ Feito com as sugestões 22.1 a 22.8, com reembolso parcial |
+| 24 | Relatórios por período com CSV | ✅ Vendas e estoque (`6702237`) e trocas e devoluções |
+| 25 | Configurações da loja | ✅ Feito com as sugestões 25.1 a 25.8 (`/admin/configuracoes`, `/trocas`, `/privacidade`) |
+| 3D-06 | Vestir a peça no avatar com indicador de caimento por região | ✅ Seis regiões e cinco classes. Ver "Provador e looks" |
+| 3D-07 | Trocar tamanho e cor; comparar 2 tamanhos lado a lado | ✅ |
+| 3D-08 | Recomendar tamanho (estimativa) e validar o provador de ponta a ponta | ✅ Recomendação feita. ⏳ A validação no navegador depende de o banco voltar e de a migration ser aplicada |
+
+**Migration nova:** `20261019120000_sprint5_trocas_configuracoes_looks`
+(trocas, fotos das trocas, looks, configurações da loja, data da entrega do
+pedido e valor já devolvido de cada pagamento). Aplicar com
+`npx prisma migrate deploy` (nunca `migrate dev` no banco compartilhado).
+
+---|---|---|
 | 15 | Salvar looks (combinação de peças no provador) | ⏳ Grupo decidiu: **uma peça de cima + uma de baixo, sem camadas**. Depende de a Equipe 3D entregar uma parte de baixo com molde |
 | 21 | Cliente pede troca ou devolução | ⏳ Esperando as decisões abaixo |
 | 22 | Admin aprova ou nega a troca | ⏳ Esperando as decisões abaixo |
@@ -81,9 +99,74 @@ o cliente vê.
 
 ---
 
-## Decisões que o grupo precisa tomar
+## Provador e looks (3D-06, 3D-07, 3D-08 e item 15)
 
-Cada linha tem uma **sugestão**. Basta o grupo aprovar ou trocar.
+### Indicador de caimento por região (3D-06)
+
+As regras ficam em `src/lib/fit-regions.ts` (sem banco, com 15 testes).
+Cada região compara a medida do cliente com a faixa da tabela de medidas do
+tamanho escolhido. A tolerância é a do item 25.8 (2 cm, editável no painel).
+
+| Classe | Quando (diferença = medida do cliente − meio da faixa) |
+|---|---|
+| Muito justo | Passa da metade da faixa + tolerância |
+| Justo | Passa da tolerância |
+| Regular | Dentro da tolerância, para mais ou para menos |
+| Solto | Abaixo de − tolerância |
+| Oversized | Abaixo de −(metade da faixa + tolerância) |
+
+| Região | De onde vem a faixa |
+|---|---|
+| Tórax, cintura, quadril | Tabela de medidas |
+| Manga | Comprimento do braço na tabela |
+| Ombros | **Estimado:** 46% da faixa do tórax (a tabela não tem ombro) |
+| Barra (peça de cima) | **Estimado pela altura:** 170 cm no M, 5 cm a mais ou a menos por tamanho, ±4 cm |
+| Barra (peça de baixo) | Comprimento da perna na tabela |
+
+Que regiões aparecem: peça de cima, todas as seis; peça de baixo, cintura,
+quadril e barra; vestido, ombros, tórax, cintura e quadril. Nas regiões de
+comprimento (manga e barra) a tela também diz se fica curta ou comprida.
+
+A classe é **física** (quanto a peça aperta ou sobra) e não muda com a
+preferência do cliente. A preferência só muda a **recomendação**.
+
+### Trocar tamanho e cor, comparar (3D-07)
+
+No provador, depois dos botões de tamanho, "Comparar lado a lado com" abre
+dois avatares, cada um com um tamanho, e uma tabela região por região.
+
+### Tamanho sugerido (3D-08)
+
+O provador já abre no tamanho sugerido. A sugestão procura o tamanho mais
+perto do alvo de cada preferência: **ajustado** mira um pouco justo,
+**regular** mira o meio da faixa e **oversized** mira o solto. Comprimentos
+pesam metade. Um tamanho que fica muito justo em alguma região só é
+sugerido se nenhum servir, e aí vai o que menos aperta, com aviso. A tela
+sempre diz que é uma **estimativa**.
+
+**Correção:** o cálculo antigo (`fit-calculator.ts`) aplicava a preferência
+ao contrário (quem pedia ajustado recebia folga). Foi trocado pelo novo e
+apagado.
+
+### Looks (item 15)
+
+- No provador de uma peça de cima (ou de baixo), o bloco "Montar look"
+  escolhe a outra peça, a cor e o tamanho (já vem o sugerido), e dá um nome.
+  Não existe molde 3D de peça de baixo, então ela aparece como cartão, com o
+  caimento estimado pelas medidas.
+- Em "Minha conta → Looks" (`/perfil/looks`): abrir no provador, pôr o look
+  na sacola e excluir.
+- Pôr na sacola é **tudo ou nada**: se uma peça está fora de venda ou sem
+  estoque, nenhuma entra e a mensagem diz qual. Salvar um look com peça sem
+  estoque é permitido.
+- Até 50 looks por cliente, nome com até 60 caracteres.
+- Se uma peça sai da loja, o look continua e mostra "Peça saiu da loja".
+
+---
+
+## Decisões dos itens 21, 22 e 25
+
+> **Aprovadas pelo grupo em 19/10:** todas as sugestões abaixo.
 
 ### Item 21 — Cliente pede troca ou devolução
 
@@ -124,9 +207,9 @@ os próximos itens"). Para usar, falta guardar quanto já foi devolvido de
 cada pagamento (campo novo, migration). Também é preciso decidir se o frete
 da ida é devolvido; a sugestão é devolver só no arrependimento e no defeito.
 
-### Item 24 — falta o relatório de trocas
+### Item 24 — relatório de trocas (feito)
 
-Depois do item 21: trocas e devoluções por período, com motivo, situação,
+Trocas e devoluções por período, com motivo, situação,
 tempo até a resposta e valor reembolsado. Mesmo formato de CSV dos outros.
 
 ### Item 25 — Configurações da loja

@@ -55,6 +55,7 @@ export type ProductDetail = {
   brand: string | null;
   description: string | null;
   category: string;
+  categorySlug: string;
   price: string;
   priceNumber: number;
   promotionalPrice: string | null;
@@ -213,6 +214,7 @@ export async function getProductDetail(
     brand: product.brand,
     description: product.description,
     category: product.category.name,
+    categorySlug: product.category.slug,
     price: formatBRL(Number(product.basePrice)),
     priceNumber: Number(product.basePrice),
     promotionalPrice: product.promotionalPrice
