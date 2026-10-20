@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useCallback, useMemo, useRef, useState } from "react";
 import { addToCartAction, type CartActionState } from "@/lib/cart-actions";
 import {
   overallFit,
@@ -13,11 +13,12 @@ import {
 } from "@/lib/fit-regions";
 import { buildAvatarParams, type AvatarBody } from "@/lib/avatar-builder";
 import { colorToHex } from "@/lib/color-names";
-import { MOLDE_SIZE, sizeGrade } from "@/lib/garment-fit";
+import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
+import { bottomEase } from "@/lib/bottom-fit";
 import type { LookProduct, OpenLook } from "@/lib/look-data";
-import { TryOnScene } from "./tryon-scene";
+import { TryOnScene, type CameraView, type ScenePiece } from "./tryon-scene";
 import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
-import { LookBuilder } from "./look-builder";
+import { LookBuilder, type LookSelection } from "./look-builder";
 
 const initialState: CartActionState = {};
 
@@ -178,6 +179,49 @@ export function TryOnExperience({
     [compareSize, sizeChart],
   );
 
+  // Item 15: a peça escolhida em "Montar look" veste junto no avatar.
+  const [companionSel, setCompanionSel] = useState<LookSelection | null>(null);
+  const onCompanionChange = useCallback((sel: LookSelection | null) => setCompanionSel(sel), []);
+  const ownRole = kind === "bottom" ? "bottom" : "top";
+
+  // Peça do provador num tamanho: a de cima pela graduação, a de baixo pela folga.
+  const ownPiece = useCallback(
+    (size: string | null, grade: Grade): ScenePiece | null =>
+      garmentUrl
+        ? {
+            url: garmentUrl,
+            color: selectedColor ? colorToHex(selectedColor) : undefined,
+            grade,
+            ease: bottomEase(size, sizeChart, body.hipCm),
+          }
+        : null,
+    [garmentUrl, selectedColor, sizeChart, body.hipCm],
+  );
+  const companionPiece = useMemo((): ScenePiece | null => {
+    const p = companionSel?.product;
+    if (!companionSel || !p?.modelUrl) return null;
+    return {
+      url: p.modelUrl,
+      color: companionSel.color ? colorToHex(companionSel.color) : undefined,
+      grade: sizeGrade(companionSel.size, p.sizeChart),
+      ease: bottomEase(companionSel.size, p.sizeChart, body.hipCm),
+    };
+  }, [companionSel, body.hipCm]);
+
+  // Vista da câmera, giro automático e foto do look
+  const [view, setView] = useState<{ name: CameraView; n: number } | null>(null);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const sceneRef = useRef<HTMLDivElement>(null);
+  function downloadPhoto() {
+    const canvas = sceneRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    const name = [productName, companionSel?.product.name].filter(Boolean).join(" + ");
+    a.download = `VESTRA look - ${name}.png`;
+    a.click();
+  }
+
   // 3D-06: caimento por região
   const fit = useMemo(
     () => sizeFit(selectedSize, body, sizeChart, kind, toleranceCm),
@@ -220,23 +264,28 @@ export function TryOnExperience({
         );
 
   return (
-    <div className="grid h-[calc(100vh-4rem)] grid-cols-1 lg:grid-cols-[1fr_360px]">
+    <div className="grid grid-cols-1 lg:h-[calc(100vh-4rem)] lg:grid-cols-[1fr_360px]">
       {/* Cena 3D */}
       <div
-        className={`relative grid bg-muted ${compareSize ? "grid-cols-2 divide-x divide-border" : ""}`}
+        ref={sceneRef}
+        className={`relative grid h-[65vh] bg-muted lg:h-auto ${compareSize ? "grid-cols-2 divide-x divide-border" : ""}`}
       >
         {[
           { size: selectedSize, grade: garmentGrade, overall: fit.overall },
           ...(compareSize && compareFit
             ? [{ size: compareSize, grade: compareGrade, overall: compareFit.overall }]
             : []),
-        ].map((scene, i) => (
+        ].map((scene, i) => {
+          const own = ownPiece(scene.size, scene.grade);
+          return (
           <div key={i} className="relative min-h-0">
             <TryOnScene
               avatarParams={avatarParams}
-              garmentUrl={garmentUrl}
-              selectedColor={selectedColor ? colorToHex(selectedColor) : undefined}
-              garmentGrade={scene.grade}
+              top={ownRole === "top" ? own : companionPiece}
+              bottom={ownRole === "bottom" ? own : companionPiece}
+              primary={ownRole}
+              view={view}
+              autoRotate={autoRotate}
             />
             {compareSize && (
               <div className="pointer-events-none absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-2 rounded-sm bg-background/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.15em]">
@@ -245,19 +294,62 @@ export function TryOnExperience({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
+
+        {/* Vistas, giro automático e foto */}
+        <div className="absolute bottom-4 left-4 flex flex-wrap items-center gap-1.5">
+          {(
+            [
+              ["front", "Frente"],
+              ["side", "Lado"],
+              ["back", "Costas"],
+            ] as const
+          ).map(([name, label]) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => {
+                setAutoRotate(false);
+                setView((v) => ({ name, n: (v?.n ?? 0) + 1 }));
+              }}
+              className="rounded-sm border border-foreground/20 bg-background/80 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors hover:border-foreground"
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            aria-pressed={autoRotate}
+            onClick={() => setAutoRotate((r) => !r)}
+            className={`rounded-sm border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+              autoRotate
+                ? "border-foreground bg-foreground text-background"
+                : "border-foreground/20 bg-background/80 hover:border-foreground"
+            }`}
+          >
+            Girar sozinho
+          </button>
+          <button
+            type="button"
+            onClick={downloadPhoto}
+            className="rounded-sm border border-foreground/20 bg-background/80 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors hover:border-foreground"
+          >
+            Baixar foto do look
+          </button>
+        </div>
 
         <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/60">
           <span className="inline-block size-1.5 rounded-full bg-acid" />
           VESTRA FIT · Provador
         </div>
-        <div className="pointer-events-none absolute bottom-4 right-4 text-[10px] uppercase tracking-[0.2em] text-foreground/50">
+        <div className="pointer-events-none absolute bottom-4 right-4 hidden text-[10px] uppercase tracking-[0.2em] text-foreground/50 xl:block">
           arraste para girar · scroll para zoom
         </div>
       </div>
 
       {/* Painel lateral */}
-      <aside className="flex flex-col gap-6 overflow-y-auto border-t border-border bg-background px-5 py-6 md:px-6 lg:border-l lg:border-t-0">
+      <aside className="flex flex-col gap-6 border-t border-border bg-background px-5 py-6 md:px-6 lg:overflow-y-auto lg:border-l lg:border-t-0">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">
             Experimentando
@@ -555,6 +647,7 @@ export function TryOnExperience({
             preference={preference}
             toleranceCm={toleranceCm}
             openLook={openLook}
+            onChange={onCompanionChange}
           />
         )}
       </aside>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { saveLookAction, type LookFormState } from "@/lib/look-actions";
 import {
   overallFit,
@@ -24,9 +24,17 @@ const chip = (active: boolean, enabled = true) =>
 
 /**
  * Item 15: monta um look com a peça do provador (de cima ou de baixo) e uma
- * peça que a completa. Sem molde 3D de peça de baixo, a outra peça aparece
- * como cartão, com o caimento estimado pelas medidas.
+ * peça que a completa. A escolha (peça, cor, tamanho) sobe por `onChange`:
+ * se a peça tiver molde 3D, o provador veste as duas no avatar. Sem molde, ela
+ * aparece só como cartão, com o caimento estimado pelas medidas.
  */
+
+/** Peça escolhida para completar o look, como o provador precisa para vestir. */
+export type LookSelection = {
+  product: LookProduct;
+  color: string | null;
+  size: string | null;
+};
 export function LookBuilder({
   role,
   ownVariantId,
@@ -36,6 +44,7 @@ export function LookBuilder({
   preference,
   toleranceCm,
   openLook,
+  onChange,
 }: {
   role: "top" | "bottom";
   /** Variante da peça do provador (cor + tamanho escolhidos), com ou sem estoque. */
@@ -46,6 +55,8 @@ export function LookBuilder({
   preference: FitPreference;
   toleranceCm: number;
   openLook: OpenLook | null;
+  /** Chamado a cada troca de peça, cor ou tamanho (null = nenhuma no avatar). */
+  onChange?: (selection: LookSelection | null) => void;
 }) {
   const [state, formAction, pending] = useActionState(saveLookAction, initialState);
 
@@ -80,6 +91,14 @@ export function LookBuilder({
   );
   const row = product?.sizeChart.find((r) => r.size === effectiveSize);
   const fit = row ? overallFit(regionFits(body, row, product!.sizeChart, companionKind, toleranceCm)) : null;
+
+  // Vestir a outra peça no avatar (quando ela tem molde 3D).
+  const [onAvatar, setOnAvatar] = useState(true);
+  useEffect(() => {
+    onChange?.(
+      product && onAvatar ? { product, color: effectiveColor, size: effectiveSize } : null,
+    );
+  }, [onChange, product, onAvatar, effectiveColor, effectiveSize]);
 
   function pickProduct(id: string) {
     setProductId(id);
@@ -177,6 +196,20 @@ export function LookBuilder({
               );
             })}
           </div>
+          {product.modelUrl ? (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={onAvatar}
+                onChange={(e) => setOnAvatar(e.target.checked)}
+              />
+              Vestir no avatar
+            </label>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Essa peça ainda não tem modelo 3D: aparece só aqui, com o caimento estimado.
+            </p>
+          )}
           {variant && variant.stockQuantity <= 0 && (
             <p className="text-xs text-muted-foreground">
               Sem estoque agora: o look fica salvo, mas essa peça não entra na sacola.

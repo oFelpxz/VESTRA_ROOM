@@ -26,7 +26,7 @@ import { readMorphBody } from "./avatar";
  * roda num Web Worker; enquanto ela roda, continua aparecendo a anterior.
  */
 
-const AVATAR_URL =
+export const AVATAR_URL =
   process.env.NEXT_PUBLIC_AVATAR_MODEL_URL ?? "/models/avatar_base.glb";
 
 useGLTF.preload(AVATAR_URL);
@@ -34,7 +34,7 @@ useGLTF.preload(AVATAR_URL);
 // Raio dos vértices do corpo que acompanham cada articulação.
 const JOINT_RADIUS = 0.05;
 
-type Part = FitPart & {
+export type Part = FitPart & {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
 };
@@ -88,7 +88,7 @@ function readFitOptions(scene: THREE.Object3D): FitOptions {
   return { rib };
 }
 
-function extractGarment(scene: THREE.Object3D): Part[] {
+export function extractGarment(scene: THREE.Object3D): Part[] {
   scene.updateMatrixWorld(true);
   const parts: Part[] = [];
   scene.traverse((o) => {

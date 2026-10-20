@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   useGLTF,
@@ -13,8 +13,9 @@ import type { AvatarParams } from "@/lib/avatar-builder";
 import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
 import { tintMaterial } from "@/lib/garment-color";
 import { AvatarErrorBoundary } from "./avatar";
-import { DressedAvatar } from "./dressed-avatar";
-import { isFittedToMannequin } from "./mannequin-mark";
+import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
+import { BareAvatar, BottomGarment, hemHeight } from "./bottom-garment";
+import { isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
 /**
  * Peça ajustada ao corpo de referência (marca `vestra_fit`) aparece vestida
@@ -142,24 +143,154 @@ function Loader() {
   );
 }
 
+/** Uma peça do look na cena: modelo, cor e tamanho. */
+export type ScenePiece = {
+  url: string;
+  color?: string;
+  /** Peça de cima: graduação do tamanho em relação ao molde (M). */
+  grade?: Grade;
+  /** Peça de baixo: folga do tamanho em relação ao molde (m). */
+  ease?: number;
+};
+
+export type CameraView = "front" | "side" | "back";
+
+/**
+ * Look com peça de baixo: a de cima veste o corpo (DressedAvatar desenha o
+ * corpo junto) e a de baixo acompanha o mesmo corpo, por dentro da de cima.
+ */
+function DressedLook({
+  params,
+  top,
+  bottom,
+}: {
+  params: AvatarParams;
+  top: ScenePiece | null;
+  bottom: ScenePiece;
+}) {
+  const topScene = useGLTF(top?.url ?? bottom.url).scene;
+  const fitted = top != null && isFittedToMannequin(topScene);
+  const tuckY = useMemo(() => (fitted ? hemHeight(topScene) : null), [fitted, topScene]);
+  const bare = <BareAvatar params={params} />;
+
+  return (
+    <>
+      {!top ? (
+        bare
+      ) : fitted ? (
+        <AvatarErrorBoundary fallback={bare}>
+          <DressedAvatar
+            garmentUrl={top.url}
+            params={params}
+            grade={top.grade ?? MOLDE_GRADE}
+            selectedColor={top.color}
+          />
+        </AvatarErrorBoundary>
+      ) : (
+        <>
+          {bare}
+          <Garment url={top.url} params={params} selectedColor={top.color} />
+        </>
+      )}
+      <AvatarErrorBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <BottomGarment
+            url={bottom.url}
+            params={params}
+            ease={bottom.ease ?? 0}
+            tuckY={tuckY}
+            selectedColor={bottom.color}
+          />
+        </Suspense>
+      </AvatarErrorBoundary>
+    </>
+  );
+}
+
+/**
+ * Escolhe como vestir: com peça de baixo moldada, o look inteiro; senão, só a
+ * peça do provador (`primary`), como antes.
+ */
+function Outfit({
+  params,
+  top,
+  bottom,
+  primary,
+}: {
+  params: AvatarParams;
+  top: ScenePiece | null;
+  bottom: ScenePiece | null;
+  primary: "top" | "bottom";
+}) {
+  const bottomScene = useGLTF(bottom?.url ?? top?.url ?? AVATAR_URL).scene;
+  if (bottom && isBottomPiece(bottomScene)) {
+    return <DressedLook params={params} top={top} bottom={bottom} />;
+  }
+  const piece = primary === "bottom" ? bottom : top;
+  if (!piece) return null;
+  return (
+    <TryOnGarment
+      url={piece.url}
+      params={params}
+      grade={piece.grade ?? MOLDE_GRADE}
+      selectedColor={piece.color}
+    />
+  );
+}
+
+const VIEW_ANGLE: Record<CameraView, number> = {
+  front: 0,
+  side: Math.PI / 2,
+  back: Math.PI,
+};
+
+/** Leva a câmera para frente/lado/costas, mantendo a distância e a altura. */
+function CameraRig({ view }: { view: { name: CameraView; n: number } | null }) {
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as unknown as {
+    target: THREE.Vector3;
+    update: () => void;
+  } | null;
+  useEffect(() => {
+    if (!view || !controls) return;
+    const t = controls.target;
+    const offset = camera.position.clone().sub(t);
+    const flat = Math.hypot(offset.x, offset.z);
+    const a = VIEW_ANGLE[view.name];
+    camera.position.set(t.x + Math.sin(a) * flat, camera.position.y, t.z + Math.cos(a) * flat);
+    controls.update();
+  }, [view, camera, controls]);
+  return null;
+}
+
 export function TryOnScene({
   avatarParams,
-  garmentUrl,
-  selectedColor,
-  garmentGrade = MOLDE_GRADE,
+  top,
+  bottom,
+  primary,
+  view = null,
+  autoRotate = false,
 }: {
   avatarParams: AvatarParams;
-  garmentUrl: string | null;
-  selectedColor?: string;
-  /** Graduação do tamanho escolhido em relação ao molde (M). */
-  garmentGrade?: Grade;
+  top: ScenePiece | null;
+  bottom: ScenePiece | null;
+  /** Peça do provador (a outra é a que completa o look). */
+  primary: "top" | "bottom";
+  /** Vista pedida pelos botões (n muda a cada clique). */
+  view?: { name: CameraView; n: number } | null;
+  autoRotate?: boolean;
 }) {
   // Câmera "afasta" se o avatar for mais alto
   const camY = avatarParams.totalHeight * 0.55;
   const camDist = 2.4 + avatarParams.totalHeight * 0.5;
 
   return (
-    <Canvas shadows camera={{ position: [0, camY, camDist], fov: 38 }}>
+    <Canvas
+      shadows
+      camera={{ position: [0, camY, camDist], fov: 38 }}
+      // Mantém a imagem para o botão "Baixar foto do look".
+      gl={{ preserveDrawingBuffer: true }}
+    >
       <color attach="background" args={["#e7e2da"]} />
 
       {/* Iluminação de estúdio */}
@@ -175,13 +306,8 @@ export function TryOnScene({
       <directionalLight position={[-4, 3, -2]} intensity={0.5} />
 
       <Suspense fallback={<Loader />}>
-        {garmentUrl && (
-          <TryOnGarment
-            url={garmentUrl}
-            params={avatarParams}
-            grade={garmentGrade}
-            selectedColor={selectedColor}
-          />
+        {(top || bottom) && (
+          <Outfit params={avatarParams} top={top} bottom={bottom} primary={primary} />
         )}
         <ContactShadows
           position={[0, 0.005, 0]}
@@ -199,7 +325,10 @@ export function TryOnScene({
         maxDistance={6}
         maxPolarAngle={Math.PI / 1.8}
         minPolarAngle={Math.PI / 4}
+        autoRotate={autoRotate}
+        autoRotateSpeed={1.6}
       />
+      <CameraRig view={view} />
     </Canvas>
   );
 }

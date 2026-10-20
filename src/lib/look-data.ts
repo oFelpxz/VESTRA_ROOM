@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { formatBRL } from "@/lib/format";
+import { resolveModelUrl } from "@/lib/storage";
 import { sortSizes } from "@/lib/sizes";
 import { categoriesOfKind, type ChartRow } from "@/lib/fit-regions";
 
@@ -13,6 +14,8 @@ export type LookProduct = {
   sizes: string[];
   variants: { id: string; color: string; size: string; stockQuantity: number }[];
   sizeChart: ChartRow[];
+  /** Molde 3D validado (veste no avatar junto com a peça do provador). */
+  modelUrl: string | null;
 };
 
 /** Peças à venda de um tipo (as de baixo para quem prova uma de cima, e vice-versa). */
@@ -27,12 +30,13 @@ export async function getLookCompanions(kind: "top" | "bottom"): Promise<LookPro
       images: { orderBy: { position: "asc" }, take: 1 },
       variants: { where: { status: "ACTIVE" } },
       sizeChart: { include: { measures: { orderBy: { createdAt: "asc" } } } },
+      model3D: { select: { fileUrl: true, status: true } },
     },
     orderBy: { name: "asc" },
     take: 40,
   });
 
-  return products.map((p) => ({
+  return Promise.all(products.map(async (p) => ({
     id: p.id,
     name: p.name,
     price: formatBRL(Number(p.promotionalPrice ?? p.basePrice)),
@@ -58,7 +62,11 @@ export async function getLookCompanions(kind: "top" | "bottom"): Promise<LookPro
       legLengthMinCm: m.legLengthMinCm,
       legLengthMaxCm: m.legLengthMaxCm,
     })),
-  }));
+    modelUrl:
+      p.has3DModel && p.availableForVirtualTryOn && p.model3D?.status === "VALIDATED"
+        ? await resolveModelUrl(p.model3D.fileUrl)
+        : null,
+  })));
 }
 
 /** Look do cliente aberto no provador (`?look=`), visto do lado de uma peça. */
