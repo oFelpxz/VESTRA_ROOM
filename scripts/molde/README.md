@@ -87,6 +87,26 @@ idênticos (byte a byte) aos do repositório. O manequim sai com os mesmos
 vértices; só as normais variam até 0,03° (invisível) desde que o avatar
 ganhou as keys de gênero, então o do repositório foi mantido.
 
+## 5. Calça e bermuda (Cargo Pant 02, Bermuda Utility) — molde 40
+
+As peças de baixo saem do próprio avatar: `calca.py` corta o corpo entre a
+cintura e a barra, afasta o tecido da pele, deixa as pernas retas e faz o cós
+e os bolsos cargo. Marca a cena com `vestra_peca = "baixo"`; no site a peça
+acompanha a pele do cliente e ganha a folga do tamanho escolhido
+(`src/lib/bottom-fit.ts`).
+
+```bash
+mb calca.py -- avatar_base.glb cargo_pant_02.glb calca
+mb calca.py -- avatar_base.glb bermuda_utility.glb bermuda
+```
+
+Depois de copiar os .glb para `public/models/`, ligar aos produtos e criar a
+tabela de medidas (38–44) no banco:
+
+```bash
+npx tsx scripts/attach-bottom-models.ts
+```
+
 ## Ferramentas de conferência
 
 | Script | Para quê |
