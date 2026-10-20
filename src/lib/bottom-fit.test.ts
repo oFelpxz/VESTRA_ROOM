@@ -77,6 +77,29 @@ describe("fitBottom", () => {
   });
 });
 
+describe("fitBottom na perna", () => {
+  // Uma "perna" do lado direito (x > 0), bem abaixo do entrepernas.
+  const leg = new Float32Array([
+    0.1, 0.4, -0.01,
+    0.1, 0.4, 0.01,
+    0.1, 0.42, 0,
+    0.1, 0.38, 0,
+  ]);
+
+  it("tamanho apertado não aperta a perna (o bolso cargo entraria no tecido)", () => {
+    const cloth = new Float32Array([0.12, 0.4, 0]);
+    const out = fitBottom(bindBottom(cloth, leg), leg, -0.05);
+    close(out[0], 0.12, 1e-5);
+  });
+
+  it("folga a mais: o lado de dentro sobra só 1/4", () => {
+    const outer = fitBottom(bindBottom(new Float32Array([0.12, 0.4, 0]), leg), leg, 0.02);
+    const inner = fitBottom(bindBottom(new Float32Array([0.08, 0.4, 0]), leg), leg, 0.02);
+    close(outer[0], 0.14, 1e-5);
+    close(inner[0], 0.075, 1e-5);
+  });
+});
+
 describe("bindBottom longe da pele", () => {
   it("a barra solta da saia segue as duas pernas, não só a mais perto", () => {
     // Duas "pernas" (um ponto cada) a 10 cm do meio; tecido no meio, à frente.

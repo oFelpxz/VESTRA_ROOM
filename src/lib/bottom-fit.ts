@@ -24,10 +24,16 @@ const BIND_RADIUS = 0.05; // pele que segura cada ponto do tecido (m)
 const BIND_SIGMA = 0.02; // peso cai com a distância (m)
 const MIN_GAP = 0.003; // tecido nunca entra na pele (m)
 const MAX_EASE = 0.04; // folga a mais, no máximo (m)
-// Tamanho apertado: o tecido chega no máximo a 3/4 da distância do molde.
-// No gancho e no vinco dos glúteos o tecido passa por cima de uma reentrância
-// e a pele em volta fica mais perto do que o ponto médio indica.
+// Tamanho apertado: o tecido chega no máximo a 3/4 da distância do molde
+// (no gancho e no vinco dos glúteos o tecido passa por cima de uma reentrância
+// e a pele em volta fica mais perto do que o ponto médio indica). Só aperta
+// do entrepernas para cima: na perna reta o bolso cargo entraria no tecido.
 const TIGHT_KEEP = 0.75;
+const TIGHT_LEG_BLEND = 0.05; // m abaixo do entrepernas até parar de apertar
+// Folga a mais no lado de dentro da perna: só essa fração (senão as duas
+// pernas se cruzam no meio num tamanho bem maior que o corpo).
+const INNER_EASE = 0.25;
+const INNER_START = 0.03; // m acima do entrepernas
 const FAR_SPREAD = 0.04; // longe da pele: pele até essa distância além da mais perto (m)
 // Sem tabela: quadril cresce 4 cm por tamanho (38, 40, 42...).
 const GRADE_HIP_CM = 4;
@@ -54,6 +60,8 @@ export type BottomBinding = {
   gap: Float32Array;
   /** Altura de cada ponto no molde (m). */
   refY: Float32Array;
+  /** Lado de cada ponto no molde (x, m). */
+  refX: Float32Array;
   /** Altura da barra no molde (m). */
   hemY: number;
 };
@@ -79,6 +87,7 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
   const dir = new Float32Array(n * 3);
   const gap = new Float32Array(n);
   const refY = new Float32Array(n);
+  const refX = new Float32Array(n);
   // Pele a menos de `radius` do ponto (procura nas células em volta).
   const gather = (x: number, y: number, z: number, radius: number) => {
     const near: number[] = [];
@@ -112,6 +121,7 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
     const y = cloth[i * 3 + 1];
     const z = cloth[i * 3 + 2];
     refY[i] = y;
+    refX[i] = x;
     start[i] = skin.length;
     let { near, dist } = gather(x, y, z, BIND_RADIUS);
     let s2 = 2 * BIND_SIGMA * BIND_SIGMA;
@@ -162,6 +172,7 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
     dir,
     gap,
     refY,
+    refX,
     hemY: refY.reduce((m, y) => Math.min(m, y), Infinity),
   };
 }
@@ -180,7 +191,7 @@ export function fitBottom(
   tuckY: number | null = null,
   length = 0,
 ): Float32Array {
-  const { start, skin, weights, dir, gap, refY, hemY } = binding;
+  const { start, skin, weights, dir, gap, refY, refX, hemY } = binding;
   const legSpan = Math.max(MOLDE_CROTCH_Y - hemY, 1e-6);
   const n = gap.length;
   const out = new Float32Array(n * 3);
@@ -195,7 +206,12 @@ export function fitBottom(
       sy += pos[j * 3 + 1] * w;
       sz += pos[j * 3 + 2] * w;
     }
-    let g = Math.max(gap[i] + ease, gap[i] * TIGHT_KEEP, MIN_GAP);
+    const leg = Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / TIGHT_LEG_BLEND, 0), 1);
+    const inner =
+      Math.max(-dir[i * 3] * Math.sign(refX[i]), 0) *
+      Math.min(Math.max((MOLDE_CROTCH_Y + INNER_START - refY[i]) / TIGHT_LEG_BLEND, 0), 1);
+    const e = ease < 0 ? ease * (1 - leg) : ease * (1 - (1 - INNER_EASE) * inner);
+    let g = Math.max(gap[i] + e, gap[i] * TIGHT_KEEP, MIN_GAP);
     if (tuckY != null) {
       const t = Math.min(Math.max((refY[i] - tuckY - TUCK_START) / TUCK_BLEND, 0), 1);
       g += (Math.min(g, TUCK_GAP) - g) * t;
