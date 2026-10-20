@@ -20,19 +20,24 @@
 
 | Item | Descrição | Situação |
 |---|---|---|
-| 15 | Salvar looks (combinação de peças no provador) | ✅ Uma peça de cima + uma de baixo, com nome. Abrir de novo no provador e pôr o look inteiro na sacola. Ver "Provador e looks" |
+| 15 | Salvar looks (combinação de peças no provador) | ✅ Uma peça de cima + uma de baixo, com nome e foto do avatar vestido. Abrir de novo no provador e pôr o look inteiro na sacola. Ver "Provador e looks" |
 | 21 | Cliente pede troca ou devolução | ✅ Feito com as sugestões 21.1 a 21.9 |
 | 22 | Admin aprova ou nega a troca | ✅ Feito com as sugestões 22.1 a 22.8, com reembolso parcial |
 | 24 | Relatórios por período com CSV | ✅ Vendas e estoque (`6702237`) e trocas e devoluções |
 | 25 | Configurações da loja | ✅ Feito com as sugestões 25.1 a 25.8 (`/admin/configuracoes`, `/trocas`, `/privacidade`) |
 | 3D-06 | Vestir a peça no avatar com indicador de caimento por região | ✅ Seis regiões e cinco classes. Ver "Provador e looks" |
-| 3D-07 | Trocar tamanho e cor; comparar 2 tamanhos lado a lado | ✅ |
+| 3D-07 | Trocar tamanho e cor; comparar 2 tamanhos lado a lado | ✅ Também com a peça do look junto nos dois avatares |
 | 3D-08 | Recomendar tamanho (estimativa) e validar o provador de ponta a ponta | ✅ Recomendação feita e provador validado no navegador em 19/10 (ver "Teste no navegador") |
 
 **Migration nova:** `20261019120000_sprint5_trocas_configuracoes_looks`
 (trocas, fotos das trocas, looks, configurações da loja, data da entrega do
 pedido e valor já devolvido de cada pagamento). Aplicar com
 `npx prisma migrate deploy` (nunca `migrate dev` no banco compartilhado).
+Em 20/10 entrou mais uma, `20261020120000_sprint5_look_foto` (foto do look),
+já aplicada.
+
+**Roteiro da entrega de 26/10:**
+[`ROTEIRO-APRESENTACAO-26-10.md`](ROTEIRO-APRESENTACAO-26-10.md).
 
 ---
 
@@ -150,8 +155,15 @@ O estoque da peça voltou ao que era (8 → 9 com o recebimento).
 | Configurações (item 25) | ✅ Arrependimento 5 dias é recusado (mínimo 7); troca 31 dias salvou e apareceu em `/trocas` na hora. Tudo voltou aos valores de antes |
 | Relatórios (item 24) | ✅ Vendas, trocas (1 devolução, 12,5%, R$ 312,88) e estoque; os 4 CSVs baixam |
 
-**Não testado:** o PIX simulado (precisaria de um segundo pedido) e a
-peça desativada na sacola (mexeria num produto do grupo).
+**Não testado:** a peça desativada na sacola (mexeria num produto do
+grupo).
+
+**PIX simulado (testado em 20/10):** dois pedidos de teste, **#DH8JJ1F6** e
+**#OR55HDOJ** (Boxy Tee 01 Preto M, R$ 201,78 cada, conta
+`teste.admin.claude@example.com`). Os dois viraram **Pago** em ~3 s na
+página de sucesso, com provedor "Simulado", e a página se atualizou sozinha.
+Os dois pedidos ficaram no banco e tiraram 2 unidades do estoque dessa
+variante.
 
 ### Corrigido durante o teste
 
@@ -166,9 +178,9 @@ peça desativada na sacola (mexeria num produto do grupo).
 
 Achados do teste que mexem em produto ou em regra; nada foi alterado.
 
-- Só Track Jacket, Hoodie Core, Tech Vest e Boxy Tee 01 têm tabela de
-  medidas; **nenhuma peça de baixo tem**, então o provador não sugere
-  tamanho para elas.
+- ~~Nenhuma peça de baixo tinha tabela de medidas.~~ Resolvido em 20/10:
+  Cargo Pant 02, Bermuda Utility, Wide Denim e Saia Midi Plissada ganharam
+  tabela (ver "Peças de baixo em 3D"). O grupo pode conferir os números.
 - O Hoodie Core tem as cores **"Branco"** e **"White"** (aparecem duplicadas
   na troca de cor).
 - Um produto se chama **"Relugar T-Shirt"** (erro de digitação?).
@@ -247,8 +259,9 @@ apagado.
 
 - No provador de uma peça de cima (ou de baixo), o bloco "Montar look"
   escolhe a outra peça, a cor e o tamanho (já vem o sugerido), e dá um nome.
-  Não existe molde 3D de peça de baixo, então ela aparece como cartão, com o
-  caimento estimado pelas medidas.
+  A outra peça veste junto no avatar (ver "Peças de baixo em 3D"); uma peça
+  sem molde 3D aparece como cartão, com o caimento estimado pelas medidas.
+- Ao salvar, vai junto uma **foto do avatar vestido** (ver "Foto do look").
 - Em "Minha conta → Looks" (`/perfil/looks`): abrir no provador, pôr o look
   na sacola e excluir.
 - Pôr na sacola é **tudo ou nada**: se uma peça está fora de venda ou sem
@@ -256,6 +269,76 @@ apagado.
   estoque é permitido.
 - Até 50 looks por cliente, nome com até 60 caracteres.
 - Se uma peça sai da loja, o look continua e mostra "Peça saiu da loja".
+
+### Peças de baixo em 3D (20/10)
+
+Quatro peças de baixo vestem no avatar, sozinhas ou junto com a peça de
+cima do look:
+
+| Peça | Molde | Tamanhos na tabela |
+|---|---|---|
+| Cargo Pant 02 | 40, com bolsos cargo | 38–44 (cintura, quadril e perna) |
+| Bermuda Utility | 40 | 38–44 (cintura e quadril) |
+| Wide Denim | 40, perna larga até o chão | 38–42 (cintura, quadril e perna) |
+| Saia Midi Plissada | M, evasê com pregas até o meio da canela | P/M/G (cintura e quadril) |
+
+Os moldes saem do próprio avatar, por script no Blender sem interface
+(`scripts/molde/calca.py` e `saia.py`, passo a passo em
+`scripts/molde/README.md`). `scripts/attach-bottom-models.ts` liga os .glb
+aos produtos e cria as tabelas de medidas (rodado no banco compartilhado em
+20/10).
+
+Como a peça veste (`src/lib/bottom-fit.ts`, com testes):
+
+- Cada ponto do tecido fica preso aos pontos da pele em volta dele (até
+  5 cm) e acompanha o corpo do cliente (medidas, homem ou mulher).
+- **Folga:** vem da diferença de quadril entre o tamanho escolhido e o
+  cliente, com no máximo 4 cm a mais. Sem tabela, conta 4 cm de quadril
+  por número.
+- **Comprimento:** vem da diferença entre a perna do tamanho e a do
+  cliente. A coxa fica onde está; a barra sobe ou desce. No máximo 5 cm mais
+  longa (e nunca abaixo do chão) e 10 cm mais curta.
+- **Tamanho apertado** só aperta acima do entrepernas, e no máximo 3/4 da
+  distância até a pele. Na perna não aperta (o bolso cargo entraria no
+  tecido).
+- **Tamanho folgado:** na perna, o lado de dentro ganha só 1/4 da folga,
+  para as pernas não se cruzarem.
+- O tecido nunca entra na pele (mínimo de 3 mm).
+- **Por dentro da peça de cima:** acima da barra da camiseta ou do moletom,
+  a peça de baixo fica rente ao corpo, e a de cima aparece por fora.
+- **Saia:** a parte solta, longe da pele, segue as duas pernas juntas, não só
+  a mais perto.
+
+"Comparar lado a lado" também funciona com a peça do look: cada avatar veste
+as duas peças (ex.: Tee M × GG com a calça; Saia P × G).
+
+### Foto do look (20/10)
+
+**Migration nova:** `20261020120000_sprint5_look_foto` (coluna
+`previewImage` em `SavedLook`), aplicada com `npx prisma migrate deploy`.
+
+- Ao salvar, o provador tira uma foto do avatar: o meio da tela, em retrato
+  3:4, num JPEG de 240×320 (qualidade 0,8), com o fundo da página.
+- O servidor só aceita `data:image/jpeg;base64,` com até 200 mil caracteres
+  (`parseLookPhoto` em `src/lib/looks.ts`); outra coisa é ignorada e o look
+  salva sem foto.
+- Editar um look troca a foto; um look sem foto nova mantém a antiga.
+- Em "Meus looks" a foto aparece à esquerda (em cima, no celular).
+
+### Busca e cesto no catálogo (20/10)
+
+- A "Pesquisa" do topo do `/catalogo` virou busca de verdade: procura em
+  nome, descrição, coleção e material, sem diferenciar maiúsculas, até 60
+  caracteres. Os filtros de categoria mantêm a busca.
+- O "Cesto" mostra a quantidade real da sacola e leva para `/carrinho`.
+
+### Limitações conhecidas
+
+- Calça muito maior que o corpo (ex.: 44 num quadril de 80 cm) mostra um
+  defeito branco no entrepernas.
+- Na **página do produto** (não no provador), o 3D da camiseta não troca de
+  cor quando se escolhe outra (ex.: continua branca no Preto).
+- A primeira carga do 3D leva ~20 s no `npm run dev`.
 
 ---
 
