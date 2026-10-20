@@ -70,3 +70,17 @@ describe("fitBottom", () => {
     close(out[1], 1.004, 1e-5);
   });
 });
+
+describe("bindBottom longe da pele", () => {
+  it("a barra solta da saia segue as duas pernas, não só a mais perto", () => {
+    // Duas "pernas" (um ponto cada) a 10 cm do meio; tecido no meio, à frente.
+    const legs = new Float32Array([-0.1, 0.5, 0, 0.1, 0.5, 0]);
+    const cloth = new Float32Array([0.001, 0.5, 0.12]);
+    const binding = bindBottom(cloth, legs);
+    assert.equal(binding.start[1] - binding.start[0], 2);
+    // As pernas abrem 2 cm cada: o tecido fica no meio.
+    const wider = new Float32Array([-0.12, 0.5, 0, 0.12, 0.5, 0]);
+    const out = fitBottom(binding, wider, 0);
+    close(out[0], 0.001, 2e-3);
+  });
+});

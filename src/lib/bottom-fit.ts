@@ -22,6 +22,7 @@ const BIND_RADIUS = 0.05; // pele que segura cada ponto do tecido (m)
 const BIND_SIGMA = 0.02; // peso cai com a distância (m)
 const MIN_GAP = 0.003; // tecido nunca entra na pele (m)
 const MAX_EASE = 0.04; // folga a mais, no máximo (m)
+const FAR_SPREAD = 0.04; // longe da pele: pele até essa distância além da mais perto (m)
 // Sem tabela: quadril cresce 4 cm por tamanho (38, 40, 42...).
 const GRADE_HIP_CM = 4;
 // Debaixo da peça de cima o tecido fica rente (fica "por dentro" da camiseta),
@@ -65,23 +66,18 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
   const dir = new Float32Array(n * 3);
   const gap = new Float32Array(n);
   const refY = new Float32Array(n);
-  const r2 = BIND_RADIUS * BIND_RADIUS;
-  const s2 = 2 * BIND_SIGMA * BIND_SIGMA;
-
-  for (let i = 0; i < n; i++) {
-    const x = cloth[i * 3];
-    const y = cloth[i * 3 + 1];
-    const z = cloth[i * 3 + 2];
-    refY[i] = y;
-    start[i] = skin.length;
+  // Pele a menos de `radius` do ponto (procura nas células em volta).
+  const gather = (x: number, y: number, z: number, radius: number) => {
     const near: number[] = [];
     const dist: number[] = [];
+    const reach = Math.ceil(radius / cell);
     const cx = Math.floor(x / cell);
     const cy = Math.floor(y / cell);
     const cz = Math.floor(z / cell);
-    for (let a = -1; a <= 1; a++)
-      for (let b = -1; b <= 1; b++)
-        for (let c = -1; c <= 1; c++) {
+    const rr = radius * radius;
+    for (let a = -reach; a <= reach; a++)
+      for (let b = -reach; b <= reach; b++)
+        for (let c = -reach; c <= reach; c++) {
           const list = grid.get(((cx + a + 512) * 1024 + (cy + b + 512)) * 1024 + (cz + c + 512));
           if (!list) continue;
           for (const j of list) {
@@ -89,28 +85,32 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
             const dy = base[j * 3 + 1] - y;
             const dz = base[j * 3 + 2] - z;
             const d = dx * dx + dy * dy + dz * dz;
-            if (d < r2) {
+            if (d < rr) {
               near.push(j);
               dist.push(d);
             }
           }
         }
-    // Longe de tudo (não deve acontecer no molde): segue o ponto mais perto.
-    if (near.length === 0) {
-      let best = 0;
-      let bestD = Infinity;
-      for (let j = 0; j < base.length / 3; j++) {
-        const dx = base[j * 3] - x;
-        const dy = base[j * 3 + 1] - y;
-        const dz = base[j * 3 + 2] - z;
-        const d = dx * dx + dy * dy + dz * dz;
-        if (d < bestD) {
-          bestD = d;
-          best = j;
-        }
-      }
-      near.push(best);
-      dist.push(0);
+    return { near, dist };
+  };
+
+  for (let i = 0; i < n; i++) {
+    const x = cloth[i * 3];
+    const y = cloth[i * 3 + 1];
+    const z = cloth[i * 3 + 2];
+    refY[i] = y;
+    start[i] = skin.length;
+    let { near, dist } = gather(x, y, z, BIND_RADIUS);
+    let s2 = 2 * BIND_SIGMA * BIND_SIGMA;
+    // Longe da pele (a parte solta da saia): segue uma região maior, que
+    // cresce com a distância, para os pontos vizinhos andarem juntos.
+    for (let r = BIND_RADIUS * 2; near.length === 0 && r < 1; r *= 2) {
+      const found = gather(x, y, z, r);
+      if (found.near.length === 0) continue;
+      const nearest = Math.sqrt(found.dist.reduce((m, d) => Math.min(m, d), Infinity));
+      ({ near, dist } = gather(x, y, z, nearest + FAR_SPREAD));
+      const sigma = Math.max(BIND_SIGMA, nearest / 2);
+      s2 = 2 * sigma * sigma;
     }
 
     let total = 0;
