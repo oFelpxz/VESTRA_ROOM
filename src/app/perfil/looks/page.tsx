@@ -23,7 +23,11 @@ const pieceSelect = {
       has3DModel: true,
       basePrice: true,
       promotionalPrice: true,
-      images: { orderBy: { position: "asc" as const }, take: 1, select: { url: true } },
+      images: {
+        orderBy: { position: "asc" as const },
+        take: 1,
+        select: { url: true },
+      },
     },
   },
 } as const;
@@ -35,7 +39,10 @@ export default async function LooksPage() {
   const looks = await prisma.savedLook.findMany({
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
-    include: { topVariant: { select: pieceSelect }, bottomVariant: { select: pieceSelect } },
+    include: {
+      topVariant: { select: pieceSelect },
+      bottomVariant: { select: pieceSelect },
+    },
   });
 
   return (
@@ -50,8 +57,12 @@ export default async function LooksPage() {
         Looks salvos
       </h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        Uma peça de cima e uma de baixo, montadas no provador. Para criar um look, abra o{" "}
-        <Link href="/catalogo?provador=1" className="underline hover:text-foreground">
+        Uma peça de cima e uma de baixo, montadas no provador. Para criar um
+        look, abra o{" "}
+        <Link
+          href="/catalogo?provador=1"
+          className="underline hover:text-foreground"
+        >
           provador de uma peça
         </Link>
         .
@@ -80,74 +91,108 @@ export default async function LooksPage() {
               const total = pieces.reduce(
                 (sum, { v }) =>
                   v
-                    ? sum + Number(v.product.promotionalPrice ?? v.price ?? v.product.basePrice)
+                    ? sum +
+                      Number(
+                        v.product.promotionalPrice ??
+                          v.price ??
+                          v.product.basePrice,
+                      )
                     : sum,
                 0,
               );
               return (
-                <li key={look.id} className="rounded-sm border border-border p-5">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h2 className="font-heading text-xl font-bold uppercase tracking-tight">
-                      {look.name}
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      Salvo em {look.createdAt.toLocaleDateString("pt-BR")} · {formatBRL(total)}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {pieces.map(({ role, v }) => (
-                      <div key={role} className="flex gap-3">
-                        <div className="relative aspect-square w-20 shrink-0 overflow-hidden bg-secondary">
-                          {v?.product.images[0] ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={v.product.images[0].url}
-                              alt={v.product.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <ProductPlaceholder />
-                          )}
-                        </div>
-                        <div className="min-w-0 text-sm">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                            {role}
-                          </p>
-                          {v ? (
-                            <>
-                              <Link
-                                href={`/produto/${v.product.id}`}
-                                className="font-medium hover:underline"
-                              >
-                                {v.product.name}
-                              </Link>
-                              <p className="text-xs text-muted-foreground">
-                                {v.color} · Tam {v.size}
-                              </p>
-                              {!available(v) && (
-                                <p className="text-xs text-destructive">
-                                  {v.stockQuantity > 0 ? "Fora de venda" : "Sem estoque"}
-                                </p>
-                              )}
-                            </>
-                          ) : (
-                            <p className="text-xs text-destructive">Peça saiu da loja</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-5">
-                    <LookCardActions
-                      id={look.id}
-                      name={look.name}
-                      provadorHref={
-                        with3D ? `/produto/${with3D.product.id}/provador?look=${look.id}` : null
-                      }
-                      canAdd={pieces.every(({ v }) => available(v))}
+                <li
+                  key={look.id}
+                  className="flex gap-5 rounded-sm border border-border p-5"
+                >
+                  {look.previewImage && (
+                    // Foto do avatar vestido, tirada no provador ao salvar.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={look.previewImage}
+                      alt={`Avatar vestindo o look ${look.name}`}
+                      className="hidden w-32 shrink-0 self-start rounded-sm bg-muted object-cover sm:block"
                     />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    {look.previewImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={look.previewImage}
+                        alt=""
+                        className="mb-4 w-full max-w-48 rounded-sm bg-muted sm:hidden"
+                      />
+                    )}
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h2 className="font-heading text-xl font-bold uppercase tracking-tight">
+                        {look.name}
+                      </h2>
+                      <p className="text-xs text-muted-foreground">
+                        Salvo em {look.createdAt.toLocaleDateString("pt-BR")} ·{" "}
+                        {formatBRL(total)}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {pieces.map(({ role, v }) => (
+                        <div key={role} className="flex gap-3">
+                          <div className="relative aspect-square w-20 shrink-0 overflow-hidden bg-secondary">
+                            {v?.product.images[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={v.product.images[0].url}
+                                alt={v.product.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <ProductPlaceholder />
+                            )}
+                          </div>
+                          <div className="min-w-0 text-sm">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                              {role}
+                            </p>
+                            {v ? (
+                              <>
+                                <Link
+                                  href={`/produto/${v.product.id}`}
+                                  className="font-medium hover:underline"
+                                >
+                                  {v.product.name}
+                                </Link>
+                                <p className="text-xs text-muted-foreground">
+                                  {v.color} · Tam {v.size}
+                                </p>
+                                {!available(v) && (
+                                  <p className="text-xs text-destructive">
+                                    {v.stockQuantity > 0
+                                      ? "Fora de venda"
+                                      : "Sem estoque"}
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-xs text-destructive">
+                                Peça saiu da loja
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-5">
+                      <LookCardActions
+                        id={look.id}
+                        name={look.name}
+                        provadorHref={
+                          with3D
+                            ? `/produto/${with3D.product.id}/provador?look=${look.id}`
+                            : null
+                        }
+                        canAdd={pieces.every(({ v }) => available(v))}
+                      />
+                    </div>
                   </div>
                 </li>
               );

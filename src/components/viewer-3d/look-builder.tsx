@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
 import { saveLookAction, type LookFormState } from "@/lib/look-actions";
 import {
   overallFit,
@@ -45,6 +45,7 @@ export function LookBuilder({
   toleranceCm,
   openLook,
   onChange,
+  takePhoto,
 }: {
   role: "top" | "bottom";
   /** Variante da peça do provador (cor + tamanho escolhidos), com ou sem estoque. */
@@ -57,6 +58,8 @@ export function LookBuilder({
   openLook: OpenLook | null;
   /** Chamado a cada troca de peça, cor ou tamanho (null = nenhuma no avatar). */
   onChange?: (selection: LookSelection | null) => void;
+  /** Foto do avatar vestido (JPEG em data URL), salva junto com o look. */
+  takePhoto?: () => string | null;
 }) {
   const [state, formAction, pending] = useActionState(saveLookAction, initialState);
 
@@ -116,7 +119,18 @@ export function LookBuilder({
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-4 rounded-sm border border-border p-4">
+    <form
+      action={formAction}
+      onSubmit={(e) => {
+        // A foto sai do canvas na hora de salvar, então entra no envio aqui.
+        const photo = takePhoto?.();
+        if (!photo) return;
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        data.set("previewImage", photo);
+        startTransition(() => formAction(data));
+      }}
+      className="flex flex-col gap-4 rounded-sm border border-border p-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
           {openLook ? "Editar look" : "Montar look"}

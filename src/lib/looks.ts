@@ -37,3 +37,14 @@ export function lookRoles<T>(
   if (a.kind === "bottom" && b.kind === "top") return { top: b.value, bottom: a.value };
   return null;
 }
+
+/** Foto do look: só JPEG em data URL e pequena (a do provador tem ~30 kB). */
+export const LOOK_PHOTO_MAX_CHARS = 200_000;
+const LOOK_PHOTO_PREFIX = "data:image/jpeg;base64,";
+
+/** A foto enviada pelo provador, ou null se vier vazia ou fora do formato. */
+export function parseLookPhoto(raw: unknown): string | null {
+  const photo = typeof raw === "string" ? raw : "";
+  if (!photo.startsWith(LOOK_PHOTO_PREFIX) || photo.length > LOOK_PHOTO_MAX_CHARS) return null;
+  return /^[A-Za-z0-9+/]+=*$/.test(photo.slice(LOOK_PHOTO_PREFIX.length)) ? photo : null;
+}

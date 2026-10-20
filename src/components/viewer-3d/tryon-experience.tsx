@@ -233,6 +233,35 @@ export function TryOnExperience({
     a.download = `VESTRA look - ${name}.png`;
     a.click();
   }
+  // Foto pequena para "Meus looks": o meio da cena em retrato (3:4), JPEG 240x320.
+  const takeLookPhoto = useCallback(() => {
+    const canvas = sceneRef.current?.querySelector("canvas");
+    if (!canvas || canvas.width === 0) return null;
+    const width = 240;
+    const height = 320;
+    const cropH = Math.min(canvas.height, (canvas.width * height) / width);
+    const cropW = (cropH * width) / height;
+    const thumb = document.createElement("canvas");
+    thumb.width = width;
+    thumb.height = height;
+    const ctx = thumb.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#f2f0ec";
+    ctx.fillStyle = getComputedStyle(sceneRef.current!).backgroundColor;
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(
+      canvas,
+      (canvas.width - cropW) / 2,
+      (canvas.height - cropH) / 2,
+      cropW,
+      cropH,
+      0,
+      0,
+      width,
+      height,
+    );
+    return thumb.toDataURL("image/jpeg", 0.8);
+  }, []);
 
   // 3D-06: caimento por região
   const fit = useMemo(
@@ -660,6 +689,7 @@ export function TryOnExperience({
             toleranceCm={toleranceCm}
             openLook={openLook}
             onChange={onCompanionChange}
+            takePhoto={takeLookPhoto}
           />
         )}
       </aside>

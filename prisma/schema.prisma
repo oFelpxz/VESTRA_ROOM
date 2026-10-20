@@ -616,6 +616,8 @@ model SavedLook {
   topVariant      ProductVariant? @relation("LookTop", fields: [topVariantId], references: [id], onDelete: SetNull)
   bottomVariantId String?
   bottomVariant   ProductVariant? @relation("LookBottom", fields: [bottomVariantId], references: [id], onDelete: SetNull)
+  /// Foto do avatar vestido, tirada no provador ao salvar (JPEG pequeno em data URL).
+  previewImage    String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 

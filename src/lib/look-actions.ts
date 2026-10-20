@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { garmentKind } from "@/lib/fit-regions";
-import { lookRoles, MAX_LOOKS, parseLookName } from "@/lib/looks";
+import { lookRoles, MAX_LOOKS, parseLookName, parseLookPhoto } from "@/lib/looks";
 
 export type LookFormState = {
   error?: string;
@@ -23,7 +23,8 @@ const variantForLook = {
  * Salva um look (item 15): a peça do provador + a que completa o look.
  * Com `lookId`, atualiza um look do próprio cliente.
  *
- * formData: name, ownVariantId, companionVariantId, lookId (opcional).
+ * formData: name, ownVariantId, companionVariantId, lookId e previewImage
+ * (foto do avatar vestido; os dois opcionais).
  */
 export async function saveLookAction(
   _prev: LookFormState,
@@ -54,7 +55,14 @@ export async function saveLookAction(
   );
   if (!roles) return { error: "O look junta uma peça de cima e uma de baixo." };
 
-  const data = { name: parsed.name, topVariantId: roles.top, bottomVariantId: roles.bottom };
+  const photo = parseLookPhoto(formData.get("previewImage"));
+  // Sem foto nova (provador sem 3D), a da última vez fica.
+  const data = {
+    name: parsed.name,
+    topVariantId: roles.top,
+    bottomVariantId: roles.bottom,
+    ...(photo ? { previewImage: photo } : {}),
+  };
   const lookId = String(formData.get("lookId") ?? "");
 
   if (lookId) {

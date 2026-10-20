@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { companionKind, lookRoles, parseLookName, LOOK_NAME_LIMIT } from "./looks";
+import { companionKind, lookRoles, parseLookName, LOOK_NAME_LIMIT, LOOK_PHOTO_MAX_CHARS, parseLookPhoto } from "./looks";
 
 describe("parseLookName", () => {
   it("limpa espaços e exige nome", () => {
@@ -35,5 +35,23 @@ describe("companionKind", () => {
     assert.equal(companionKind("top"), "bottom");
     assert.equal(companionKind("bottom"), "top");
     assert.equal(companionKind("dress"), null);
+  });
+});
+
+describe("parseLookPhoto", () => {
+  it("aceita JPEG em data URL", () => {
+    const photo = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
+    assert.equal(parseLookPhoto(photo), photo);
+  });
+
+  it("recusa vazio, outro formato, lixo ou foto grande", () => {
+    assert.equal(parseLookPhoto(null), null);
+    assert.equal(parseLookPhoto(""), null);
+    assert.equal(parseLookPhoto("data:image/png;base64,iVBORw0KGgo="), null);
+    assert.equal(parseLookPhoto('data:image/jpeg;base64,"><script>'), null);
+    assert.equal(
+      parseLookPhoto("data:image/jpeg;base64," + "A".repeat(LOOK_PHOTO_MAX_CHARS)),
+      null,
+    );
   });
 });
