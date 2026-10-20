@@ -309,7 +309,12 @@ export function TryOnExperience({
       {/* Cena 3D */}
       <div
         ref={sceneRef}
-        className={`relative grid h-[65vh] bg-muted lg:h-auto ${compareSize ? "grid-cols-2 divide-x divide-border" : ""}`}
+        className={`relative grid bg-muted lg:h-auto ${
+          compareSize
+            ? // No celular, um embaixo do outro (lado a lado ficava estreito demais).
+              "h-[110svh] grid-rows-2 divide-y divide-border md:h-[65vh] md:grid-cols-2 md:grid-rows-1 md:divide-x md:divide-y-0"
+            : "h-[65vh]"
+        }`}
       >
         {[
           { size: selectedSize, grade: garmentGrade, overall: fit.overall },
@@ -329,7 +334,7 @@ export function TryOnExperience({
               autoRotate={autoRotate}
             />
             {compareSize && (
-              <div className="pointer-events-none absolute left-1/2 top-12 flex -translate-x-1/2 items-center gap-2 rounded-sm bg-background/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.15em]">
+              <div className={`pointer-events-none absolute left-1/2 flex ${i === 0 ? "top-12" : "top-3 md:top-12"} -translate-x-1/2 items-center gap-2 rounded-sm bg-background/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.15em]`}>
                 Tam {scene.size}
                 {scene.overall && <FitPill fit={scene.overall} />}
               </div>
@@ -339,7 +344,7 @@ export function TryOnExperience({
         })}
 
         {/* Vistas, giro automático e foto */}
-        <div className="absolute bottom-4 left-4 flex flex-wrap items-center gap-1.5">
+        <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-auto">
           {(
             [
               ["front", "Frente"],
@@ -369,14 +374,15 @@ export function TryOnExperience({
                 : "border-foreground/20 bg-background/80 hover:border-foreground"
             }`}
           >
-            Girar sozinho
+            Girar<span className="hidden sm:inline"> sozinho</span>
           </button>
           <button
             type="button"
             onClick={downloadPhoto}
             className="rounded-sm border border-foreground/20 bg-background/80 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors hover:border-foreground"
           >
-            Baixar foto do look
+            <span className="hidden sm:inline">Baixar foto do look</span>
+            <span className="sm:hidden">Foto</span>
           </button>
         </div>
 
@@ -599,7 +605,7 @@ export function TryOnExperience({
             {selectedSize && sizes.length > 1 && (
               <div className="mt-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                  Comparar lado a lado com
+                  Comparar<span className="hidden md:inline"> lado a lado</span> com
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {sizes
