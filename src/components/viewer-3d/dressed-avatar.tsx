@@ -17,6 +17,7 @@ import {
 } from "@/lib/garment-dress";
 import { tintMaterial } from "@/lib/garment-color";
 import { readMorphBody } from "./avatar";
+import { AVATAR_URL } from "./avatar-url";
 
 /**
  * Avatar do cliente vestindo uma peça ajustada ao corpo de referência
@@ -26,8 +27,7 @@ import { readMorphBody } from "./avatar";
  * roda num Web Worker; enquanto ela roda, continua aparecendo a anterior.
  */
 
-export const AVATAR_URL =
-  process.env.NEXT_PUBLIC_AVATAR_MODEL_URL ?? "/models/avatar_base.glb";
+export { AVATAR_URL };
 
 useGLTF.preload(AVATAR_URL);
 

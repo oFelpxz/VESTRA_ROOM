@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { Tag } from "@/components/ui/tag";
 import { ProductViewer } from "@/components/viewer-3d/product-viewer";
+import { PreloadTryOn } from "@/components/viewer-3d/preload-tryon";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
 import { ProductPurchase } from "@/components/product/product-purchase";
 import { ProductColorProvider } from "@/components/product/product-color";
@@ -177,6 +178,7 @@ export default async function ProdutoPage({
                 Experimentar no VESTRA FIT
               </Link>
             )}
+            {product.has3D && product.modelUrl && <PreloadTryOn />}
 
             {/* Tabela de medidas */}
             {product.sizeChart && product.sizeChart.rows.length > 0 && (
