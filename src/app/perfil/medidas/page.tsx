@@ -7,6 +7,8 @@ import {
   type MeasurementInitial,
 } from "@/components/profile/measurement-form";
 
+export const metadata = { title: "Medidas corporais" };
+
 export default async function MedidasPage() {
   const session = await auth();
   if (!session?.user?.id) {

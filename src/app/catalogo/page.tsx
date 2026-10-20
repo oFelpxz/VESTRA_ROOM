@@ -12,6 +12,8 @@ import {
   type ProductFilters as Filters,
 } from "@/lib/products";
 
+export const metadata = { title: "Catálogo" };
+
 type Current = Record<string, string | undefined>;
 
 function hrefWith(current: Current, key: string, value: string) {

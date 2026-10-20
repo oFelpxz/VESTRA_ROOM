@@ -1,6 +1,8 @@
 import { LoginForm } from "@/components/auth/login-form";
 import { safeNextPath } from "@/lib/safe-next";
 
+export const metadata = { title: "Entrar" };
+
 export default async function LoginPage({
   searchParams,
 }: {

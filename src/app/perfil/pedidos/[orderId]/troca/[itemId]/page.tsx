@@ -15,6 +15,8 @@ import { compareVariants } from "@/lib/sizes";
 import { getStoreSettings } from "@/lib/store-settings-db";
 import { ReturnRequestForm } from "@/components/profile/return-request-form";
 
+export const metadata = { title: "Trocar ou devolver" };
+
 export default async function TrocaPage({
   params,
 }: {

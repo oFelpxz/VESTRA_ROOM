@@ -13,6 +13,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+export const metadata = { title: "Minha conta" };
+
 export default async function PerfilPage() {
   const session = await auth();
 

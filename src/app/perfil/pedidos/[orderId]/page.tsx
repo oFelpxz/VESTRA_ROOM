@@ -18,6 +18,8 @@ import {
 } from "@/lib/returns";
 import { getStoreSettings } from "@/lib/store-settings-db";
 
+export const metadata = { title: "Pedido" };
+
 export default async function PedidoDetalhePage({
   params,
 }: {
