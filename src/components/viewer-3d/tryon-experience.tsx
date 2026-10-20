@@ -11,10 +11,14 @@ import {
   type FitPreference,
   type GarmentKind,
 } from "@/lib/fit-regions";
-import { buildAvatarParams, type AvatarBody } from "@/lib/avatar-builder";
+import {
+  buildAvatarParams,
+  predictAvatarMeasurements,
+  type AvatarBody,
+} from "@/lib/avatar-builder";
 import { colorToHex } from "@/lib/color-names";
 import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
-import { bottomEase } from "@/lib/bottom-fit";
+import { bottomEase, bottomLength } from "@/lib/bottom-fit";
 import type { LookProduct, OpenLook } from "@/lib/look-data";
 import { TryOnScene, type CameraView, type ScenePiece } from "./tryon-scene";
 import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
@@ -168,6 +172,12 @@ export function TryOnExperience({
     [body, bodyType],
   );
 
+  // Perna (entrepernas) do avatar, em cm: a barra da calça depende dela.
+  const avatarLegCm = useMemo(
+    () => predictAvatarMeasurements(avatarParams.morphs).inseam,
+    [avatarParams],
+  );
+
   // A peça tem a forma do tamanho escolhido — não acompanha o corpo.
   const garmentGrade = useMemo(
     () => sizeGrade(selectedSize, sizeChart),
@@ -193,9 +203,10 @@ export function TryOnExperience({
             color: selectedColor ? colorToHex(selectedColor) : undefined,
             grade,
             ease: bottomEase(size, sizeChart, body.hipCm),
+            length: bottomLength(size, sizeChart, avatarLegCm),
           }
         : null,
-    [garmentUrl, selectedColor, sizeChart, body.hipCm],
+    [garmentUrl, selectedColor, sizeChart, body.hipCm, avatarLegCm],
   );
   const companionPiece = useMemo((): ScenePiece | null => {
     const p = companionSel?.product;
@@ -205,8 +216,9 @@ export function TryOnExperience({
       color: companionSel.color ? colorToHex(companionSel.color) : undefined,
       grade: sizeGrade(companionSel.size, p.sizeChart),
       ease: bottomEase(companionSel.size, p.sizeChart, body.hipCm),
+      length: bottomLength(companionSel.size, p.sizeChart, avatarLegCm),
     };
-  }, [companionSel, body.hipCm]);
+  }, [companionSel, body.hipCm, avatarLegCm]);
 
   // Vista da câmera, giro automático e foto do look
   const [view, setView] = useState<{ name: CameraView; n: number } | null>(null);

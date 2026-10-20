@@ -151,6 +151,8 @@ export type ScenePiece = {
   grade?: Grade;
   /** Peça de baixo: folga do tamanho em relação ao molde (m). */
   ease?: number;
+  /** Peça de baixo: quanto é mais longa que a perna (m, ver `bottomLength`). */
+  length?: number;
 };
 
 export type CameraView = "front" | "side" | "back";
@@ -198,6 +200,7 @@ function DressedLook({
             url={bottom.url}
             params={params}
             ease={bottom.ease ?? 0}
+            length={bottom.length ?? 0}
             tuckY={tuckY}
             selectedColor={bottom.color}
           />

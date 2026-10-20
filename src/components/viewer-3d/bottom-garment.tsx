@@ -54,6 +54,7 @@ export function BottomGarment({
   url,
   params,
   ease,
+  length = 0,
   tuckY = null,
   selectedColor,
 }: {
@@ -61,6 +62,8 @@ export function BottomGarment({
   params: AvatarParams;
   /** Folga do tamanho escolhido em relação ao molde (m, ver `bottomEase`). */
   ease: number;
+  /** Quanto a peça é mais longa que a perna (m, ver `bottomLength`). */
+  length?: number;
   /** Barra da peça de cima no molde (m): acima dela a peça fica por dentro. */
   tuckY?: number | null;
   selectedColor?: string;
@@ -79,12 +82,12 @@ export function BottomGarment({
         const g = p.geometry.clone();
         g.setAttribute(
           "position",
-          new THREE.BufferAttribute(fitBottom(bindings[i], pos, ease, tuckY), 3),
+          new THREE.BufferAttribute(fitBottom(bindings[i], pos, ease, tuckY, length), 3),
         );
         g.computeVertexNormals();
         return g;
       }),
-    [parts, bindings, pos, ease, tuckY],
+    [parts, bindings, pos, ease, tuckY, length],
   );
 
   const materials = useMemo(
@@ -107,10 +110,11 @@ export function BottomGarment({
     if (process.env.NODE_ENV !== "production") {
       console.info(
         `[VESTRA FIT] peça de baixo · folga ${(ease * 100).toFixed(1)} cm` +
+          (length !== 0 ? ` · ${(length * 100).toFixed(1)} cm ${length > 0 ? "mais longa" : "mais curta"}` : "") +
           (tuckY != null ? ` · por dentro acima de ${tuckY.toFixed(2)} m` : ""),
       );
     }
-  }, [ease, tuckY]);
+  }, [ease, length, tuckY]);
 
   return (
     <group>

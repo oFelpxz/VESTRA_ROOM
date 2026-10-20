@@ -10,6 +10,8 @@
  *
  * A folga vem da tabela de medidas: quadril do tamanho menos o quadril do
  * cliente. Tamanho maior que o corpo sobra; menor fica colado (até MIN_GAP).
+ * O comprimento também: perna do tamanho menos a perna do cliente. Calça
+ * mais longa que a perna desce até o chão; mais curta, a barra sobe.
  *
  * Conta pura sobre arrays (x, y, z intercalados, em metros, Y para cima),
  * sem three.js.
@@ -22,6 +24,10 @@ const BIND_RADIUS = 0.05; // pele que segura cada ponto do tecido (m)
 const BIND_SIGMA = 0.02; // peso cai com a distância (m)
 const MIN_GAP = 0.003; // tecido nunca entra na pele (m)
 const MAX_EASE = 0.04; // folga a mais, no máximo (m)
+// Tamanho apertado: o tecido chega no máximo a 3/4 da distância do molde.
+// No gancho e no vinco dos glúteos o tecido passa por cima de uma reentrância
+// e a pele em volta fica mais perto do que o ponto médio indica.
+const TIGHT_KEEP = 0.75;
 const FAR_SPREAD = 0.04; // longe da pele: pele até essa distância além da mais perto (m)
 // Sem tabela: quadril cresce 4 cm por tamanho (38, 40, 42...).
 const GRADE_HIP_CM = 4;
@@ -31,6 +37,11 @@ const GRADE_HIP_CM = 4;
 const TUCK_GAP = 0.004;
 const TUCK_START = 0.03; // m
 const TUCK_BLEND = 0.03; // m
+// Comprimento: só abaixo do entrepernas do molde (m), até a barra.
+const MOLDE_CROTCH_Y = 0.776;
+const MAX_LONGER = 0.05; // m a mais, no máximo (a barra para no chão)
+const MAX_SHORTER = 0.1; // m a menos, no máximo
+const FLOOR_Y = 0.005; // m
 
 export type BottomBinding = {
   /** Início dos vizinhos de cada ponto em `skin`/`weights` (n + 1 itens). */
@@ -43,6 +54,8 @@ export type BottomBinding = {
   gap: Float32Array;
   /** Altura de cada ponto no molde (m). */
   refY: Float32Array;
+  /** Altura da barra no molde (m). */
+  hemY: number;
 };
 
 /** Prende cada ponto da peça (`cloth`) à pele do corpo de referência (`base`). */
@@ -149,6 +162,7 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
     dir,
     gap,
     refY,
+    hemY: refY.reduce((m, y) => Math.min(m, y), Infinity),
   };
 }
 
@@ -156,14 +170,18 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
  * Posições da peça no corpo do cliente (`pos`, mesmos vértices de `base`).
  * `ease` = folga a mais (ou a menos) que no molde, em m. `tuckY` = barra da
  * peça de cima no molde (m): acima dela o tecido fica rente à pele.
+ * `length` = quanto a peça é mais longa (ou mais curta) que a perna, em m
+ * (ver `bottomLength`): a perna estica ou encolhe do entrepernas à barra.
  */
 export function fitBottom(
   binding: BottomBinding,
   pos: Float32Array,
   ease: number,
   tuckY: number | null = null,
+  length = 0,
 ): Float32Array {
-  const { start, skin, weights, dir, gap, refY } = binding;
+  const { start, skin, weights, dir, gap, refY, hemY } = binding;
+  const legSpan = Math.max(MOLDE_CROTCH_Y - hemY, 1e-6);
   const n = gap.length;
   const out = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
@@ -177,7 +195,7 @@ export function fitBottom(
       sy += pos[j * 3 + 1] * w;
       sz += pos[j * 3 + 2] * w;
     }
-    let g = Math.max(gap[i] + ease, MIN_GAP);
+    let g = Math.max(gap[i] + ease, gap[i] * TIGHT_KEEP, MIN_GAP);
     if (tuckY != null) {
       const t = Math.min(Math.max((refY[i] - tuckY - TUCK_START) / TUCK_BLEND, 0), 1);
       g += (Math.min(g, TUCK_GAP) - g) * t;
@@ -185,6 +203,10 @@ export function fitBottom(
     out[i * 3] = sx + dir[i * 3] * g;
     out[i * 3 + 1] = sy + dir[i * 3 + 1] * g;
     out[i * 3 + 2] = sz + dir[i * 3 + 2] * g;
+    if (length !== 0) {
+      const t = Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / legSpan, 0), 1);
+      out[i * 3 + 1] = Math.max(out[i * 3 + 1] - length * t, FLOOR_Y);
+    }
   }
   return out;
 }
@@ -193,6 +215,8 @@ type BottomSizeRow = {
   size: string;
   hipMinCm?: number | null;
   hipMaxCm?: number | null;
+  legLengthMinCm?: number | null;
+  legLengthMaxCm?: number | null;
 };
 
 const mid = (min?: number | null, max?: number | null) =>
@@ -228,4 +252,21 @@ export function bottomEase(
   if (garment == null || body == null) return 0;
   const ease = (garment - body) / (2 * Math.PI) / 100;
   return Math.min(Math.max(ease, -0.05), MAX_EASE);
+}
+
+/**
+ * Quanto a peça do tamanho escolhido é mais longa que a perna do cliente (m;
+ * negativo = mais curta), pela perna (entrepernas) da tabela. Sem perna na
+ * tabela (bermuda, saia), o comprimento não muda.
+ */
+export function bottomLength(
+  size: string | null,
+  chart: BottomSizeRow[],
+  clientLegCm: number | null,
+): number {
+  const row = chart.find((r) => r.size === size);
+  const garment = mid(row?.legLengthMinCm, row?.legLengthMaxCm);
+  if (garment == null || clientLegCm == null) return 0;
+  const length = (garment - clientLegCm) / 100;
+  return Math.min(Math.max(length, -MAX_SHORTER), MAX_LONGER);
 }
