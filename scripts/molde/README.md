@@ -87,7 +87,7 @@ idênticos (byte a byte) aos do repositório. O manequim sai com os mesmos
 vértices; só as normais variam até 0,03° (invisível) desde que o avatar
 ganhou as keys de gênero, então o do repositório foi mantido.
 
-## 5. Calça, bermuda e saia (Cargo Pant 02 e Bermuda Utility no molde 40, Saia Midi Plissada no M)
+## 5. Calças, bermuda e saia (Cargo Pant 02, Wide Denim e Bermuda Utility no molde 40, Saia Midi Plissada no M)
 
 As peças de baixo saem do próprio avatar: `calca.py` corta o corpo entre a
 cintura e a barra, afasta o tecido da pele, deixa as pernas retas e faz o cós
@@ -98,6 +98,8 @@ acompanha a pele do cliente e ganha a folga do tamanho escolhido
 ```bash
 mb calca.py -- avatar_base.glb cargo_pant_02.glb calca
 mb calca.py -- avatar_base.glb bermuda_utility.glb bermuda
+# Wide Denim: perna larga até o chão, sem bolsos cargo
+mb calca.py -- avatar_base.glb wide_denim.glb wide
 ```
 
 A saia (Saia Midi Plissada, molde M) sai do mesmo jeito com `saia.py`: justa
@@ -109,7 +111,7 @@ mb saia.py -- avatar_base.glb saia_midi_plissada.glb
 ```
 
 Depois de copiar os .glb para `public/models/`, ligar aos produtos e criar a
-tabela de medidas (calça e bermuda 38–44, saia P/M/G) no banco:
+tabela de medidas (cargo e bermuda 38–44, wide 38–42, saia P/M/G) no banco:
 
 ```bash
 npx tsx scripts/attach-bottom-models.ts

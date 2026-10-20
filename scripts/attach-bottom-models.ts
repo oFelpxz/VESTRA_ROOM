@@ -29,6 +29,12 @@ const CALCA: Row[] = [
   { size: "44", waist: [86, 90], hip: [104, 108], leg: [82, 86] },
 ];
 const BERMUDA: Row[] = CALCA.map((r) => ({ ...r, leg: null }));
+// Wide Denim (feminina, 38–42): perna até o chão, entrepernas um pouco maior.
+const WIDE: Row[] = [
+  { size: "38", waist: [70, 74], hip: [94, 98], leg: [78, 82] },
+  { size: "40", waist: [74, 78], hip: [98, 102], leg: [80, 84] },
+  { size: "42", waist: [78, 82], hip: [102, 106], leg: [82, 86] },
+];
 // Saia (P/M/G, numeração feminina): +4 cm de cintura e quadril por tamanho.
 const SAIA: Row[] = [
   { size: "P", waist: [64, 68], hip: [90, 94], leg: null },
@@ -39,6 +45,7 @@ const SAIA: Row[] = [
 const pieces = [
   { slug: "cargo-pant-02", fileUrl: "/models/cargo_pant_02.glb", chart: CALCA },
   { slug: "bermuda-utility", fileUrl: "/models/bermuda_utility.glb", chart: BERMUDA },
+  { slug: "wide-denim", fileUrl: "/models/wide_denim.glb", chart: WIDE },
   { slug: "saia-midi-plissada", fileUrl: "/models/saia_midi_plissada.glb", chart: SAIA },
 ];
 

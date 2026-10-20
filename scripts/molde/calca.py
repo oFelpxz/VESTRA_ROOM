@@ -1,30 +1,34 @@
-# VESTRA ROOM — gera o molde de uma peça de baixo (calça ou bermuda cargo) a
-# partir do próprio avatar de referência: corta o corpo entre a cintura e a
-# barra, afasta o tecido da pele (folga), deixa as pernas retas, faz o cós e
-# os bolsos laterais. Sai nas mesmas coordenadas do avatar_base, com as marcas
+# VESTRA ROOM — gera o molde de uma peça de baixo (calça ou bermuda cargo,
+# calça wide) a partir do próprio avatar de referência: corta o corpo entre a
+# cintura e a barra, afasta o tecido da pele (folga), deixa as pernas retas (ou
+# largas, na wide), faz o cós e os bolsos laterais (só nas cargo). Sai nas mesmas coordenadas do avatar_base, com as marcas
 # vestra_fit = "avatar_base" e vestra_peca = "baixo" (o site veste pela cintura
 # e pelas pernas, ver src/lib/bottom-fit.ts).
 #
-# Uso: blender -b --factory-startup -P calca.py -- avatar_base.glb saida.glb calca|bermuda
+# Uso: blender -b --factory-startup -P calca.py -- avatar_base.glb saida.glb calca|bermuda|wide
 import bpy, bmesh, sys
 from math import atan2, cos, sin
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 AVATAR, OUT, KIND = sys.argv[sys.argv.index("--") + 1:][:3]
-assert KIND in ("calca", "bermuda")
+assert KIND in ("calca", "bermuda", "wide")
 
 # Alturas no corpo de referência (m, eixo Z do Blender; pés em 0).
 TOP = 0.985                                  # cintura da calça (cós)
-HEM = 0.085 if KIND == "calca" else 0.47     # barra: tornozelo / acima do joelho
+# barra: tornozelo (cargo) / quase no chão (wide) / acima do joelho (bermuda)
+HEM = {"calca": 0.085, "wide": 0.035, "bermuda": 0.47}[KIND]
 BAND = 0.045                                 # altura do cós
 HIP_EASE = 0.014                             # folga no quadril
 BAND_EASE = 0.008                            # o cós fica mais justo
 LEG_EASE = 0.016                             # folga mínima nas pernas
-# Perna reta: raio mínimo da perna (m) no joelho e na barra.
+# Perna reta: raio mínimo da perna (m) no joelho e na barra. Na wide a perna
+# abre do joelho até a barra.
 KNEE_Z = 0.47
-LEG_R_KNEE = 0.084 if KIND == "calca" else 0.088
-LEG_R_HEM = 0.079 if KIND == "calca" else 0.09
+LEG_R_KNEE = {"calca": 0.084, "wide": 0.1, "bermuda": 0.088}[KIND]
+LEG_R_HEM = {"calca": 0.079, "wide": 0.122, "bermuda": 0.09}[KIND]
+# As duas pernas largas não se cruzam: o lado de dentro para antes do meio.
+INNER_GAP = 0.004
 # Bolso cargo na lateral da coxa.
 POCKET_Z = (0.50, 0.65) if KIND == "calca" else (0.52, 0.64)
 
@@ -71,7 +75,7 @@ bmesh.ops.delete(bm, geom=[v for isl in islands[1:] for v in isl], context="VERT
 me = bpy.data.meshes.new("calca")
 bm.to_mesh(me)
 bm.free()
-obj = bpy.data.objects.new("Calca" if KIND == "calca" else "Bermuda", me)
+obj = bpy.data.objects.new({"calca": "Calca", "wide": "Wide", "bermuda": "Bermuda"}[KIND], me)
 bpy.context.scene.collection.objects.link(obj)
 bpy.data.objects.remove(src)
 
@@ -129,6 +133,8 @@ for v, c, n in zip(bm.verts, skin, normals):
     ang = atan2(d.y, d.x)
     r2 = max(r + LEG_EASE, leg_radius(c.z))
     leg = Vector((ctr.x + cos(ang) * r2, ctr.y + sin(ang) * r2, c.z))
+    if KIND == "wide" and side * leg.x < INNER_GAP:
+        leg.x = side * INNER_GAP
     # Do entrepernas para cima vale o quadril; abaixo, a perna.
     w = smooth(crotch - 0.07, crotch + 0.01, c.z)
     v.co = leg.lerp(hip, w)
@@ -177,7 +183,7 @@ def patch(side, z0, z1, a0, a1, out, nz=10, na=8):
             q = [grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]]
             bm.faces.new(q if side > 0 else q[::-1])
             pocket_faces += 1
-for side in (1, -1):
+for side in (1, -1) if KIND != "wide" else ():
     patch(side, POCKET_Z[0], POCKET_Z[1], -0.55, 0.55, 0.006)
     patch(side, POCKET_Z[1] - 0.035, POCKET_Z[1] + 0.004, -0.6, 0.6, 0.011, nz=3)
 bm.normal_update()
