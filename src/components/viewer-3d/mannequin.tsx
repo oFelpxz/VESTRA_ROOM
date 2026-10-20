@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
+import { useTintedScene } from "./tinted-scene";
 
 /**
  * Peça vestida num manequim genérico (item 3D-04).
@@ -23,11 +24,24 @@ function Model({ url }: { url: string }) {
   return <primitive object={model} />;
 }
 
-export default function Mannequin({ garmentUrl }: { garmentUrl: string }) {
+function Garment({ url, color }: { url: string; color?: string }) {
+  const { scene } = useGLTF(url);
+  const model = useTintedScene(scene, color);
+  return <primitive object={model} />;
+}
+
+export default function Mannequin({
+  garmentUrl,
+  color,
+}: {
+  garmentUrl: string;
+  /** Cor da peça (hex); o manequim fica como está. */
+  color?: string;
+}) {
   return (
     <group>
       <Model url={MANNEQUIN_URL} />
-      <Model url={garmentUrl} />
+      <Garment url={garmentUrl} color={color} />
     </group>
   );
 }

@@ -13,7 +13,6 @@ import {
   lazy,
   Suspense,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -21,6 +20,7 @@ import {
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { isFittedToMannequin } from "./mannequin-mark";
+import { useTintedScene } from "./tinted-scene";
 
 // Carregado só quando o cliente escolhe "Manequim": quem só olha a peça não
 // baixa o manequim.
@@ -30,14 +30,17 @@ type DisplayMode = "piece" | "mannequin";
 
 function Model({
   url,
+  color,
   onFitted,
 }: {
   url: string;
+  /** Cor escolhida pelo cliente (hex); sem ela, a do arquivo. */
+  color?: string;
   /** Avisa se a peça foi ajustada ao manequim no Blender. */
   onFitted?: (fitted: boolean) => void;
 }) {
   const { scene } = useGLTF(url);
-  const model = useMemo(() => scene.clone(true), [scene]);
+  const model = useTintedScene(scene, color);
   useEffect(() => {
     onFitted?.(isFittedToMannequin(scene));
   }, [scene, onFitted]);
@@ -126,12 +129,15 @@ export function Viewer3D({
   controls = false,
   /** Oferece a peça vestida no manequim padrão (item 3D-04). */
   mannequin = false,
+  /** Cor da peça (hex), a escolhida na compra. */
+  color,
 }: {
   modelUrl?: string;
   interactive?: boolean;
   autoRotate?: boolean;
   controls?: boolean;
   mannequin?: boolean;
+  color?: string;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
@@ -191,9 +197,9 @@ export function Viewer3D({
             <CameraPreset view={view} controlsRef={orbitRef} />
             <Center>
               {mode === "mannequin" ? (
-                <Mannequin garmentUrl={modelUrl} />
+                <Mannequin garmentUrl={modelUrl} color={color} />
               ) : (
-                <Model url={modelUrl} onFitted={setFitted} />
+                <Model url={modelUrl} color={color} onFitted={setFitted} />
               )}
             </Center>
           </Bounds>
