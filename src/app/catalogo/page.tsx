@@ -104,14 +104,15 @@ export default async function CatalogoPage({
   return (
     <div className="min-h-screen px-5 py-6 md:px-8">
       {/* topo: marca + ações */}
-      <div className="flex items-start justify-between border-b border-border pb-5">
+      <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
         <Link
           href="/"
           className="font-heading text-lg font-bold uppercase tracking-[0.2em]"
         >
           VESTRA ROOM
         </Link>
-        <div className="flex items-center gap-5 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+        {/* No celular os links quebram linha em vez de empurrar a página para o lado. */}
+        <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
           <span>Pesquisa</span>
           <span>Cesto 0</span>
           {isAdmin && (

@@ -73,7 +73,7 @@ export default async function ProdutoPage({
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-      <div className="grid gap-12 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
         {/* Visual: 3D quando disponível, senão placeholder */}
         <div>
           {product.has3D && product.modelUrl ? (
