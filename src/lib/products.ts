@@ -13,7 +13,15 @@ export type ProductFilters = {
   colecao?: string;
   material?: string;
   provador?: boolean;
+  /** Busca por texto: nome, descrição, coleção ou material. */
+  q?: string;
 };
+
+/** Termo da busca do catálogo, limpo e com no máximo 60 caracteres. */
+export function parseSearch(raw: unknown): string | undefined {
+  const q = typeof raw === "string" ? raw.trim().replace(/\s+/g, " ").slice(0, 60) : "";
+  return q || undefined;
+}
 
 export type CatalogProduct = {
   id: string;
@@ -138,6 +146,13 @@ export async function getProducts(
       ...(filters.colecao ? { collection: filters.colecao } : {}),
       ...(filters.material ? { material: filters.material } : {}),
       ...(filters.provador ? { availableForVirtualTryOn: true } : {}),
+      ...(filters.q
+        ? {
+            OR: (["name", "description", "collection", "material"] as const).map((field) => ({
+              [field]: { contains: filters.q, mode: "insensitive" as const },
+            })),
+          }
+        : {}),
     },
     include: {
       images: { orderBy: { position: "asc" }, take: 1 },
