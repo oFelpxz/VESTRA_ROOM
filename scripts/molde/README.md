@@ -117,6 +117,20 @@ tabela de medidas (cargo e bermuda 38–44, wide 38–42, saia P/M/G) no banco:
 npx tsx scripts/attach-bottom-models.ts
 ```
 
+## 6. Oversized Shirt — derivada da Boxy Tee 01 (sem Blender)
+
+A Oversized Shirt sai do molde M da Boxy Tee 01: tronco mais largo dos
+ombros para baixo, 6 cm mais comprido, manga 30% mais longa e 12% mais
+aberta. As marcas do provador (`vestra_fit`, `_BRACO`) continuam as mesmas:
+
+```bash
+npx tsx scripts/derivar-oversized.ts public/models/boxy_tee_01.glb public/models/oversized_shirt.glb
+npx tsx scripts/attach-top-models.ts   # liga ao produto + tabela P/M/G
+```
+
+O gltf-transform grava os atributos entrelaçados num buffer só; o provador
+separa eles ao ler a peça (`src/lib/deinterleave.ts`).
+
 ## Ferramentas de conferência
 
 | Script | Para quê |
