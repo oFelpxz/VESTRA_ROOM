@@ -2,9 +2,9 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-// Liga os moldes das peças de baixo (feitos com scripts/molde/calca.py) aos
-// produtos e cria a tabela de medidas deles, que o provador usa para a folga
-// de cada tamanho e o caimento por região (cintura, quadril, barra).
+// Liga os moldes das peças de baixo (feitos com scripts/molde/calca.py e
+// saia.py) aos produtos e cria a tabela de medidas deles, que o provador usa
+// para a folga de cada tamanho e o caimento por região (cintura, quadril, barra).
 //
 // Uso: npx tsx scripts/attach-bottom-models.ts
 
@@ -29,10 +29,17 @@ const CALCA: Row[] = [
   { size: "44", waist: [86, 90], hip: [104, 108], leg: [82, 86] },
 ];
 const BERMUDA: Row[] = CALCA.map((r) => ({ ...r, leg: null }));
+// Saia (P/M/G, numeração feminina): +4 cm de cintura e quadril por tamanho.
+const SAIA: Row[] = [
+  { size: "P", waist: [64, 68], hip: [90, 94], leg: null },
+  { size: "M", waist: [68, 72], hip: [94, 98], leg: null },
+  { size: "G", waist: [72, 76], hip: [98, 102], leg: null },
+];
 
 const pieces = [
   { slug: "cargo-pant-02", fileUrl: "/models/cargo_pant_02.glb", chart: CALCA },
   { slug: "bermuda-utility", fileUrl: "/models/bermuda_utility.glb", chart: BERMUDA },
+  { slug: "saia-midi-plissada", fileUrl: "/models/saia_midi_plissada.glb", chart: SAIA },
 ];
 
 async function main() {
