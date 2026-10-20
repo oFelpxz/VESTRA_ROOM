@@ -14,7 +14,7 @@ const fmt = (d: Date) =>
 export function ReturnTimeline({ status, dates }: { status: ReturnStatus; dates: Dates }) {
   const ended = status === "DENIED" || status === "CANCELED";
   const steps: { label: string; at: Date | null }[] = [
-    { label: "Pedido enviado", at: dates.createdAt },
+    { label: "Solicitação enviada", at: dates.createdAt },
     {
       label: status === "DENIED" ? "Negado" : "Aprovado",
       at: dates.answeredAt,
