@@ -98,6 +98,15 @@ describe("fitBottom na perna", () => {
     close(outer[0], 0.14, 1e-5);
     close(inner[0], 0.075, 1e-5);
   });
+
+  it("perto do entrepernas o lado de dentro não ganha folga (as pernas se encostavam)", () => {
+    // Coxa direita 3 cm abaixo do entrepernas (0,776 m).
+    const thigh = leg.map((v, i) => (i % 3 === 1 ? v + 0.346 : v));
+    const inner = fitBottom(bindBottom(new Float32Array([0.08, 0.746, 0]), thigh), thigh, 0.04);
+    const outer = fitBottom(bindBottom(new Float32Array([0.12, 0.746, 0]), thigh), thigh, 0.04);
+    close(inner[0], 0.08, 1e-5);
+    close(outer[0], 0.16, 1e-5);
+  });
 });
 
 describe("bindBottom longe da pele", () => {
