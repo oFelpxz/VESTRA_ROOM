@@ -396,6 +396,28 @@ Testado no celular (375 px): abre igual e sem erro no console.
 script (passo no [guia dos moldes](../scripts/molde/README.md#peça-nova)).
 Sem a marca, o provador usa algodão.
 
+## Apresentação segura e acabamento do provador (lista 4)
+
+> **Aprovada em 21/10:** "Pode fazer todos". Feita em 21/10 na mesma branch
+> `feat/sprint5-tecido`. Texto do PR e checklist do grupo:
+> [PR-SPRINT5-TECIDO.md](PR-SPRINT5-TECIDO.md).
+
+| # | Item | Situação | Como ficou |
+|---|---|---|---|
+| 1 | Versão de produção + roteiro | Feito | `npm run build` sem erro e o roteiro inteiro repassado no `next start` com o tecido novo |
+| 2 | Prints do plano B | Feito | 02–05 e 13 refeitos (de novo depois do tênis); passo "2b. Tecido de perto" no [roteiro](ROTEIRO-APRESENTACAO-26-10.md) |
+| 3 | Modo leve automático | Feito | `render-quality.ts` (com teste): tela de toque com até 4 núcleos ou menos de 4 GB começa leve, e um celular bom fica leve sozinho se cair abaixo de ~50 quadros/s. O leve tira dobras, pesponto, sombras e a tela em resolução dupla; a trama e a cor ficam. No computador nunca muda sozinho. `?leve=1` / `?leve=0` forçam |
+| 4 | Testes | Feito | Detecção saia × calça e a regra da tira sem acabamento (`npm test`) |
+| 5 | Tecido na página do produto | Feito | O 3D da página usa o mesmo material do provador |
+| 6 | "Tecido de perto" | Feito | Botão no provador: peito (pega a gola) → barra da peça → volta. A altura vem das caixas das peças vestidas (`close-up.ts`, com teste); a touca é ignorada |
+| 7 | Tênis no avatar | Feito | `scripts/molde/tenis.py` faz o tênis dos próprios pés do avatar (casco até o tornozelo, folga de 6 mm, boca inclinada, sola mais larga). No site ele segue a pele dos pés de cada corpo, como as peças de baixo. Não é produto: entra em todo look, no comparar e no modo leve |
+| 8 | Revisão do moletom | Sem mudança | As faixas verticais vêm do tricô e do relevo do próprio arquivo, não das dobras novas. Os painéis do moletom não se tocam nas emendas (40% dos pontos viram "borda"); liberar o pesponto nele riscou o tricô e o cós, então ficou a regra antiga: moletom sem pesponto |
+| 9 | Tecido no upload do admin | Feito | Campo "Tecido no provador" no upload de modelo 3D: "Automático" (pelo nome do material) ou um dos 6 tecidos. O `.glb` é marcado na hora (`markFabricGlb`, com teste). Sem migração no banco |
+| 10 | Texto do PR e checklist | Feito | [PR-SPRINT5-TECIDO.md](PR-SPRINT5-TECIDO.md) |
+
+**Não testado num celular de verdade:** o modo leve foi medido no Mac com a
+tela de celular simulada.
+
 ## Decisões dos itens 21, 22 e 25
 
 > **Aprovadas pelo grupo em 19/10:** todas as sugestões abaixo.
