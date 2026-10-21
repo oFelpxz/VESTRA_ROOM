@@ -1,5 +1,7 @@
 "use client";
 
+import { createContext, useContext } from "react";
+
 /**
  * Pele do avatar (provador e prévia).
  *
@@ -11,7 +13,25 @@
 
 export const SKIN_COLOR = "#d9bba4";
 
+/**
+ * Manequim da página do produto: o mesmo corpo, com acabamento de manequim de
+ * loja (fibra de vidro cinza, verniz leve) — com pele, sem roupa embaixo,
+ * parecia uma pessoa pelada.
+ */
+export const MannequinFinish = createContext(false);
+
 export function SkinMaterial({ color = SKIN_COLOR }: { color?: string }) {
+  const mannequin = useContext(MannequinFinish);
+  if (mannequin) {
+    return (
+      <meshPhysicalMaterial
+        color="#9d9994"
+        roughness={0.42}
+        clearcoat={0.35}
+        clearcoatRoughness={0.3}
+      />
+    );
+  }
   return (
     <meshPhysicalMaterial
       color={color}

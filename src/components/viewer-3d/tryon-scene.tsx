@@ -231,7 +231,7 @@ function Accessory({ params, piece }: { params: AvatarParams; piece: ScenePiece 
  * Escolhe como vestir: com peça de baixo moldada, o look inteiro; senão, só a
  * peça do provador (`primary`), como antes.
  */
-function Outfit({
+export function Outfit({
   params,
   top,
   bottom,

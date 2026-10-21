@@ -73,9 +73,14 @@ mb marcar.py -- mol_pe.glb hoodie_molde.glb 0.10
 
 `hoodie_molde.glb` → `public/models/hoodie-core-v3.glb`.
 
-## 4. Manequim (`public/models/manequim.glb`)
+## 4. Manequim (`public/models/manequim.glb`, fora de uso)
 
-O manequim de vitrine é o avatar sem braços (`../manequim_sem_bracos.py`, o
+> Desde 21/10/2026 o modo Manequim da página do produto usa o próprio avatar
+> do provador (medidas de referência, com braços e tênis, acabamento cinza de
+> manequim; ver `src/components/viewer-3d/mannequin.tsx`). O `manequim.glb`
+> ficou no repositório só como histórico.
+
+O manequim de vitrine era o avatar sem braços (`../manequim_sem_bracos.py`, o
 mesmo script que roda na aba Scripting do Blender):
 
 ```bash

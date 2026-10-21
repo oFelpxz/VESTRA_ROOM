@@ -50,7 +50,7 @@ essas medidas sem mexer no perfil salvo. Ele não aparece em produção.
 | Botões Homem / Mulher | `src/components/viewer-3d/tryon-experience.tsx` |
 | Moletom moldado (tamanho M) | `public/models/hoodie-core-v3.glb` |
 | Camiseta moldada (tamanho M) | `public/models/boxy_tee_01.glb` |
-| Manequim de vitrine (avatar sem braços) | `public/models/manequim.glb` |
+| Manequim de vitrine (fora de uso desde 21/10: o modo Manequim usa o avatar do provador) | `public/models/manequim.glb` |
 | Vestir: tamanho, apoio nos ombros, mangas no braço, ribana | `src/lib/garment-dress.ts` (`dress`) |
 | Conta num Web Worker, sem travar a página | `src/lib/garment-fit.worker.ts` + `src/lib/fit-runner.ts` |
 | Mostrar o avatar vestido | `src/components/viewer-3d/dressed-avatar.tsx` |
@@ -271,9 +271,11 @@ não serve nele. Por isso `avatar_base.glb` e `hoodie-core-v3.glb` entram
 juntos. Não há mudança no banco: o `Model3D` do Hoodie Core continua
 apontando para `/models/hoodie-core-v3.glb`.
 
-O modo **Manequim** da página do produto usa `manequim.glb`, gerado do avatar
+O modo **Manequim** da página do produto usava `manequim.glb`, gerado do avatar
 novo (o tronco mudou no máximo 0,9 cm, perto das axilas). A Boxy Tee 01 passa
 a ter o modo Manequim também, porque o molde dela tem a marca `vestra_fit`.
+(Desde 21/10/2026 o Manequim é o avatar do provador com braços, tênis e
+acabamento cinza: o `manequim.glb` sem braços parecia um corpo cortado.)
 
 A **Relugar T-Shirt** usa o mesmo modelo da Boxy Tee com outro arquivo:
 `relugar-t-shirt-v1.glb` recebeu o mesmo molde.

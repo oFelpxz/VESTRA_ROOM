@@ -195,13 +195,15 @@ export function Viewer3D({
           <Bounds fit clip observe margin={1.2}>
             <Refit mode={mode} />
             <CameraPreset view={view} controlsRef={orbitRef} />
-            <Center>
-              {mode === "mannequin" ? (
-                <Mannequin garmentUrl={modelUrl} color={color} />
-              ) : (
+            {mode === "mannequin" ? (
+              // O avatar já fica de pé na origem; o Center o deslocaria
+              // pelas partes que carregam primeiro (o tênis).
+              <Mannequin garmentUrl={modelUrl} color={color} />
+            ) : (
+              <Center>
                 <Model url={modelUrl} color={color} onFitted={setFitted} />
-              )}
-            </Center>
+              </Center>
+            )}
           </Bounds>
         </Suspense>
 
