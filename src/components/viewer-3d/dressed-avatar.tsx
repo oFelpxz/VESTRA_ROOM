@@ -16,7 +16,8 @@ import {
   type Fitted,
 } from "@/lib/garment-dress";
 import { deinterleave } from "@/lib/deinterleave";
-import { tintMaterial } from "@/lib/garment-color";
+import { clothMaterial, fabricOf } from "@/lib/fabric";
+import type { FabricName } from "@/lib/fabric-weave";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL } from "./avatar-url";
 
@@ -38,6 +39,7 @@ const JOINT_RADIUS = 0.05;
 export type Part = FitPart & {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
+  fabric: FabricName;
 };
 
 function extractBody(scene: THREE.Object3D): FitBody {
@@ -105,6 +107,7 @@ export function extractGarment(scene: THREE.Object3D): Part[] {
     parts.push({
       geometry,
       material,
+      fabric: fabricOf(scene, source),
       base: new Float32Array(geometry.attributes.position.array),
       arm: geometry.attributes._braco?.array ?? null,
     });
@@ -216,7 +219,7 @@ function FittedAvatar({
   );
 
   const materials = useMemo(
-    () => parts.map((p) => tintMaterial(p.material, selectedColor)),
+    () => parts.map((p) => clothMaterial(p.material, selectedColor, p.fabric)),
     [parts, selectedColor],
   );
 
@@ -240,11 +243,11 @@ function FittedAvatar({
 
   return (
     <group>
-      <mesh geometry={bodyGeometry} castShadow>
+      <mesh geometry={bodyGeometry} castShadow receiveShadow>
         <meshStandardMaterial color="#d6c6b3" roughness={0.85} />
       </mesh>
       {clothGeometries.map((g, i) => (
-        <mesh key={i} geometry={g} material={materials[i]} castShadow />
+        <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
       ))}
     </group>
   );

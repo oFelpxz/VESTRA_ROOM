@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Html, ContactShadows } from "@react-three/drei";
 import { buildAvatarParams, type MeasurementInput } from "@/lib/avatar-builder";
 import { Avatar } from "./avatar";
+import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 
 /**
  * Cena de pré-visualização do avatar (sem roupa).
@@ -17,19 +18,14 @@ export function AvatarPreview({ measures }: { measures: MeasurementInput }) {
   const camDist = 2.4 + params.totalHeight * 0.5;
 
   return (
-    <Canvas shadows camera={{ position: [0, camY, camDist], fov: 38 }}>
+    <Canvas
+      shadows
+      camera={{ position: [0, camY, camDist], fov: 38 }}
+      gl={{ toneMapping: STUDIO_TONE_MAPPING }}
+    >
       <color attach="background" args={["#e7e2da"]} />
 
-      <hemisphereLight intensity={0.55} groundColor="#cfcabd" />
-      <ambientLight intensity={0.4} />
-      <directionalLight
-        position={[3, 5, 4]}
-        intensity={1.3}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
-      <directionalLight position={[-4, 3, -2]} intensity={0.5} />
+      <StudioLights />
 
       <Suspense
         fallback={

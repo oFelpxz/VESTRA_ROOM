@@ -15,6 +15,7 @@ import { tintMaterial } from "@/lib/garment-color";
 import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
 import { BareAvatar, BottomGarment, hemHeight } from "./bottom-garment";
+import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
 /**
@@ -316,21 +317,11 @@ export function TryOnScene({
       shadows
       camera={{ position: [0, camY, camDist], fov: 38 }}
       // Mantém a imagem para o botão "Baixar foto do look".
-      gl={{ preserveDrawingBuffer: true }}
+      gl={{ preserveDrawingBuffer: true, toneMapping: STUDIO_TONE_MAPPING }}
     >
       <color attach="background" args={["#e7e2da"]} />
 
-      {/* Iluminação de estúdio */}
-      <hemisphereLight intensity={0.55} groundColor="#cfcabd" />
-      <ambientLight intensity={0.4} />
-      <directionalLight
-        position={[3, 5, 4]}
-        intensity={1.3}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
-      <directionalLight position={[-4, 3, -2]} intensity={0.5} />
+      <StudioLights />
 
       <Suspense fallback={<Loader />}>
         {top || bottom ? (

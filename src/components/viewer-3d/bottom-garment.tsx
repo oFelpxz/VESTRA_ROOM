@@ -6,7 +6,7 @@ import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
 import { bindBottom, fitBottom } from "@/lib/bottom-fit";
 import { shapeBody } from "@/lib/garment-dress";
-import { tintMaterial } from "@/lib/garment-color";
+import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
 
@@ -44,7 +44,7 @@ export function BareAvatar({ params }: { params: AvatarParams }) {
   }, [pos, body.index]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return (
-    <mesh geometry={geometry} castShadow>
+    <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial color="#d6c6b3" roughness={0.85} />
     </mesh>
   );
@@ -93,7 +93,7 @@ export function BottomGarment({
   const materials = useMemo(
     () =>
       parts.map((p) => {
-        const m = tintMaterial(p.material, selectedColor);
+        const m = clothMaterial(p.material, selectedColor, p.fabric);
         // Onde encosta na peça de cima, a de cima aparece por fora.
         m.polygonOffset = true;
         m.polygonOffsetFactor = 1;
@@ -119,7 +119,7 @@ export function BottomGarment({
   return (
     <group>
       {geometries.map((g, i) => (
-        <mesh key={i} geometry={g} material={materials[i]} castShadow />
+        <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
       ))}
     </group>
   );
