@@ -16,6 +16,7 @@ import {
   type Fitted,
 } from "@/lib/garment-dress";
 import { deinterleave } from "@/lib/deinterleave";
+import { duplicateLayers } from "@/lib/garment-layers";
 import { addFabricEdge, clothMaterial, fabricOf } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import { readMorphBody } from "./avatar";
@@ -95,7 +96,7 @@ function readFitOptions(scene: THREE.Object3D): FitOptions {
 
 export function extractGarment(scene: THREE.Object3D): Part[] {
   scene.updateMatrixWorld(true);
-  const parts: Part[] = [];
+  const meshes: { mesh: THREE.Mesh; geometry: THREE.BufferGeometry }[] = [];
   scene.traverse((o) => {
     const m = o as THREE.Mesh;
     if (!m.isMesh) return;
@@ -103,6 +104,16 @@ export function extractGarment(scene: THREE.Object3D): Part[] {
     geometry.applyMatrix4(m.matrixWorld);
     geometry.morphAttributes = {};
     deinterleave(geometry);
+    meshes.push({ mesh: m, geometry });
+  });
+  // O avesso duplicado furava a camada de fora (ver garment-layers.ts).
+  const avesso = duplicateLayers(meshes.map((x) => x.geometry.attributes.position.array));
+  const parts: Part[] = [];
+  meshes.forEach(({ mesh: m, geometry }, i) => {
+    if (avesso.has(i)) {
+      geometry.dispose();
+      return;
+    }
     addFabricEdge(geometry);
     const source = Array.isArray(m.material) ? m.material[0] : m.material;
     const material = source.clone();
