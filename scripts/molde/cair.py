@@ -3,7 +3,6 @@
 # O molde (saia.py, vestido.py, calca.py...) dá a forma "de cabide"; aqui a
 # parte solta cai: as pregas da saia abrem, o cetim desce reto, a camiseta
 # pesa dos ombros. A parte que veste o corpo (cós, ombros) fica presa.
-# A calça larga ficou de fora: a barra encosta no tênis e no chão e amassa.
 #
 # Não grava um .glb: grava um .bin com a posição de cada ponto antes e
 # depois da queda (coordenadas do glTF, Y para cima), que o
@@ -11,7 +10,7 @@
 # (marcas, tecido, UV e _BRACO continuam).
 #
 # Uso: blender -b --factory-startup -P cair.py -- avatar_base.glb peca.glb queda.bin modo
-#   modo: saia | vestido | camiseta
+#   modo: saia | vestido | calca | bermuda | wide | camiseta | moletom
 import bpy, bmesh, struct, sys
 from mathutils import Vector
 
@@ -32,6 +31,32 @@ MODOS = {
     # Cetim leve e mole; preso no corpete (acima da cintura) e nas alças.
     "vestido": dict(mass=0.02, tension=25, shear=5, bending=0.05, frames=110,
                     pin=lambda co: smooth(0.90, 0.985, co.z)),
+    # Sarja da cargo; presa da cintura ao gancho e na barra (que já está
+    # em cima do tênis). A perna entre as duas cede com o peso: o tecido se
+    # apoia no joelho e franze um pouco acima da barra. Solta embaixo, a perna
+    # balançava e torcia (foi o que acabou com a primeira Wide Denim).
+    "calca": dict(mass=0.03, tension=40, compression=3, shear=10, bending=8, frames=80,
+                  pin=lambda co: max(smooth(0.70, 0.77, co.z),
+                                     1 - smooth(HEM + 0.02, HEM + 0.10, co.z)),
+                  sobra=-0.03, onde=lambda co: 1 - smooth(HEM + 0.10, HEM + 0.30, co.z)),
+    # Bermuda: mesma coisa, com a barra acima do joelho. Solta, a barra
+    # amassava como papel.
+    "bermuda": dict(mass=0.03, tension=40, compression=3, shear=10, bending=8, frames=70,
+                    pin=lambda co: max(smooth(0.70, 0.77, co.z),
+                                       1 - smooth(HEM + 0.02, HEM + 0.07, co.z)),
+                    sobra=-0.02, onde=lambda co: 1 - smooth(HEM + 0.07, HEM + 0.20, co.z)),
+    # Denim pesado da Wide Denim: mesma ideia da cargo, com a barra presa um
+    # pouco mais alto e o denim mais mole na compressão, para a perna larga
+    # "sanfonar" sobre o tênis. Sem os pés (a barra já passa por eles no
+    # molde) e sem chão: a barra presa não chega lá.
+    # `sobra`: o tecido fica esse tanto mais comprido (negativo = cresce) onde
+    # `onde` dá 1, como a calça que é mais longa que a perna: entre os dois
+    # pinos ele não cabe e franze.
+    "wide": dict(mass=0.04, tension=60, compression=1.5, shear=20, bending=5, frames=90,
+                 pin=lambda co: max(smooth(0.72, 0.80, co.z),
+                                    1 - smooth(HEM + 0.03, HEM + 0.13, co.z)),
+                 sobra=-0.07, onde=lambda co: 1 - smooth(HEM + 0.12, HEM + 0.40, co.z),
+                 pe_z=0.12, chao=False),
     # Algodão; preso nos ombros e no peito, o resto cai. A camiseta tem
     # painéis em camadas (~1 mm) e costuras que não batem ponto a ponto:
     # tudo a menos de 3 mm vira um ponto só, e sem colisão consigo mesma
@@ -39,6 +64,12 @@ MODOS = {
     "camiseta": dict(mass=0.02, tension=30, shear=8, bending=0.5, frames=70,
                      pin=lambda co: smooth(1.30, 1.40, co.z),
                      unir=0.003, auto=False),
+    # Moletom felpado do Hoodie Core: mais pesado e mais duro que a camiseta,
+    # preso nos ombros e no capuz. Os painéis do CLO não se tocam nas emendas
+    # (vão de até ~5 mm): unir a 5 mm fecha as costuras.
+    "moletom": dict(mass=0.05, tension=40, shear=12, bending=4, frames=80,
+                    pin=lambda co: smooth(1.28, 1.38, co.z),
+                    unir=0.005, auto=False),
 }
 cfg = MODOS[MODO]
 # Para testar valores sem editar: AJUSTE="mass=0.05,bending=2"
@@ -64,10 +95,21 @@ for o in corpo:
     col.thickness_outer = 0.003
     col.cloth_friction = 5
 
+# Sem os pés (calça larga): do tornozelo para baixo nada segura o tecido.
+if cfg.get("pe_z"):
+    for o in corpo:
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        pe = [v for v in bm.verts if (o.matrix_world @ v.co).z < cfg["pe_z"]]
+        bmesh.ops.delete(bm, geom=pe, context="VERTS")
+        bm.to_mesh(o.data)
+        bm.free()
+
 # Chão.
-bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0))
-chao = bpy.context.active_object
-chao.modifiers.new("col", "COLLISION").settings.thickness_outer = 0.002
+if cfg.get("chao", True):
+    bpy.ops.mesh.primitive_plane_add(size=4, location=(0, 0, 0))
+    chao = bpy.context.active_object
+    chao.modifiers.new("col", "COLLISION").settings.thickness_outer = 0.002
 
 # A peça vira uma malha só, com os pontos repetidos (costuras do glTF) unidos,
 # para o tecido não abrir nas costuras durante a queda.
@@ -91,6 +133,37 @@ bm.free()
 obj = bpy.data.objects.new("Peca", me)
 scene.collection.objects.link(obj)
 rest = [v.co.copy() for v in me.vertices]
+HEM = min(v.co.z for v in me.vertices)  # altura da barra (m), usada nos pinos
+
+# Pedaços sem nenhum ponto preso (bolsos da cargo, costurados por cima da perna
+# mas soltos na malha) cairiam até o chão: saem da simulação, e o
+# `aplicar-queda.ts` move cada ponto deles junto com a perna mais perto.
+bm = bmesh.new()
+bm.from_mesh(me)
+bm.verts.ensure_lookup_table()
+visto = set()
+soltos = []
+for v in bm.verts:
+    if v.index in visto:
+        continue
+    ilha, fila = [], [v]
+    visto.add(v.index)
+    while fila:
+        a = fila.pop()
+        ilha.append(a)
+        for e in a.link_edges:
+            b = e.other_vert(a)
+            if b.index not in visto:
+                visto.add(b.index)
+                fila.append(b)
+    if all(cfg["pin"](a.co) <= 0 for a in ilha):
+        soltos += ilha
+if soltos:
+    bmesh.ops.delete(bm, geom=soltos, context="VERTS")
+    bm.to_mesh(me)
+    print(f"QUEDA: {len(soltos)} pontos de pedaços soltos ficam fora")
+bm.free()
+rest = [v.co.copy() for v in me.vertices]
 
 grupo = obj.vertex_groups.new(name="pino")
 for v in me.vertices:
@@ -98,8 +171,18 @@ for v in me.vertices:
     if w > 0:
         grupo.add([v.index], w, "REPLACE")
 
+if "sobra" in cfg:
+    onde = obj.vertex_groups.new(name="sobra")
+    for v in me.vertices:
+        onde.add([v.index], 1 - cfg["onde"](v.co), "REPLACE")
+
 cloth = obj.modifiers.new("tecido", "CLOTH")
 s = cloth.settings
+if "sobra" in cfg:
+    s.vertex_group_shrink = "sobra"
+    # No Blender o peso 0 do grupo leva shrink_min e o 1, shrink_max (ao
+    # contrário não funciona): o grupo guarda 1 - onde.
+    s.shrink_min, s.shrink_max = cfg["sobra"], 0
 s.quality = 10
 s.mass = cfg["mass"]
 s.tension_stiffness = s.compression_stiffness = cfg["tension"]
