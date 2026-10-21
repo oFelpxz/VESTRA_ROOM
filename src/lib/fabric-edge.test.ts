@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { EDGE_CAP, edgeDistance } from "./fabric-edge";
+import { EDGE_CAP, edgeDistance, fabricEdgeAttribute } from "./fabric-edge";
 
 /** Retalho plano N×N com vértices a cada 1 cm. */
 function patch(N: number) {
@@ -57,5 +57,39 @@ describe("edgeDistance", () => {
     const e = edgeDistance(g.pos, g.index, 0.1);
     close(e[2 * g.at(5, 5)], 0.05, "meio");
     close(e[2 * copies.get(g.at(5, 5))!], 0.05, "cópia");
+  });
+});
+
+describe("fabricEdgeAttribute", () => {
+  it("retalho largo: borda = limite, meio = 0", () => {
+    const g = patch(21);
+    const e = fabricEdgeAttribute(g.pos, g.index);
+    close(e[2 * g.at(0, 10)], EDGE_CAP, "borda");
+    close(e[2 * g.at(10, 10)], 0, "meio");
+  });
+
+  it("tira estreita (ribana) fica sem acabamento", () => {
+    // 40 × 3 cm: quase todo vértice a menos de 2 cm da borda.
+    const pos: number[] = [];
+    const index: number[] = [];
+    const W = 41;
+    const H = 4;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) pos.push(i * 0.01, j * 0.01, 0);
+    for (let j = 0; j < H - 1; j++)
+      for (let i = 0; i < W - 1; i++) {
+        const a = j * W + i;
+        index.push(a, a + 1, a + W, a + 1, a + W + 1, a + W);
+      }
+    const e = fabricEdgeAttribute(pos, index);
+    for (let v = 0; v < W * H; v++) assert.equal(e[2 * v], 0);
+  });
+
+  it("malha retalhada (triângulos soltos) fica sem acabamento", () => {
+    const g = patch(11);
+    const pos: number[] = [];
+    // Cada triângulo num z diferente: nenhum vértice é dividido, tudo é borda.
+    g.index.forEach((v, k) => pos.push(g.pos[3 * v], g.pos[3 * v + 1], Math.floor(k / 3) * 1e-3));
+    const e = fabricEdgeAttribute(pos, null);
+    for (let v = 0; v < pos.length / 3; v++) assert.equal(e[2 * v], 0);
   });
 });

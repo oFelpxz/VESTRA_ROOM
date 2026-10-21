@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { bindBottom, bottomEase, bottomLength, fitBottom } from "./bottom-fit";
+import { bindBottom, bottomEase, bottomLength, bottomWrinkle, fitBottom } from "./bottom-fit";
 
 // Tabela da calça (scripts/attach-bottom-models.ts): quadril e perna por tamanho.
 const CHART = [
@@ -156,5 +156,32 @@ describe("fitBottom comprimento", () => {
     const binding = bindBottom(cloth, skin);
     close(fitBottom(binding, skin, 0, null, -0.05)[4], 0.15, 1e-5);
     close(fitBottom(binding, skin, 0, null, 0.2)[4], 0.005, 1e-5);
+  });
+});
+
+describe("bottomWrinkle", () => {
+  // Anel de pontos na altura y, com raio r, centrado em x = cx.
+  const ring = (cx: number, y: number, r: number) => {
+    const out: number[] = [];
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      out.push(cx + r * Math.cos(a), y, r * Math.sin(a));
+    }
+    return out;
+  };
+
+  it("saia passa pelo meio na altura do joelho: caimento", () => {
+    const skirt = [...ring(0, 0.9, 0.18), ...ring(0, 0.5, 0.22)];
+    assert.equal(bottomWrinkle(new Float32Array(skirt)), "caimento");
+  });
+
+  it("calça tem vão entre as pernas: calça", () => {
+    const pants = [...ring(0, 0.95, 0.17), ...ring(-0.09, 0.5, 0.06), ...ring(0.09, 0.5, 0.06)];
+    assert.equal(bottomWrinkle(new Float32Array(pants)), "calca");
+  });
+
+  it("bermuda acaba acima do joelho: calça", () => {
+    const shorts = [...ring(0, 0.95, 0.17), ...ring(-0.09, 0.62, 0.07), ...ring(0.09, 0.62, 0.07)];
+    assert.equal(bottomWrinkle(new Float32Array(shorts)), "calca");
   });
 });

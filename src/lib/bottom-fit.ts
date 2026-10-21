@@ -300,3 +300,14 @@ export function bottomLength(
   const length = (garment - clientLegCm) / 100;
   return Math.min(Math.max(length, -MAX_SHORTER), MAX_LONGER);
 }
+
+/**
+ * Calça ou saia? Na altura do joelho a calça tem um vão entre as pernas; a
+ * saia (e o vestido) passa pelo meio. A bermuda nem chega lá: calça.
+ * O material usa para escolher as dobras (`Wrinkle` em `fabric.ts`).
+ */
+export function bottomWrinkle(base: Float32Array): "caimento" | "calca" {
+  for (let i = 0; i < base.length; i += 3)
+    if (Math.abs(base[i]) < 0.015 && base[i + 1] > 0.42 && base[i + 1] < 0.55) return "caimento";
+  return "calca";
+}

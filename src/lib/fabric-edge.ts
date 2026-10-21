@@ -144,3 +144,17 @@ export function edgeDistance(
   }
   return out;
 }
+
+/**
+ * Atributo `fabricEdge` do material: [EDGE_CAP − distância, posição ao longo
+ * da borda]. Parte que é quase toda borda (ribana, malha retalhada) fica 0,
+ * sem acabamento — o pesponto viraria rabisco.
+ */
+export function fabricEdgeAttribute(pos: ArrayLike<number>, index: ArrayLike<number> | null): Float32Array {
+  const e = edgeDistance(pos, index);
+  let near = 0;
+  for (let i = 0; i < e.length; i += 2) if (e[i] < 0.02) near++;
+  const strip = near > 0.6 * (e.length / 2);
+  for (let i = 0; i < e.length; i += 2) e[i] = strip ? 0 : EDGE_CAP - e[i];
+  return e;
+}

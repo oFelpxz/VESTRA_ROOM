@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { applyTint, meanLuminance } from "./garment-color";
 import { FABRICS, WEAVE_SIZE, makeWeave, type FabricName } from "./fabric-weave";
-import { EDGE_CAP, edgeDistance } from "./fabric-edge";
+import { EDGE_CAP, fabricEdgeAttribute } from "./fabric-edge";
 
 /**
  * Material de tecido das peças do provador (tira a "cara de massinha").
@@ -314,11 +314,7 @@ export function clothMaterial(
  * retalhadas ficam sem — o pesponto viraria rabisco.
  */
 export function addFabricEdge(g: THREE.BufferGeometry) {
-  const e = edgeDistance(g.getAttribute("position").array, g.getIndex()?.array ?? null);
-  let near = 0;
-  for (let i = 0; i < e.length; i += 2) if (e[i] < 0.02) near++;
-  const strip = near > 0.6 * (e.length / 2);
-  for (let i = 0; i < e.length; i += 2) e[i] = strip ? 0 : EDGE_CAP - e[i];
+  const e = fabricEdgeAttribute(g.getAttribute("position").array, g.getIndex()?.array ?? null);
   g.setAttribute("fabricEdge", new THREE.BufferAttribute(e, 2));
   return g;
 }
