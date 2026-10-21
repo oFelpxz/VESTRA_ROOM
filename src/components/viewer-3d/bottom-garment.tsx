@@ -9,6 +9,7 @@ import { bindBottom, bottomWrinkle, fitBottom } from "@/lib/bottom-fit";
 import { shapeBody } from "@/lib/garment-dress";
 import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
+import { SHOES_URL } from "./avatar-url";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
 import { useLite } from "./lite-context";
 import { SkinMaterial } from "./skin-material";
@@ -123,6 +124,53 @@ export function BottomGarment({
     }
   }, [ease, length, tuckY]);
 
+  return (
+    <group>
+      {geometries.map((g, i) => (
+        <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
+      ))}
+    </group>
+  );
+}
+
+/**
+ * Tênis do avatar: preso à pele dos pés como as peças de baixo (sem folga de
+ * tamanho). Cabedal de lona (tecido, com pesponto na boca e na sola) e sola
+ * de borracha lisa.
+ */
+export function Shoes({ params }: { params: AvatarParams }) {
+  const shoes = useGLTF(SHOES_URL);
+  const { body, pos } = useClientBody(params);
+  const parts = useMemo(() => extractGarment(shoes.scene), [shoes.scene]);
+  const lite = useLite();
+  const bindings = useMemo(
+    () => parts.map((p) => bindBottom(p.base, body.base)),
+    [parts, body.base],
+  );
+  const geometries = useMemo(
+    () =>
+      parts.map((p, i) => {
+        const g = p.geometry.clone();
+        g.setAttribute("position", new THREE.BufferAttribute(fitBottom(bindings[i], pos, 0), 3));
+        g.computeVertexNormals();
+        return g;
+      }),
+    [parts, bindings, pos],
+  );
+  const materials = useMemo(
+    () =>
+      parts.map((p): THREE.Material =>
+        p.material.name === "Sola"
+          ? new THREE.MeshStandardMaterial({
+              color: (p.material as THREE.MeshStandardMaterial).color,
+              roughness: 0.65,
+            })
+          : clothMaterial(p.material, undefined, p.fabric, null, lite),
+      ),
+    [parts, lite],
+  );
+  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
+  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
   return (
     <group>
       {geometries.map((g, i) => (

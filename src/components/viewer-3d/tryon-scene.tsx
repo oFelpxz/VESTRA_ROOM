@@ -17,7 +17,7 @@ import { CLOSE_DISTANCE, closeUpY, type Box } from "@/lib/close-up";
 import { liteMode, type LiteMode } from "@/lib/render-quality";
 import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
-import { BareAvatar, BottomGarment, hemHeight } from "./bottom-garment";
+import { BareAvatar, BottomGarment, Shoes, hemHeight } from "./bottom-garment";
 import { LiteContext } from "./lite-context";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
@@ -452,6 +452,13 @@ export function TryOnScene({
           accessory && <BareAvatar params={avatarParams} />
         )}
         {accessory && <Accessory params={avatarParams} piece={accessory} />}
+        {(top || bottom || accessory) && (
+          <AvatarErrorBoundary fallback={null}>
+            <Suspense fallback={null}>
+              <Shoes params={avatarParams} />
+            </Suspense>
+          </AvatarErrorBoundary>
+        )}
         {!lite && (
           <ContactShadows
             position={[0, 0.005, 0]}

@@ -153,6 +153,22 @@ mb gorro.py -- avatar_base.glb knit_beanie.glb
 npx tsx scripts/attach-accessory-models.ts   # liga ao produto (sem tabela)
 ```
 
+## 8. Tênis do avatar (`public/models/tenis.glb`) — não é produto
+
+Antes o avatar ficava descalço. `tenis.py` faz o tênis a partir dos próprios
+pés do `avatar_base.glb`: casco convexo de cada pé até o tornozelo (com
+volume extra na biqueira), remesh, folga de 6 mm da pele, boca num plano
+inclinado (mais baixa no calcanhar) e sola de 2,4 cm um pouco mais larga.
+Duas malhas: "Cabedal" (lona, com pesponto) e "Sola" (borracha lisa).
+Marcas `vestra_fit = "avatar_base"` e `vestra_peca = "calcado"`: no site o
+tênis segue a pele dos pés do corpo do cliente (`Shoes` em
+`bottom-garment.tsx`) e entra em todo look do provador.
+
+```bash
+mb tenis.py -- avatar_base.glb tenis.glb
+ORTHO=0.45 ALVO=0.19,-0.08,0.07 mb render.py -- tenis avatar_base.glb tenis.glb ""
+```
+
 ## Ferramentas de conferência
 
 | Script | Para quê |
