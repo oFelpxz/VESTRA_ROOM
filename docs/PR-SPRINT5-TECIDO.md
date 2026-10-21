@@ -1,15 +1,16 @@
-# PR — Sprint 5: tecido de verdade no provador (listas 3 e 4)
+# PR — Sprint 5: tecido de verdade no provador (listas 3, 4 e 5)
 
 Texto pronto para abrir o PR no GitHub e checklist do grupo antes da
 apresentação de 26/10. Decisões item a item:
-[SPRINT5-DECISOES.md](SPRINT5-DECISOES.md#apresentação-segura-e-acabamento-do-provador-lista-4).
+[SPRINT5-DECISOES.md](SPRINT5-DECISOES.md#apresentação-segura-e-acabamento-do-provador-lista-4)
+e [lista 5](SPRINT5-DECISOES.md#melhorar-o-3d-que-já-existe-lista-5).
 
 ## Antes de abrir
 
 - **Branch:** `feat/sprint5-tecido` (ainda só no computador: publicar pelo
   GitHub Desktop → "Publish branch").
 - **Base:** ela sai de `feat/sprint5-itens` (que está no GitHub até
-  `6a28808`). São **15 commits novos** em cima dela.
+  `6a28808`). São **24 commits novos** em cima dela.
 - Se o PR for aberto contra a `main`, o GitHub vai mostrar ~100 commits,
   porque a `main` (`f046785`) ainda não tem a sprint 5. Para revisar só o que
   é novo, abra contra `feat/sprint5-itens`; ou junte a `feat/sprint5-itens`
@@ -35,7 +36,9 @@ As roupas do provador deixam de parecer "massinha": cada peça ganha a trama e
 o brilho do seu tecido, dobras de caimento, barra dobrada e pesponto. Também
 entram um modo leve para celular fraco, o botão "Tecido de perto", o tecido
 no 3D da página do produto, a escolha do tecido no upload do admin e um tênis
-no avatar.
+no avatar. Por último, o 3D que já existia foi lapidado: manequim com braços,
+camisetas sem o avesso furando, barra reta, cetim sem pisca-pisca, sombra
+macia e de contato, e a touca com câmera na cabeça.
 
 ### Tecido e avatar (lista 3)
 - f466c74 Tecido por peça (algodão, jeans, moletom, tricô, cetim, sarja) + luz de estúdio
@@ -56,6 +59,15 @@ no avatar.
 - 4526756 Tênis no avatar, feito no Blender (`scripts/molde/tenis.py`)
 - 3415d30 Prints do plano B refeitos com o tênis
 
+### Melhorar o 3D que já existe (lista 5)
+- 5c43fd7 Manequim da página do produto: avatar do provador com braços e tênis
+- 0836f04 Camisetas do CLO: tira o avesso duplicado que furava a camada de fora
+- 847063a Página do produto: mesma luz e tom do provador, com sombra
+- 41ac6ba Barra e pesponto retos
+- 599bebb Cetim sem pisca-pisca nas alças e no decote
+- 149308a Sombra macia, AO de contato e mais nitidez no computador
+- ac424aa Provador da touca abre na cabeça
+
 Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.glb`.
 
 ## Como testar
@@ -71,13 +83,17 @@ Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.
    volta.
 4. Repetir com `?leve=1` no fim da URL: some dobra, pesponto e sombra; a cor
    e a trama ficam.
-5. Página do produto (`/produto/wide-denim`): o 3D usa o mesmo tecido.
-6. Admin → upload de modelo 3D: o campo "Tecido no provador" aparece
+5. Página do produto (`/produto/wide-denim`): o 3D usa o mesmo tecido e a
+   mesma luz; em "Manequim" o avatar aparece com braços.
+6. Provador da Knit Beanie: abre enquadrado na cabeça.
+7. Admin → upload de modelo 3D: o campo "Tecido no provador" aparece
    ("Automático" mantém o comportamento antigo).
-7. `npm test`, `npx tsc --noEmit -p .` e `npx eslint .` sem erro.
+8. `npm test`, `npx tsc --noEmit -p .` e `npx eslint .` sem erro.
 
 ## Limitações conhecidas
 - Modo leve medido no Mac com tela de celular simulada, não num celular de verdade.
+- A sombra de contato (AO) pesa mais na placa de vídeo; fica só no modo normal.
+- Avatar sem cabelo (cabeça lisa de manequim).
 - Moletom continua sem pesponto (as emendas do arquivo não se tocam; o
   pesponto riscava o tricô e o cós).
 - No celular, a ponta do tênis fica atrás dos botões de vista (igual ao pé
@@ -93,10 +109,11 @@ Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.
 - [ ] Publicar `feat/sprint5-tecido` pelo GitHub Desktop e abrir o PR com o
       texto acima
 - [ ] Alguém além do Leonardo revisar o PR (rodar os passos de "Como testar")
-- [ ] Abrir o provador num **celular de verdade** (Android e iPhone, se der)
-      e anotar se travou ou se ficou leve sozinho
+- [ ] (Fora por enquanto, decisão de 21/10) abrir o provador num celular de
+      verdade e anotar se travou ou se ficou leve sozinho
 - [ ] Decidir se o moletom fica sem pesponto (sugestão: fica, ver item 8 das
       decisões)
+- [ ] Decidir se as 6 tiras do desenho do Hoodie Core ficam (item 5 da lista 5)
 - [ ] `npm test` passando na máquina de quem vai apresentar
 - [ ] Juntar na `main` até **24/10** (último dia de mudança visual)
 - [ ] **Ensaio em 25/10** seguindo o

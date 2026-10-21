@@ -418,6 +418,31 @@ Sem a marca, o provador usa algodão.
 **Não testado num celular de verdade:** o modo leve foi medido no Mac com a
 tela de celular simulada.
 
+## Melhorar o 3D que já existe (lista 5)
+
+> **Aprovada em 21/10:** "Pode fazer todos, mete bala". Regra do Leonardo:
+> nada de celular por enquanto e nada de peça nova (tênis etc.) enquanto o
+> que já existe estiver ruim. Feita em 21/10 na `feat/sprint5-tecido`.
+> Antes dela: manequim da página do produto refeito com braços (5c43fd7).
+
+| # | Item | Situação | Como ficou |
+|---|---|---|---|
+| 1 | Pele/avesso furando a roupa | Feito (0836f04) | As camisetas do CLO vinham com o tecido em duas camadas quase no mesmo lugar; no caimento o avesso furava a de fora (manchas cinza). O avesso duplicado sai na hora de vestir (`garment-layers.ts`, com teste). O moletom não tem camada dupla e fica igual |
+| 2 | Buracos na manga da camiseta | Feito (junto do 1) | Eram o mesmo avesso duplicado |
+| 3 | Barra serrilhada | Feito (41ac6ba) | A distância até a borda passou a ser medida em linha reta até a aresta (`fabric-edge.ts`, com teste), não até o ponto mais perto: barra e pesponto saem retos |
+| 4 | Brilho piscando no vestido | Feito (599bebb) | Onde a superfície vira muito dentro de um pixel (alça, decote, crista de dobra) o brilho espalha em vez de piscar. Cetim um pouco menos espelhado |
+| 5 | Faixas do moletom | Sem mudança | São 6 tiras costuradas do próprio desenho do Hoodie Core, não defeito. **Pergunta ao grupo:** tirar? |
+| 6 | Cabelo / cabeça estilizada | Cortado | Arriscado a 3 dias da entrega; cabeça lisa de manequim é o padrão em provador virtual e não briga com a touca |
+| 7 | Mesma luz no 3D do produto | Feito (847063a) | A página do produto usa a luz, o tom e a sombra do provador |
+| 8 | Qualidade máxima no computador | Feito (149308a) | Sombra de borda macia; sombra de contato (AO) na axila, gola, entre as pernas e na barra do moletom; trama some aos poucos de longe (sem "anéis" na calça); resolução mínima 1,5× (projetor/monitor comum fica mais nítido). O AO fica de fora no modo leve. "Baixar foto" conferido com o AO |
+| 9 | Touca: câmera na cabeça | Feito (ac424aa) | O provador da Knit Beanie abre da cabeça ao peito; "Tecido de perto" vai para a lateral da touca e volta direto |
+| 10 | Prints do plano B | Ver [apresentação](apresentacao/README.md) | Só computador |
+
+**Achado no caminho:** a primeira versão do AO desenhava anéis na calça de
+perto; com raio menor (8 cm) e mais amostras eles somem. Se aparecerem de
+novo em outro computador, tirar `<StudioAO />` de `tryon-scene.tsx` e
+`viewer.tsx` volta ao que era, sem mexer no resto.
+
 ## Decisões dos itens 21, 22 e 25
 
 > **Aprovadas pelo grupo em 19/10:** todas as sugestões abaixo.
