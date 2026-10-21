@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { applyTint, meanLuminance } from "./garment-color";
-import { FABRICS, WEAVE_SIZE, makeWeave, type FabricName } from "./fabric-weave";
+import { WEAVE_SIZE, isFabricName, makeWeave, type FabricName } from "./fabric-weave";
 import { EDGE_CAP, fabricEdgeAttribute } from "./fabric-edge";
 
 /**
@@ -72,18 +72,15 @@ const INSIDE = 0.8;
 /** Menor brilho (linear) da cor do tecido. */
 const BLACK_FLOOR = 0.045;
 
-const isFabric = (v: unknown): v is FabricName =>
-  typeof v === "string" && (FABRICS as string[]).includes(v);
-
 /**
  * Tecido da peça: a marca `vestra_tecido` da cena (gravada no .glb por
- * `scripts/marcar-tecido.ts`) ou, sem ela, o nome do material do arquivo.
+ * `scripts/marcar-tecido.ts` ou pelo upload do admin) ou, sem ela, o nome do material do arquivo.
  */
 export function fabricOf(scene: THREE.Object3D, material?: THREE.Material): FabricName {
   let marked: FabricName | null = null;
   scene.traverse((o) => {
     const v = o.userData?.vestra_tecido;
-    if (!marked && isFabric(v)) marked = v;
+    if (!marked && isFabricName(v)) marked = v;
   });
   if (marked) return marked;
   const name = (material?.name ?? "").toLowerCase();

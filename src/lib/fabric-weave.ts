@@ -15,6 +15,19 @@ export type FabricName = "algodao" | "sarja" | "denim" | "trico" | "cetim" | "mo
 
 export const FABRICS: FabricName[] = ["algodao", "sarja", "denim", "trico", "cetim", "moletom"];
 
+/** Nome do tecido na tela (admin). */
+export const FABRIC_LABEL: Record<FabricName, string> = {
+  algodao: "Algodão (malha)",
+  sarja: "Sarja",
+  denim: "Jeans",
+  trico: "Tricô",
+  cetim: "Cetim",
+  moletom: "Moletom",
+};
+
+export const isFabricName = (v: unknown): v is FabricName =>
+  typeof v === "string" && (FABRICS as string[]).includes(v);
+
 export const WEAVE_SIZE = 256;
 
 function hash(x: number, y: number, seed: number) {

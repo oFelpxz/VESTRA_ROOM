@@ -3,7 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { optimizeGlb } from "@/lib/model-optimizer";
+import { isFabricName } from "@/lib/fabric-weave";
+import { markFabricGlb, optimizeGlb } from "@/lib/model-optimizer";
 import {
   MODELS_BUCKET,
   storageConfigured,
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
 
   const file = form.get("file");
   const productId = String(form.get("productId") ?? "").trim();
+  // Tecido do provador; vazio = automático (pelo nome do material).
+  const fabricField = String(form.get("fabric") ?? "").trim();
 
   if (!productId) {
     return NextResponse.json(
@@ -45,6 +48,14 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  if (fabricField && !isFabricName(fabricField)) {
+    return NextResponse.json(
+      { error: "Tecido inválido." },
+      { status: 400 },
+    );
+  }
+  const fabric = isFabricName(fabricField) ? fabricField : null;
 
   const ext = path.extname(file.name).toLowerCase();
   if (!ALLOWED_EXT.includes(ext as (typeof ALLOWED_EXT)[number])) {
@@ -97,6 +108,15 @@ export async function POST(request: Request) {
     wasOptimized = result.optimized;
   }
 
+  // --- Tecido do provador ---
+  // Gravado no próprio .glb, depois da compressão (`fabricOf` lê a marca).
+  let fabricMarked = false;
+  if (ext === ".glb" && fabric) {
+    const marked = await markFabricGlb(bytes, fabric);
+    bytes = Buffer.from(marked.data);
+    fabricMarked = marked.marked;
+  }
+
   const finalSizeMb = Number((bytes.byteLength / (1024 * 1024)).toFixed(2));
   const originalSizeMb = Number((originalBytes / (1024 * 1024)).toFixed(2));
 
@@ -144,6 +164,7 @@ export async function POST(request: Request) {
     originalSizeMb,
     optimizedPct,
     wasOptimized,
+    fabric: fabricMarked ? fabric : null,
     format,
     storage,
     bucket: storage === "cloud" ? MODELS_BUCKET : null,

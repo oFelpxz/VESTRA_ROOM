@@ -9,6 +9,7 @@ import {
   resample,
   weld,
 } from "@gltf-transform/functions";
+import type { FabricName } from "./fabric-weave";
 
 /**
  * Compressão / otimização automática de modelos `.glb` no upload (item 3D-01).
@@ -81,5 +82,27 @@ export async function optimizeGlb(input: Uint8Array): Promise<OptimizeResult> {
       ratio: 0,
       optimized: false,
     };
+  }
+}
+
+/**
+ * Grava o tecido escolhido no upload (`vestra_tecido` nas cenas do .glb), a
+ * mesma marca de `scripts/marcar-tecido.ts`, lida por `fabricOf` no provador.
+ * Se o arquivo não abrir, devolve como veio (`marked: false`).
+ */
+export async function markFabricGlb(
+  input: Uint8Array,
+  fabric: FabricName,
+): Promise<{ data: Uint8Array; marked: boolean }> {
+  try {
+    const doc = await io.readBinary(input);
+    const scenes = doc.getRoot().listScenes();
+    if (!scenes.length) return { data: input, marked: false };
+    for (const scene of scenes)
+      scene.setExtras({ ...scene.getExtras(), vestra_tecido: fabric });
+    return { data: await io.writeBinary(doc), marked: true };
+  } catch (e) {
+    console.error("markFabricGlb falhou, mantendo arquivo sem marca:", e);
+    return { data: input, marked: false };
   }
 }
