@@ -1,20 +1,23 @@
 "use client";
 
-import { Suspense, useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   useGLTF,
   Html,
   ContactShadows,
+  PerformanceMonitor,
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
 import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
 import { tintMaterial } from "@/lib/garment-color";
+import { liteMode, type LiteMode } from "@/lib/render-quality";
 import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
 import { BareAvatar, BottomGarment, hemHeight } from "./bottom-garment";
+import { LiteContext } from "./lite-context";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
@@ -288,6 +291,20 @@ function CameraRig({ view }: { view: { name: CameraView; n: number } | null }) {
   return null;
 }
 
+// Lido uma vez por página (o aparelho não muda); no servidor, completo.
+let deviceMode: LiteMode | null = null;
+const FULL: LiteMode = { lite: false, auto: false };
+function readDeviceMode(): LiteMode {
+  deviceMode ??= liteMode({
+    search: window.location.search,
+    touch: window.matchMedia("(pointer: coarse)").matches,
+    cores: navigator.hardwareConcurrency,
+    memory: (navigator as { deviceMemory?: number }).deviceMemory,
+  });
+  return deviceMode;
+}
+const noSubscribe = () => () => {};
+
 export function TryOnScene({
   avatarParams,
   top,
@@ -312,17 +329,26 @@ export function TryOnScene({
   const camY = avatarParams.totalHeight * 0.55;
   const camDist = 2.4 + avatarParams.totalHeight * 0.5;
 
+  // Modo leve (src/lib/render-quality.ts): pelo aparelho ou se travar.
+  const device = useSyncExternalStore(noSubscribe, readDeviceMode, () => FULL);
+  const [slow, setSlow] = useState(false);
+  const lite = device.lite || slow;
+
   return (
     <Canvas
-      shadows
+      shadows={!lite}
+      dpr={lite ? 1 : [1, 2]}
+      data-lite={lite ? "1" : undefined}
       camera={{ position: [0, camY, camDist], fov: 38 }}
       // Mantém a imagem para o botão "Baixar foto do look".
       gl={{ preserveDrawingBuffer: true, toneMapping: STUDIO_TONE_MAPPING }}
     >
       <color attach="background" args={["#e7e2da"]} />
 
-      <StudioLights />
+      {device.auto && !lite && <PerformanceMonitor onDecline={() => setSlow(true)} />}
+      <StudioLights shadows={!lite} />
 
+      <LiteContext.Provider value={lite}>
       <Suspense fallback={<Loader />}>
         {top || bottom ? (
           <Outfit params={avatarParams} top={top} bottom={bottom} primary={primary} />
@@ -330,14 +356,17 @@ export function TryOnScene({
           accessory && <BareAvatar params={avatarParams} />
         )}
         {accessory && <Accessory params={avatarParams} piece={accessory} />}
-        <ContactShadows
-          position={[0, 0.005, 0]}
-          opacity={0.45}
-          scale={4}
-          blur={2.4}
-          far={2}
-        />
+        {!lite && (
+          <ContactShadows
+            position={[0, 0.005, 0]}
+            opacity={0.45}
+            scale={4}
+            blur={2.4}
+            far={2}
+          />
+        )}
       </Suspense>
+      </LiteContext.Provider>
 
       <OrbitControls
         makeDefault

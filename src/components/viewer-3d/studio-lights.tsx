@@ -16,7 +16,8 @@ import * as THREE from "three";
  * tira saturação). Usar em `gl={{ toneMapping: STUDIO_TONE_MAPPING }}`. */
 export const STUDIO_TONE_MAPPING = THREE.NeutralToneMapping;
 
-export function StudioLights() {
+/** `shadows = false` no modo leve (ver `src/lib/render-quality.ts`). */
+export function StudioLights({ shadows = true }: { shadows?: boolean }) {
   return (
     <>
       <Environment resolution={256} frames={1} environmentIntensity={0.9}>
@@ -59,7 +60,7 @@ export function StudioLights() {
         position={[3, 5, 4]}
         intensity={1.5}
         color="#fff8f0"
-        castShadow
+        castShadow={shadows}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-bias={-0.0002}

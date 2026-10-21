@@ -20,6 +20,7 @@ import { addFabricEdge, clothMaterial, fabricOf } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL } from "./avatar-url";
+import { useLite } from "./lite-context";
 import { SkinMaterial } from "./skin-material";
 
 /**
@@ -194,6 +195,7 @@ function FittedAvatar({
   fitted: Fitted;
   selectedColor?: string;
 }) {
+  const lite = useLite();
   const bodyGeometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(fitted.body, 3));
@@ -221,8 +223,8 @@ function FittedAvatar({
   );
 
   const materials = useMemo(
-    () => parts.map((p) => clothMaterial(p.material, selectedColor, p.fabric, "caimento")),
-    [parts, selectedColor],
+    () => parts.map((p) => clothMaterial(p.material, selectedColor, p.fabric, "caimento", lite)),
+    [parts, selectedColor, lite],
   );
 
   // Libera da GPU as geometrias/materiais substituídos a cada troca.

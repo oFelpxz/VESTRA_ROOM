@@ -179,6 +179,7 @@ const FRAGMENT_BODY = /* glsl */ `
   vec3 fabricBump = vec3( 0.0, nX.y, nX.x ) * fw.x + vec3( nY.x, 0.0, nY.y ) * fw.y + vec3( nZ.x, nZ.y, 0.0 ) * fw.z;
   normal = normalize( normal + faceDirection * ( normalMatrix * fabricBump ) * fabricRelief );
 
+#ifndef FABRIC_LITE
   // Dobras de caimento: ondas que inclinam a normal (a malha não muda).
   // O desenho vem da mancha da trama, então cada dobra tem largura e força
   // diferentes, sem virar sanfona.
@@ -216,6 +217,7 @@ const FRAGMENT_BODY = /* glsl */ `
     wtilt -= fn * dot( wtilt, fn );
     normal = normalize( normal + faceDirection * ( normalMatrix * wtilt ) );
   }
+#endif
 
   float fabricTone = tX.a * fw.x + tY.a * fw.y + tZ.a * fw.z + 0.5;
   diffuseColor.rgb *= mix( 1.0, fabricTone, fabricThreads );
@@ -225,6 +227,7 @@ const FRAGMENT_BODY = /* glsl */ `
   diffuseColor.rgb *= 1.0 + ( mottle - 0.5 ) * 2.0 * fabricMottle;
   roughnessFactor = clamp( roughnessFactor + ( mottle - 0.5 ) * 0.12, 0.05, 1.0 );
 
+#ifndef FABRIC_LITE
   // Acabamento: o atributo guarda "limite - distância" (sem ele = longe).
   float edgeD = ${EDGE_CAP.toFixed(4)} - vFabricEdge.x;
   // Borda e vinco da barra dobrada.
@@ -238,6 +241,7 @@ const FRAGMENT_BODY = /* glsl */ `
   // Furinho da agulha: um vinco escuro dos dois lados do ponto.
   diffuseColor.rgb *= 1.0 - 0.1 * max( fabricLine( edgeD, fabricStitches.x, ${STITCH_WIDTH * 2.6} ), fabricLine( edgeD, fabricStitches.y, ${STITCH_WIDTH * 2.6} ) ) * ( 1.0 - stitch );
   diffuseColor.rgb = mix( diffuseColor.rgb, fabricThread, stitch * 0.9 );
+#endif
 
   if ( ! gl_FrontFacing ) diffuseColor.rgb *= fabricInside;
 }`;
@@ -245,12 +249,14 @@ const FRAGMENT_BODY = /* glsl */ `
 /**
  * Material de tecido na cor escolhida, a partir do material do arquivo.
  * Quem chama libera com `dispose()` (a textura da trama é dividida e fica).
+ * `lite` (modo leve, `render-quality.ts`): sem dobras, barra e pesponto.
  */
 export function clothMaterial(
   source: THREE.Material,
   color: string | undefined,
   fabric: FabricName,
   wrinkle: Wrinkle | null = null,
+  lite = false,
 ): THREE.MeshPhysicalMaterial {
   const look = FABRIC_LOOK[fabric];
   const m = toPhysical(source);
@@ -301,7 +307,8 @@ export function clothMaterial(
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>${FRAGMENT_BODY}`);
   };
   // O código do shader muda só com o ajuste da cor; o resto são uniforms.
-  m.customProgramCacheKey = () => `vestra-fabric-${mean != null ? 1 : 0}`;
+  if (lite) m.defines = { ...m.defines, FABRIC_LITE: "" };
+  m.customProgramCacheKey = () => `vestra-fabric-${mean != null ? 1 : 0}${lite ? "-lite" : ""}`;
   return m;
 }
 

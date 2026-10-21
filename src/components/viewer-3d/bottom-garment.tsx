@@ -10,6 +10,7 @@ import { shapeBody } from "@/lib/garment-dress";
 import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
+import { useLite } from "./lite-context";
 import { SkinMaterial } from "./skin-material";
 
 const CREASE_ANGLE = (30 * Math.PI) / 180;
@@ -75,6 +76,7 @@ export function BottomGarment({
   const garment = useGLTF(url);
   const { body, pos } = useClientBody(params);
   const parts = useMemo(() => extractGarment(garment.scene), [garment.scene]);
+  const lite = useLite();
   const bindings = useMemo(
     () => parts.map((p) => bindBottom(p.base, body.base)),
     [parts, body.base],
@@ -98,14 +100,14 @@ export function BottomGarment({
   const materials = useMemo(
     () =>
       parts.map((p) => {
-        const m = clothMaterial(p.material, selectedColor, p.fabric, bottomWrinkle(p.base));
+        const m = clothMaterial(p.material, selectedColor, p.fabric, bottomWrinkle(p.base), lite);
         // Onde encosta na peça de cima, a de cima aparece por fora.
         m.polygonOffset = true;
         m.polygonOffsetFactor = 1;
         m.polygonOffsetUnits = 1;
         return m;
       }),
-    [parts, selectedColor],
+    [parts, selectedColor, lite],
   );
 
   useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
