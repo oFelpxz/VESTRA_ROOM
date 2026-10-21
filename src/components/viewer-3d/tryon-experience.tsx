@@ -354,6 +354,7 @@ export function TryOnExperience({
               primary={ownRole}
               view={view}
               autoRotate={autoRotate}
+              focus={isAccessory ? "head" : "body"}
             />
             {compareSize && (
               <div className={`pointer-events-none absolute left-1/2 flex ${i === 0 ? "top-12" : "top-3 md:top-12"} -translate-x-1/2 items-center gap-2 rounded-sm bg-background/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.15em]`}>
@@ -388,9 +389,12 @@ export function TryOnExperience({
           ))}
           {/* Tecido de perto: peito → barra → volta */}
           {(() => {
+            // Touca não tem barra: do close volta direto.
             const [next, label] =
               view?.name === "chest"
-                ? (["hem", "Ver a barra"] as const)
+                ? isAccessory
+                  ? (["front", "Voltar"] as const)
+                  : (["hem", "Ver a barra"] as const)
                 : view?.name === "hem"
                   ? (["front", "Voltar"] as const)
                   : (["chest", "Tecido de perto"] as const);

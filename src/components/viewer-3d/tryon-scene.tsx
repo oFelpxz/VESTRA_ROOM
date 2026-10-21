@@ -276,6 +276,8 @@ const VIEW_ANGLE: Record<"front" | "side" | "back", number> = {
 };
 
 const MIN_DISTANCE = 1.5;
+/** Provador da touca: a câmera abre na cabeça, não no corpo inteiro. */
+const HEAD_DISTANCE = 1.0;
 
 type Controls = THREE.EventDispatcher<{ start: object }> & {
   target: THREE.Vector3;
@@ -303,11 +305,13 @@ function CameraRig({
   params,
   primary,
   home,
+  head,
 }: {
   view: { name: CameraView; n: number } | null;
   params: AvatarParams;
   primary: "top" | "bottom";
   home: { y: number; dist: number; targetY: number };
+  head: boolean;
 }) {
   const camera = useThree((s) => s.camera);
   const scene = useThree((s) => s.scene);
@@ -315,20 +319,33 @@ function CameraRig({
   const goal = useRef<{ pos: THREE.Vector3; target: THREE.Vector3; close: boolean } | null>(null);
   const close = useRef(false);
 
+  // Na touca a câmera já começa mais perto que o limite do corpo inteiro.
+  const minDistance = head ? 0.6 : MIN_DISTANCE;
+
   useEffect(() => {
     if (!controls) return;
-    setMinDistance(controls, MIN_DISTANCE);
+    setMinDistance(controls, minDistance);
     const stop = () => {
       if (goal.current) close.current = goal.current.close;
       goal.current = null;
     };
     controls.addEventListener("start", stop);
     return () => controls.removeEventListener("start", stop);
-  }, [controls]);
+  }, [controls, minDistance]);
 
   useEffect(() => {
     if (!view || !controls) return;
-    if (view.name === "chest" || view.name === "hem") {
+    if (head && (view.name === "chest" || view.name === "hem")) {
+      // Close da touca: a trama da malha na lateral da cabeça.
+      const y = params.anchors.head.y + 0.07;
+      const a = 0.6;
+      const d = CLOSE_DISTANCE * 0.6;
+      goal.current = {
+        target: new THREE.Vector3(0, y, 0),
+        pos: new THREE.Vector3(Math.sin(a) * d, y + 0.05, Math.cos(a) * d),
+        close: true,
+      };
+    } else if (view.name === "chest" || view.name === "hem") {
       const boxes: Box[] = [];
       scene.traverse((o) => {
         if (!(o as THREE.Mesh).isMesh || !isFabric(o)) return;
@@ -363,7 +380,7 @@ function CameraRig({
     }
     // Deixa chegar perto durante o caminho; volta ao limite no fim.
     setMinDistance(controls, 0.3);
-  }, [view, camera, controls, scene, params, primary, home]);
+  }, [view, camera, controls, scene, params, primary, home, head]);
 
   useFrame((_, dt) => {
     const g = goal.current;
@@ -376,7 +393,7 @@ function CameraRig({
       camera.position.copy(g.pos);
       controls.target.copy(g.target);
       close.current = g.close;
-      setMinDistance(controls, g.close ? 0.3 : MIN_DISTANCE);
+      setMinDistance(controls, g.close ? 0.3 : minDistance);
       controls.update();
       goal.current = null;
     }
@@ -406,6 +423,7 @@ export function TryOnScene({
   primary,
   view = null,
   autoRotate = false,
+  focus = "body",
 }: {
   avatarParams: AvatarParams;
   top: ScenePiece | null;
@@ -417,13 +435,22 @@ export function TryOnScene({
   /** Vista pedida pelos botões (n muda a cada clique). */
   view?: { name: CameraView; n: number } | null;
   autoRotate?: boolean;
+  /** "head": provador da touca, enquadrado da cabeça ao peito. */
+  focus?: "body" | "head";
 }) {
-  // Câmera "afasta" se o avatar for mais alto
-  const camY = avatarParams.totalHeight * 0.55;
-  const camDist = 2.4 + avatarParams.totalHeight * 0.5;
+  const head = focus === "head";
+  const headY = avatarParams.anchors.head.y;
   const home = useMemo(
-    () => ({ y: camY, dist: camDist, targetY: avatarParams.totalHeight * 0.5 }),
-    [camY, camDist, avatarParams.totalHeight],
+    () =>
+      head
+        ? { y: headY + 0.12, dist: HEAD_DISTANCE, targetY: headY + 0.04 }
+        : // Câmera "afasta" se o avatar for mais alto
+          {
+            y: avatarParams.totalHeight * 0.55,
+            dist: 2.4 + avatarParams.totalHeight * 0.5,
+            targetY: avatarParams.totalHeight * 0.5,
+          },
+    [head, headY, avatarParams.totalHeight],
   );
 
   // Modo leve (src/lib/render-quality.ts): pelo aparelho ou se travar.
@@ -436,7 +463,7 @@ export function TryOnScene({
       shadows={!lite}
       dpr={lite ? 1 : [1.5, 2]}
       data-lite={lite ? "1" : undefined}
-      camera={{ position: [0, camY, camDist], fov: 38 }}
+      camera={{ position: [0, home.y, home.dist], fov: 38 }}
       // Mantém a imagem para o botão "Baixar foto do look".
       gl={{ preserveDrawingBuffer: true, toneMapping: STUDIO_TONE_MAPPING }}
     >
@@ -474,14 +501,14 @@ export function TryOnScene({
 
       <OrbitControls
         makeDefault
-        target={[0, avatarParams.totalHeight * 0.5, 0]}
+        target={[0, home.targetY, 0]}
         maxDistance={6}
         maxPolarAngle={Math.PI / 1.8}
         minPolarAngle={Math.PI / 4}
         autoRotate={autoRotate}
         autoRotateSpeed={1.6}
       />
-      <CameraRig view={view} params={avatarParams} primary={primary} home={home} />
+      <CameraRig view={view} params={avatarParams} primary={primary} home={home} head={head} />
       {!lite && <StudioAO />}
     </Canvas>
   );
