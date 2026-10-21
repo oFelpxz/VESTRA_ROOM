@@ -41,6 +41,22 @@ describe("edgeDistance", () => {
     close(e[2 * g.at(1, 5) + 1], e[2 * g.at(0, 5) + 1], "para dentro");
   });
 
+  it("triângulo em diagonal não faz a linha ziguezaguear", () => {
+    // Linhas deslocadas meio centímetro, uma sim outra não: pelas arestas o
+    // caminho até a barra é mais longo que a distância reta.
+    const N = 11;
+    const pos: number[] = [];
+    const index: number[] = [];
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) pos.push(i * 0.01 + (j % 2) * 0.005, j * 0.01, 0);
+    for (let j = 0; j < N - 1; j++)
+      for (let i = 0; i < N - 1; i++) {
+        const a = j * N + i;
+        index.push(a, a + 1, a + N, a + 1, a + N + 1, a + N);
+      }
+    const e = edgeDistance(pos, index);
+    for (const i of [3, 5, 7]) close(e[2 * (2 * N + i)], 0.02, `coluna ${i}`);
+  });
+
   it("costura de UV (vértice repetido) não vira borda", () => {
     const g = patch(11);
     // Duplica a coluna do meio e faz os triângulos da direita usarem a cópia.

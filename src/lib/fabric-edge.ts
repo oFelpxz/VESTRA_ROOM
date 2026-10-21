@@ -60,12 +60,17 @@ export function edgeDistance(
     }
   }
   const border: number[][] = Array.from({ length: m }, () => []);
+  const edges: [number, number][] = [];
+  const edgeOf = new Int32Array(m).fill(-1);
   for (const [key, c] of uses) {
     if (c !== 1) continue;
     const a = Math.floor(key / m);
     const b = key % m;
     border[a].push(b);
     border[b].push(a);
+    if (edgeOf[a] < 0) edgeOf[a] = edges.length;
+    if (edgeOf[b] < 0) edgeOf[b] = edges.length;
+    edges.push([a, b]);
   }
 
   // Percorre cada contorno somando o comprimento.
@@ -84,9 +89,27 @@ export function edgeDistance(
     }
   }
 
-  // Dijkstra a partir de todas as bordas, parando em `cap`.
+  // Distância reta até o trecho de borda mais próximo. Cada vértice herda o
+  // trecho do vizinho que chega primeiro (Dijkstra a partir das bordas,
+  // parando em `cap`); somar as arestas da malha fazia a linha ziguezaguear
+  // (o pesponto e a dobra da barra saíam ondulados).
+  const toEdge = (v: number, e: number): [number, number] => {
+    const [a, b] = edges[e];
+    const ab = [P(b, 0) - P(a, 0), P(b, 1) - P(a, 1), P(b, 2) - P(a, 2)];
+    const av = [P(v, 0) - P(a, 0), P(v, 1) - P(a, 1), P(v, 2) - P(a, 2)];
+    const ll = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
+    const t = ll > 0 ? Math.min(Math.max((av[0] * ab[0] + av[1] * ab[1] + av[2] * ab[2]) / ll, 0), 1) : 0;
+    const dist = Math.hypot(av[0] - ab[0] * t, av[1] - ab[1] * t, av[2] - ab[2] * t);
+    // Posição ao longo: entre as duas pontas (na aresta que fecha o contorno
+    // o "ao longo" dá um salto; aí fica a ponta mais perto).
+    const len = Math.sqrt(ll);
+    const step = along[b] - along[a];
+    const pos = Math.abs(Math.abs(step) - len) < len * 0.5 + 1e-9 ? along[a] + step * t : t < 0.5 ? along[a] : along[b];
+    return [dist, pos];
+  };
   const d = new Float64Array(m).fill(Infinity);
   const src = new Float64Array(m);
+  const srcEdge = new Int32Array(m).fill(-1);
   const heap: [number, number][] = [];
   const push = (k: number, w: number) => {
     heap.push([k, w]);
@@ -121,16 +144,19 @@ export function edgeDistance(
     if (along[w] >= 0) {
       d[w] = 0;
       src[w] = along[w];
+      srcEdge[w] = edgeOf[w];
       push(0, w);
     }
   while (heap.length) {
     const [k, w] = pop();
     if (k > d[w] || k >= cap) continue;
     for (const u of adj[w]) {
-      const nk = k + dist(w, u);
+      if (d[u] === 0) continue;
+      const [nk, at] = toEdge(u, srcEdge[w]);
       if (nk < d[u]) {
         d[u] = nk;
-        src[u] = src[w];
+        src[u] = at;
+        srcEdge[u] = srcEdge[w];
         push(nk, u);
       }
     }
