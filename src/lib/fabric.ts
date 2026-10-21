@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { applyTint, meanLuminance } from "./garment-color";
 import { FABRICS, WEAVE_SIZE, makeWeave, type FabricName } from "./fabric-weave";
+import { EDGE_CAP, edgeDistance } from "./fabric-edge";
 
 /**
  * Material de tecido das peças do provador (tira a "cara de massinha").
@@ -13,6 +14,8 @@ import { FABRICS, WEAVE_SIZE, makeWeave, type FabricName } from "./fabric-weave"
  *   menos no cetim.
  * - Mancha grande e suave na cor e na aspereza, e o avesso (gola, barra,
  *   cava) mais escuro.
+ * - Acabamento perto da borda do tecido (`addFabricEdge`): vinco da barra
+ *   dobrada e pesponto tracejado — dourado no jeans.
  *
  * A cor escolhida entra como no `tintMaterial` (`garment-color.ts`).
  */
@@ -35,15 +38,21 @@ type FabricLook = {
   mottle: number;
   /** Mancha esticada na vertical (listras de desbotado do jeans); 1 = redonda. */
   streak?: number;
+  /** Largura da barra dobrada (m): vinco a essa distância da borda; 0 = sem. */
+  hem: number;
+  /** Linhas de pesponto (m da borda); vazio = sem pesponto. */
+  stitches: number[];
+  /** Cor da linha do pesponto; sem ela, a cor da peça um pouco mais clara. */
+  thread?: string;
 };
 
 export const FABRIC_LOOK: Record<FabricName, FabricLook> = {
-  algodao: { tile: 0.036, roughness: 0.9, specular: 0.3, sheen: 0.7, sheenRoughness: 0.75, sheenWhite: 0.35, relief: 0.6, threads: 1, mottle: 0.06 },
-  sarja: { tile: 0.028, roughness: 0.88, specular: 0.3, sheen: 0.45, sheenRoughness: 0.7, sheenWhite: 0.3, relief: 0.7, threads: 1, mottle: 0.08 },
-  denim: { tile: 0.05, roughness: 0.92, specular: 0.25, sheen: 0.5, sheenRoughness: 0.8, sheenWhite: 0.45, relief: 1, threads: 1.3, mottle: 0.22, streak: 6 },
-  trico: { tile: 0.05, roughness: 0.95, specular: 0.2, sheen: 0.9, sheenRoughness: 0.85, sheenWhite: 0.3, relief: 1, threads: 1, mottle: 0.05 },
-  cetim: { tile: 0.06, roughness: 0.2, specular: 1, sheen: 0.6, sheenRoughness: 0.3, sheenWhite: 0.6, relief: 0.25, threads: 1, mottle: 0.03 },
-  moletom: { tile: 0.03, roughness: 0.92, specular: 0.25, sheen: 0.8, sheenRoughness: 0.85, sheenWhite: 0.35, relief: 0.4, threads: 1, mottle: 0.05 },
+  algodao: { tile: 0.036, roughness: 0.9, specular: 0.3, sheen: 0.7, sheenRoughness: 0.75, sheenWhite: 0.35, relief: 0.6, threads: 1, mottle: 0.06, hem: 0.022, stitches: [0.015] },
+  sarja: { tile: 0.028, roughness: 0.88, specular: 0.3, sheen: 0.45, sheenRoughness: 0.7, sheenWhite: 0.3, relief: 0.7, threads: 1, mottle: 0.08, hem: 0.025, stitches: [0.009] },
+  denim: { tile: 0.05, roughness: 0.92, specular: 0.25, sheen: 0.5, sheenRoughness: 0.8, sheenWhite: 0.45, relief: 1, threads: 1.3, mottle: 0.22, streak: 6, hem: 0.02, stitches: [0.006, 0.013], thread: "#c8923e" },
+  trico: { tile: 0.05, roughness: 0.95, specular: 0.2, sheen: 0.9, sheenRoughness: 0.85, sheenWhite: 0.3, relief: 1, threads: 1, mottle: 0.05, hem: 0, stitches: [] },
+  cetim: { tile: 0.06, roughness: 0.2, specular: 1, sheen: 0.6, sheenRoughness: 0.3, sheenWhite: 0.6, relief: 0.25, threads: 1, mottle: 0.03, hem: 0.005, stitches: [] },
+  moletom: { tile: 0.03, roughness: 0.92, specular: 0.25, sheen: 0.8, sheenRoughness: 0.85, sheenWhite: 0.35, relief: 0.4, threads: 1, mottle: 0.05, hem: 0.02, stitches: [0.009] },
 };
 
 /** Tamanho da mancha grande (m): ela se repete a cada ~0,7 m. */
@@ -110,9 +119,15 @@ function toPhysical(source: THREE.Material): THREE.MeshPhysicalMaterial {
   return p;
 }
 
+/** Pesponto: largura da linha e comprimento de cada ponto (m). */
+const STITCH_WIDTH = 0.0011;
+const STITCH_LENGTH = 0.0045;
+
 const VERTEX_DECL = /* glsl */ `
+attribute vec2 fabricEdge;
 varying vec3 vFabricPos;
-varying vec3 vFabricNormal;`;
+varying vec3 vFabricNormal;
+varying vec2 vFabricEdge;`;
 
 const FRAGMENT_DECL = /* glsl */ `
 uniform sampler2D fabricMap;
@@ -122,9 +137,20 @@ uniform float fabricThreads;
 uniform vec3 fabricMottleScale;
 uniform float fabricMottle;
 uniform float fabricInside;
+uniform float fabricHem;
+uniform vec2 fabricStitches;
+uniform vec3 fabricThread;
 uniform mat3 normalMatrix;
 varying vec3 vFabricPos;
-varying vec3 vFabricNormal;`;
+varying vec3 vFabricNormal;
+varying vec2 vFabricEdge;
+
+// Linha fina a "at" da borda, sem serrilhar: de longe some aos poucos.
+float fabricLine( float d, float at, float width ) {
+  float aa = fwidth( d ) + 1e-6;
+  float cover = 1.0 - smoothstep( width * 0.5, width * 0.5 + aa, abs( d - at ) );
+  return at > 0.0 ? cover * clamp( width / aa, 0.0, 1.0 ) : 0.0;
+}`;
 
 // Depois da normal do arquivo: relevo dos fios, tom, mancha e avesso.
 const FRAGMENT_BODY = /* glsl */ `
@@ -149,6 +175,20 @@ const FRAGMENT_BODY = /* glsl */ `
   float mottle = texture2D( fabricMap, mp.zy ).b * fw.x + texture2D( fabricMap, mp.xz ).b * fw.y + texture2D( fabricMap, mp.xy ).b * fw.z;
   diffuseColor.rgb *= 1.0 + ( mottle - 0.5 ) * 2.0 * fabricMottle;
   roughnessFactor = clamp( roughnessFactor + ( mottle - 0.5 ) * 0.12, 0.05, 1.0 );
+
+  // Acabamento: o atributo guarda "limite - distância" (sem ele = longe).
+  float edgeD = ${EDGE_CAP.toFixed(4)} - vFabricEdge.x;
+  // Borda e vinco da barra dobrada.
+  diffuseColor.rgb *= 1.0 - 0.15 * fabricLine( edgeD, 0.0012, 0.0024 );
+  diffuseColor.rgb *= 1.0 - 0.12 * fabricLine( edgeD, fabricHem, 0.0016 );
+  // Pesponto: tracejado ao longo da borda.
+  float ph = vFabricEdge.y / ${STITCH_LENGTH.toFixed(4)};
+  float pw = fwidth( ph );
+  float dash = mix( smoothstep( 0.18 - pw, 0.18 + pw, fract( ph ) ) * ( 1.0 - smoothstep( 0.92 - pw, 0.92 + pw, fract( ph ) ) ), 0.74, clamp( pw * 2.0 - 0.5, 0.0, 1.0 ) );
+  float stitch = max( fabricLine( edgeD, fabricStitches.x, ${STITCH_WIDTH} ), fabricLine( edgeD, fabricStitches.y, ${STITCH_WIDTH} ) ) * dash;
+  // Furinho da agulha: um vinco escuro dos dois lados do ponto.
+  diffuseColor.rgb *= 1.0 - 0.1 * max( fabricLine( edgeD, fabricStitches.x, ${STITCH_WIDTH * 2.6} ), fabricLine( edgeD, fabricStitches.y, ${STITCH_WIDTH * 2.6} ) ) * ( 1.0 - stitch );
+  diffuseColor.rgb = mix( diffuseColor.rgb, fabricThread, stitch * 0.9 );
 
   if ( ! gl_FrontFacing ) diffuseColor.rgb *= fabricInside;
 }`;
@@ -191,12 +231,19 @@ export function clothMaterial(
       },
       fabricMottle: { value: look.mottle },
       fabricInside: { value: INSIDE },
+      fabricHem: { value: look.hem },
+      fabricStitches: { value: new THREE.Vector2(look.stitches[0] ?? 0, look.stitches[1] ?? 0) },
+      fabricThread: {
+        value: look.thread
+          ? new THREE.Color(look.thread)
+          : m.color.clone().multiplyScalar(1.25).addScalar(0.035),
+      },
     });
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>${VERTEX_DECL}`)
       .replace(
         "#include <begin_vertex>",
-        "#include <begin_vertex>\n  vFabricPos = transformed;\n  vFabricNormal = objectNormal;",
+        "#include <begin_vertex>\n  vFabricPos = transformed;\n  vFabricNormal = objectNormal;\n  vFabricEdge = fabricEdge;",
       );
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>${FRAGMENT_DECL}`)
@@ -205,4 +252,22 @@ export function clothMaterial(
   // O código do shader muda só com o ajuste da cor; o resto são uniforms.
   m.customProgramCacheKey = () => `vestra-fabric-${mean != null ? 1 : 0}`;
   return m;
+}
+
+/**
+ * Grava na parte da peça a distância até a borda do tecido (para a barra e o
+ * pesponto do `clothMaterial`), como "limite - distância": parte sem o
+ * atributo fica sem acabamento em vez de toda riscada.
+ *
+ * Tiras estreitas (ribana da gola/punho, quase toda perto da borda) e malhas
+ * retalhadas ficam sem — o pesponto viraria rabisco.
+ */
+export function addFabricEdge(g: THREE.BufferGeometry) {
+  const e = edgeDistance(g.getAttribute("position").array, g.getIndex()?.array ?? null);
+  let near = 0;
+  for (let i = 0; i < e.length; i += 2) if (e[i] < 0.02) near++;
+  const strip = near > 0.6 * (e.length / 2);
+  for (let i = 0; i < e.length; i += 2) e[i] = strip ? 0 : EDGE_CAP - e[i];
+  g.setAttribute("fabricEdge", new THREE.BufferAttribute(e, 2));
+  return g;
 }
