@@ -449,22 +449,29 @@ novo em outro computador, tirar `<StudioAO />` de `tryon-scene.tsx` e
 > aparecem mais na apresentação e não dependem de mexer no ajuste ao corpo do
 > cliente. Feita em 21/10 na `feat/sprint5-tecido` (f33fd0a). Como refazer:
 > [scripts/molde/README.md](../scripts/molde/README.md#9-caimento-com-gravidade-e-espessura-depois-do-molde).
+>
+> **21/10 (tarde):** "Faz as outras 5 e tenta ver o que aconteceu com a 3".
+> Feitos 3, 4, 6, 7, 8 e 10 (431b3ef e o commit seguinte). Prints antes
+> (d070e68) e depois em [docs/apresentacao/tecido/](apresentacao/tecido/README.md), 08 a 12.
 
 | # | Item | Situação | Como ficou |
 |---|---|---|---|
 | 1 | Saia Midi Plissada com gravidade | Feito | Presa do cós ao quadril, solta dali para baixo: as pregas caem retas em vez de abrir em cone |
 | 2 | Vestido Slip | Feito | Preso no corpete; o cetim cai com dobras de verdade até a barra |
-| 3 | Wide Denim | **Cortado** | 7 tentativas: a barra encosta no tênis e no chão e amassa feito papel em todas (com e sem tênis, presa ou solta). Fica como estava |
-| 4 | Cargo Pant e Bermuda | Não escolhido | |
+| 3 | Wide Denim | Feito (na 2ª rodada) | O problema era a barra solta batendo no tênis e no chão. Agora a barra fica presa (ela já passa por cima do tênis no molde), sem pés e sem chão na simulação, com o tecido 7 cm mais comprido perto da barra e o denim mais duro (dobra 15; com 5 amassava como papel): a perna larga sanfona em cima do tênis |
+| 4 | Cargo Pant e Bermuda | Feito | Presas no quadril e na barra, sarja mais dura: franzem um pouco acima da barra e no joelho. Os bolsos (pedaços soltos) andam junto com a perna. A espessura não entra mais na borda do bolso: dobrada para dentro, ela encostava na perna e desenhava uma linha escura em volta dele |
 | 5 | Camisetas (Boxy Tee, Relugar, Oversized) | Feito | Presas nos ombros e no peito; o resto pesa e forma dobras macias. As camadas do CLO (~1 mm) são unidas a 3 mm na simulação e a queda é a média num raio de 12 mm; com menos, a manga da oversized furava a camada de baixo |
-| 6 | Hoodie Core | Não escolhido | |
-| 7 | Gravidade por tamanho | Não escolhido | |
-| 8 | Caimento no corpo do cliente | Não escolhido | A queda vai gravada na forma da peça e o ajuste ao corpo do cliente continua o de antes; nos corpos testados (padrão e 185 cm/98 kg) a queda se mantém |
+| 6 | Hoodie Core | Feito, sem pesponto | Preso nos ombros e no capuz, moletom mais pesado; as emendas do CLO (vão de até 5 mm) são unidas na simulação. Pesponto cortado: as "tiras" da frente são recortes do próprio painel, não costura. **Perguntar ao grupo** se o desenho é esse |
+| 7 | Gravidade por tamanho | Feito nas peças de baixo | Tamanho maior cai reto: a folga a mais cresce do entrepernas até a barra (2,5 vezes na barra), em vez de inflar a perna inteira (`bottom-fit.ts`). Nas camisetas o tamanho continua como antes (não foi renderizado P/G) |
+| 8 | Caimento no corpo do cliente | Conferido, sem código | A queda vai gravada na forma da peça e o ajuste ao corpo do cliente leva as dobras junto. Conferido no corpo padrão, 185 cm/98 kg e 175 cm com quadril 120 (print 12) |
 | 9 | Espessura do tecido | Feito | Peças de baixo (folha só): barra, cós, cava e alças ganham uma faixa dobrada para dentro (sarja 2,5 mm, cetim 1,2 mm, denim 3 mm). De perto, a barra da cargo e o bolso têm "corpo". As camisetas já vêm em camadas do CLO e ficaram como estavam |
-| 10 | Fechamento do tema | Não escolhido | |
+| 10 | Fechamento do tema | Feito | Corpo grande com tamanho apertado: a pele aparecia no gancho e no glúteo (losango branco). Agora o tecido nunca fica atrás da pele logo embaixo dele (até 8 mm a mais, fora do cós). Prints 08–12 e documentação |
 
 **Achados no caminho:**
-- A Wide Denim também ganhou espessura, só não a queda.
+- A primeira versão da regra do gancho (item 10) deixava um ponto sem
+  posição (NaN) quando toda a pele perto dele era da outra perna: o ponto ia
+  para o chão e desenhava uma linha fina do gancho ao pé. Corrigido, com teste.
+- O contorno do bolso da cargo é serrilhado no molde (já era assim antes).
 - Sobra um pontinho de 1–2 px na barra da manga da camiseta, de perto e só
   em alguns corpos. A oversized original já tinha um igual.
 - Volta rápida: os `.glb` de antes estão no commit anterior (d070e68).

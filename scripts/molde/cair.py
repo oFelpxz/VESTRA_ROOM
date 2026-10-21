@@ -48,11 +48,12 @@ MODOS = {
     # Denim pesado da Wide Denim: mesma ideia da cargo, com a barra presa um
     # pouco mais alto e o denim mais mole na compressão, para a perna larga
     # "sanfonar" sobre o tênis. Sem os pés (a barra já passa por eles no
-    # molde) e sem chão: a barra presa não chega lá.
+    # molde) e sem chão: a barra presa não chega lá. Dobra 15: com 5 o denim
+    # amassava como papel.
     # `sobra`: o tecido fica esse tanto mais comprido (negativo = cresce) onde
     # `onde` dá 1, como a calça que é mais longa que a perna: entre os dois
     # pinos ele não cabe e franze.
-    "wide": dict(mass=0.04, tension=60, compression=1.5, shear=20, bending=5, frames=90,
+    "wide": dict(mass=0.04, tension=60, compression=1.5, shear=20, bending=15, frames=90,
                  pin=lambda co: max(smooth(0.72, 0.80, co.z),
                                     1 - smooth(HEM + 0.03, HEM + 0.13, co.z)),
                  sobra=-0.07, onde=lambda co: 1 - smooth(HEM + 0.12, HEM + 0.40, co.z),

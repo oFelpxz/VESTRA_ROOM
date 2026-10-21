@@ -23,6 +23,10 @@ export const BOTTOM_MOLDE_SIZE = "40";
 const BIND_RADIUS = 0.05; // pele que segura cada ponto do tecido (m)
 const BIND_SIGMA = 0.02; // peso cai com a distância (m)
 const MIN_GAP = 0.003; // tecido nunca entra na pele (m)
+const BULGE_RADIUS = 0.015; // pele "embaixo" do ponto do tecido (m)
+const BULGE_MAX = 0.008; // m
+const BULGE_TOP = 0.2; // m acima do entrepernas do molde (o cós fica de fora)
+const BULGE_MID = 0.01; // m do meio do corpo: daí para fora, só pele do mesmo lado
 const MAX_EASE = 0.04; // folga a mais, no máximo (m)
 // Tamanho apertado: o tecido chega no máximo a 3/4 da distância do molde
 // (no gancho e no vinco dos glúteos o tecido passa por cima de uma reentrância
@@ -53,6 +57,11 @@ const MOLDE_CROTCH_Y = 0.776;
 const MAX_LONGER = 0.05; // m a mais, no máximo (a barra para no chão)
 const MAX_SHORTER = 0.1; // m a menos, no máximo
 const FLOOR_Y = 0.005; // m
+// Gravidade no tamanho maior: a folga a mais cresce do entrepernas para baixo
+// (até HANG vezes mais a HANG_SPAN dele) e o tecido cai reto da coxa, em vez
+// de seguir a perna. Sem isso o G parecia o P inflado por igual.
+const HANG = 1.5;
+const HANG_SPAN = 0.7; // m
 
 export type BottomBinding = {
   /** Início dos vizinhos de cada ponto em `skin`/`weights` (n + 1 itens). */
@@ -224,12 +233,36 @@ export function fitBottom(
         Math.max((MOLDE_CROTCH_Y - INNER_FULL_FROM - refY[i]) / (INNER_FULL_AT - INNER_FULL_FROM), 0),
         1,
       );
-    const e = ease < 0 ? ease * (1 - leg) : ease * (1 - (1 - innerEase) * inner);
+    const hang = 1 + HANG * Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / HANG_SPAN, 0), 1);
+    const e = ease < 0 ? ease * (1 - leg) : ease * hang * (1 - (1 - innerEase) * inner);
     let g = Math.max(gap[i] + e, gap[i] * TIGHT_KEEP, MIN_GAP);
     if (tuckY != null) {
       const t = Math.min(Math.max((refY[i] - tuckY - TUCK_START) / TUCK_BLEND, 0), 1);
       g += (Math.min(g, TUCK_GAP) - g) * t;
     }
+    // A média da pele fica por dentro da curva (quadril e glúteo grandes, e o
+    // gancho): o tecido não pode ficar atrás da pele logo embaixo dele, senão
+    // a pele aparecia por cima (o "defeito branco" do entrepernas). Só a pele a
+    // até BULGE_RADIUS da linha do ponto e do mesmo lado do meio: a da outra
+    // perna rasgava o gancho.
+    let bulge = -Infinity;
+    const side = Math.abs(refX[i]) > BULGE_MID ? Math.sign(refX[i]) : 0;
+    for (let k = start[i]; k < start[i + 1]; k++) {
+      const j = skin[k];
+      if (side !== 0 && Math.sign(pos[j * 3]) !== side) continue;
+      const px = pos[j * 3] - sx;
+      const py = pos[j * 3 + 1] - sy;
+      const pz = pos[j * 3 + 2] - sz;
+      const d = px * dir[i * 3] + py * dir[i * 3 + 1] + pz * dir[i * 3 + 2];
+      if (d > bulge && px * px + py * py + pz * pz - d * d < BULGE_RADIUS * BULGE_RADIUS) bulge = d;
+    }
+    // No máximo BULGE_MAX a mais: no fundo do gancho a pele da coxa fica
+    // "embaixo" e empurrava o tecido em pontas. Perto do cós, nada: a barriga
+    // acima dele serrilhava a borda.
+    // Sem pele embaixo (toda do outro lado), nada: -Infinity × 0 dava NaN e o
+    // ponto ia para a origem, uma linha do gancho até o chão.
+    const below = Math.min(Math.max((MOLDE_CROTCH_Y + BULGE_TOP - refY[i]) / TIGHT_LEG_BLEND, 0), 1);
+    if (bulge > -Infinity) g = Math.max(g, g + (Math.min(bulge + MIN_GAP, g + BULGE_MAX) - g) * below);
     out[i * 3] = sx + dir[i * 3] * g;
     out[i * 3 + 1] = sy + dir[i * 3 + 1] * g;
     out[i * 3 + 2] = sz + dir[i * 3 + 2] * g;

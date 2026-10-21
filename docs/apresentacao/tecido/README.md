@@ -16,4 +16,15 @@ Mesma câmera, mesmo look, `npm run dev`.
 | `07-celular.jpg` | Oversized + Wide Denim, 375 px | O mesmo acabamento no celular, sem erro no console |
 | `manequim-novo.png` | Página do produto, aba "Manequim" (lista 5) | O manequim virou o avatar do provador, com braços e tênis |
 
-O que mudou e por quê: [SPRINT5-DECISOES.md](../../SPRINT5-DECISOES.md#roupa-sem-cara-de-massinha-lista-3).
+Lista 6 (gravidade): renders do Blender (`scripts/molde/render.py`), peça em
+laranja e corpo em cinza. **Antes:** d070e68. **Depois:** 21/10, tarde.
+
+| Arquivo | O que mostra | O que reparar |
+|---|---|---|
+| `08-queda-pecas-de-baixo.jpg` | Saia, vestido, Wide, Cargo e Bermuda: antes (em cima) e depois | Pregas e cetim caem retos; a Wide sanfona em cima do tênis; cargo e bermuda franzem perto da barra |
+| `09-queda-camisetas-moletom.jpg` | Boxy Tee, Relugar, Oversized e Hoodie Core | Dobras macias do peito para baixo em vez de tecido "inflado" |
+| `10-tamanho-p-g.jpg` | Cargo 38 e 44 no mesmo corpo (quadril 98), frente e lado | O 44 sobra mais na barra que na coxa: cai reto |
+| `11-entrepernas-corpo-grande.jpg` | Corpo grande com tamanho apertado: antes e depois | Some o losango branco do gancho e as manchas no glúteo |
+| `12-corpo-grande.jpg` | Saia G, Bermuda 44 e Wide 42 com tênis, quadril 120 | As dobras da queda continuam no corpo do cliente |
+
+O que mudou e por quê: [lista 3](../../SPRINT5-DECISOES.md#roupa-sem-cara-de-massinha-lista-3) e [lista 6](../../SPRINT5-DECISOES.md#tecido-e-gravidade-de-vez-lista-6).

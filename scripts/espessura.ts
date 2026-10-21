@@ -68,8 +68,9 @@ async function main() {
           uses.set(key, (uses.get(key) ?? 0) + 1);
           if (!first.has(key)) first.set(key, [a, b]);
         }
+      const sewn = sewnOn(pos, index, weld, m);
       const border: [number, number][] = [];
-      for (const [key, c] of uses) if (c === 1) border.push(first.get(key)!);
+      for (const [key, c] of uses) if (c === 1 && !sewn[weld[first.get(key)![0]]]) border.push(first.get(key)!);
       if (!border.length) continue;
 
       // Normal de cada ponto juntado: as cópias de uma costura de UV na barra
@@ -134,6 +135,44 @@ async function main() {
   scene.setExtras({ ...extras, vestra_espessura: mm });
   await io.write(output, doc);
   console.log(`${output}: ${rim} arestas de borda com ${mm} mm de espessura`);
+}
+
+/**
+ * Pontos de pedaços costurados por cima da peça (bolso, lapela, passante):
+ * pedaços soltos que ficam, na mediana, a menos de SEWN da parte maior. A
+ * borda deles não ganha faixa: dobrada para dentro, ela encostava na perna e
+ * desenhava uma linha escura em volta do bolso da cargo.
+ */
+const SEWN = 0.012; // m
+function sewnOn(pos: ArrayLike<number>, index: ArrayLike<number>, weld: Int32Array, m: number): Uint8Array {
+  const parent = Array.from({ length: m }, (_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let f = 0; f < index.length; f += 3) {
+    parent[find(weld[index[f + 1]])] = find(weld[index[f]]);
+    parent[find(weld[index[f + 2]])] = find(weld[index[f]]);
+  }
+  const at = new Int32Array(m);
+  for (let v = 0; v < weld.length; v++) at[weld[v]] = v;
+  const pieces = new Map<number, number[]>();
+  for (let w = 0; w < m; w++) {
+    const list = pieces.get(find(w));
+    if (list) list.push(w);
+    else pieces.set(find(w), [w]);
+  }
+  const sorted = [...pieces.values()].sort((a, b) => b.length - a.length);
+  const out = new Uint8Array(m);
+  for (const piece of sorted.slice(1)) {
+    const dist = piece.map((w) => {
+      let best = Infinity;
+      for (const u of sorted[0]) {
+        const [a, b] = [at[w] * 3, at[u] * 3];
+        best = Math.min(best, (pos[a] - pos[b]) ** 2 + (pos[a + 1] - pos[b + 1]) ** 2 + (pos[a + 2] - pos[b + 2]) ** 2);
+      }
+      return Math.sqrt(best);
+    });
+    if (dist.sort((a, b) => a - b)[dist.length >> 1] < SEWN) for (const w of piece) out[w] = 1;
+  }
+  return out;
 }
 
 /** Normais por ponto (média das faces em volta, pesada pela área). */

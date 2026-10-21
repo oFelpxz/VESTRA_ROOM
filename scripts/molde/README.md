@@ -188,19 +188,40 @@ npx tsx scripts/aplicar-queda.ts public/models/saia_midi_plissada.glb /tmp/saia.
 mb cair.py -- avatar_base.glb vestido_slip.glb /tmp/vestido.bin vestido
 mb cair.py -- avatar_base.glb boxy_tee_01.glb /tmp/tee.bin camiseta
 npx tsx scripts/aplicar-queda.ts public/models/boxy_tee_01.glb /tmp/tee.bin public/models/boxy_tee_01.glb 12
+mb cair.py -- avatar_base.glb cargo_pant_02.glb /tmp/cargo.bin calca   # bermuda, wide: idem
+mb cair.py -- avatar_base.glb hoodie-core-v3.glb /tmp/hoodie.bin moletom
+npx tsx scripts/aplicar-queda.ts public/models/hoodie-core-v3.glb /tmp/hoodie.bin public/models/hoodie-core-v3.glb 12
 ```
+
+A queda é feita uma vez, no corpo de referência. No site, `bottom-fit.ts`
+leva as dobras para o corpo do cliente (cada ponto do tecido segue a pele
+que estava embaixo dele). Duas regras de lá completam a gravidade:
+
+- Tamanho maior cai reto: a folga a mais cresce do entrepernas para baixo
+  (até 2,5 vezes na barra), em vez de inflar a perna por igual.
+- O tecido nunca fica atrás da pele logo embaixo dele (até 8 mm a mais,
+  fora do cós): em corpo grande com tamanho apertado a pele aparecia no
+  gancho e no glúteo.
 
 - Camisetas: raio 12 (mm) no `aplicar-queda.ts`. A simulação une as camadas
   e costuras do CLO a 3 mm; com raio menor a manga da oversized furava a
   camada de baixo. A Relugar é o mesmo arquivo da Boxy Tee (copiar).
-- Wide Denim **fica sem queda**: a barra encosta no tênis e no chão e amassa
-  (7 tentativas, 21/10).
+- Calças e bermuda (`calca`, `bermuda`, `wide`): presas no quadril e na
+  barra, com `sobra` (negativa: o tecido fica mais comprido que a perna e
+  franze entre os dois pinos, sobre o joelho e o tênis). A Wide Denim não
+  usa pés nem chão (`pe_z`, `chao=False`): a barra presa já passa por eles.
+- Ilhas soltas (bolso cargo, passante) saem da simulação: o
+  `aplicar-queda.ts` move cada uma pelo ponto da simulação mais perto.
+- Moletom do Hoodie Core (`moletom`): preso nos ombros, raio 12, costuras
+  unidas a 5 mm na simulação. Sem espessura (não é uma folha só).
 - `AJUSTE="mass=0.05,bending=2"` muda o tecido sem editar o script.
 
 Depois da queda, as peças de baixo (uma folha só) ganham espessura na
 barra, no cós, na cava e nas alças: uma faixa dobrada para dentro com a
 espessura do tecido (sarja 2,5 mm, cetim 1,2 mm, denim 3 mm). O script grava
-`vestra_espessura` na cena e pula a peça que já tem:
+`vestra_espessura` na cena e pula a peça que já tem. Pedaços costurados por
+cima (bolso da cargo, passante) ficam sem faixa: dobrada para dentro, ela
+encostava na perna e riscava uma linha escura em volta do bolso. Uso:
 
 ```bash
 npx tsx scripts/espessura.ts public/models/saia_midi_plissada.glb

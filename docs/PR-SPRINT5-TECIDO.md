@@ -73,6 +73,8 @@ ganham espessura na barra e no cós.
 
 ### Tecido e gravidade (lista 6)
 - f33fd0a Saia, vestido e camisetas com gravidade (`scripts/molde/cair.py`) e espessura na barra das peças de baixo (`scripts/espessura.ts`)
+- 431b3ef Gravidade na Wide Denim, Cargo, Bermuda e Hoodie Core
+- Tamanho maior cai reto e o tecido não fica atrás da pele no gancho (`bottom-fit.ts`); bolso da cargo sem a faixa de espessura
 
 Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.glb`.
 
@@ -104,7 +106,8 @@ Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.
 - Avatar sem cabelo (cabeça lisa de manequim).
 - Moletom continua sem pesponto (as emendas do arquivo não se tocam; o
   pesponto riscava o tricô e o cós).
-- Wide Denim sem queda com gravidade (a barra amassava no tênis e no chão).
+- Hoodie Core sem pesponto: as "tiras" da frente são recortes do painel (confirmar com o grupo se o desenho é esse).
+- Tamanho P/G nas camisetas sem render de conferência (só as peças de baixo).
 - No celular, a ponta do tênis fica atrás dos botões de vista (igual ao pé
   descalço antes).
 

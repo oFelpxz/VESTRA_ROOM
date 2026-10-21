@@ -70,6 +70,14 @@ describe("fitBottom", () => {
     close(out[1], 1.003, 1e-5);
   });
 
+  it("toda a pele do outro lado do meio: o ponto não vira NaN", () => {
+    const left = SKIN.map((v, i) => (i % 3 === 0 ? v - 0.02 : v));
+    const cloth = new Float32Array([0.011, 1.01, 0]);
+    const out = fitBottom(bindBottom(cloth, left), left, 0);
+    assert.ok(out.every(Number.isFinite), `${out}`);
+    close(out[1], 1.01, 1e-5);
+  });
+
   it("debaixo da peça de cima fica rente", () => {
     const binding = bindBottom(CLOTH, SKIN);
     const out = fitBottom(binding, SKIN, 0, 0.9);
@@ -78,6 +86,8 @@ describe("fitBottom", () => {
 });
 
 describe("fitBottom na perna", () => {
+  // Folga a mais cresce para baixo do entrepernas (gravidade no tamanho maior).
+  const hang = (y: number) => 1 + 1.5 * Math.min((0.776 - y) / 0.7, 1);
   // Uma "perna" do lado direito (x > 0), bem abaixo do entrepernas.
   const leg = new Float32Array([
     0.1, 0.4, -0.01,
@@ -95,8 +105,8 @@ describe("fitBottom na perna", () => {
   it("folga a mais: o lado de dentro sobra só 1/4", () => {
     const outer = fitBottom(bindBottom(new Float32Array([0.12, 0.4, 0]), leg), leg, 0.02);
     const inner = fitBottom(bindBottom(new Float32Array([0.08, 0.4, 0]), leg), leg, 0.02);
-    close(outer[0], 0.14, 1e-5);
-    close(inner[0], 0.075, 1e-5);
+    close(outer[0], 0.12 + 0.02 * hang(0.4), 1e-5);
+    close(inner[0], 0.08 - 0.02 * 0.25 * hang(0.4), 1e-5);
   });
 
   it("perto do entrepernas o lado de dentro não ganha folga (as pernas se encostavam)", () => {
@@ -105,7 +115,15 @@ describe("fitBottom na perna", () => {
     const inner = fitBottom(bindBottom(new Float32Array([0.08, 0.746, 0]), thigh), thigh, 0.04);
     const outer = fitBottom(bindBottom(new Float32Array([0.12, 0.746, 0]), thigh), thigh, 0.04);
     close(inner[0], 0.08, 1e-5);
-    close(outer[0], 0.16, 1e-5);
+    close(outer[0], 0.12 + 0.04 * hang(0.746), 1e-5);
+  });
+
+  it("tamanho maior cai reto: perto da barra sobra mais que na coxa", () => {
+    const knee = leg.map((v, i) => (i % 3 === 1 ? v - 0.3 : v));
+    const thigh = leg.map((v, i) => (i % 3 === 1 ? v + 0.3 : v));
+    const low = fitBottom(bindBottom(new Float32Array([0.12, 0.1, 0]), knee), knee, 0.02);
+    const high = fitBottom(bindBottom(new Float32Array([0.12, 0.7, 0]), thigh), thigh, 0.02);
+    assert.ok(low[0] - 0.12 > 2 * (high[0] - 0.12));
   });
 });
 
