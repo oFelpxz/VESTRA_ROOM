@@ -386,6 +386,31 @@ export function TryOnExperience({
               {label}
             </button>
           ))}
+          {/* Tecido de perto: peito → barra → volta */}
+          {(() => {
+            const [next, label] =
+              view?.name === "chest"
+                ? (["hem", "Ver a barra"] as const)
+                : view?.name === "hem"
+                  ? (["front", "Voltar"] as const)
+                  : (["chest", "Tecido de perto"] as const);
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoRotate(false);
+                  setView((v) => ({ name: next, n: (v?.n ?? 0) + 1 }));
+                }}
+                className={`rounded-sm border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+                  next !== "chest"
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-foreground/20 bg-background/80 hover:border-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })()}
           <button
             type="button"
             aria-pressed={autoRotate}

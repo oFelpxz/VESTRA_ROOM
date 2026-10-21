@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   useGLTF,
@@ -13,6 +13,7 @@ import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
 import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
 import { tintMaterial } from "@/lib/garment-color";
+import { CLOSE_DISTANCE, closeUpY, type Box } from "@/lib/close-up";
 import { liteMode, type LiteMode } from "@/lib/render-quality";
 import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
@@ -159,7 +160,8 @@ export type ScenePiece = {
   length?: number;
 };
 
-export type CameraView = "front" | "side" | "back";
+/** Vistas dos botões; "chest" e "hem" são o close do tecido. */
+export type CameraView = "front" | "side" | "back" | "chest" | "hem";
 
 /**
  * Look com peça de baixo: a de cima veste o corpo (DressedAvatar desenha o
@@ -266,28 +268,118 @@ function Outfit({
   );
 }
 
-const VIEW_ANGLE: Record<CameraView, number> = {
+const VIEW_ANGLE: Record<"front" | "side" | "back", number> = {
   front: 0,
   side: Math.PI / 2,
   back: Math.PI,
 };
 
-/** Leva a câmera para frente/lado/costas, mantendo a distância e a altura. */
-function CameraRig({ view }: { view: { name: CameraView; n: number } | null }) {
+const MIN_DISTANCE = 1.5;
+
+type Controls = THREE.EventDispatcher<{ start: object }> & {
+  target: THREE.Vector3;
+  minDistance: number;
+  update: () => void;
+};
+
+// Fora do componente: os controles são da cena, não do estado do React.
+function setMinDistance(c: Controls, d: number) {
+  c.minDistance = d;
+}
+
+function isFabric(o: THREE.Object3D) {
+  const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+  return !!m && !Array.isArray(m) && m.customProgramCacheKey().startsWith("vestra-fabric");
+}
+
+/**
+ * Leva a câmera para frente/lado/costas (mantendo distância e altura) ou
+ * para perto do tecido (peito ou barra da peça do provador), deslizando.
+ * Arrastar no meio do caminho cancela.
+ */
+function CameraRig({
+  view,
+  params,
+  primary,
+  home,
+}: {
+  view: { name: CameraView; n: number } | null;
+  params: AvatarParams;
+  primary: "top" | "bottom";
+  home: { y: number; dist: number; targetY: number };
+}) {
   const camera = useThree((s) => s.camera);
-  const controls = useThree((s) => s.controls) as unknown as {
-    target: THREE.Vector3;
-    update: () => void;
-  } | null;
+  const scene = useThree((s) => s.scene);
+  const controls = useThree((s) => s.controls) as unknown as Controls | null;
+  const goal = useRef<{ pos: THREE.Vector3; target: THREE.Vector3; close: boolean } | null>(null);
+  const close = useRef(false);
+
+  useEffect(() => {
+    if (!controls) return;
+    setMinDistance(controls, MIN_DISTANCE);
+    const stop = () => {
+      if (goal.current) close.current = goal.current.close;
+      goal.current = null;
+    };
+    controls.addEventListener("start", stop);
+    return () => controls.removeEventListener("start", stop);
+  }, [controls]);
+
   useEffect(() => {
     if (!view || !controls) return;
-    const t = controls.target;
-    const offset = camera.position.clone().sub(t);
-    const flat = Math.hypot(offset.x, offset.z);
-    const a = VIEW_ANGLE[view.name];
-    camera.position.set(t.x + Math.sin(a) * flat, camera.position.y, t.z + Math.cos(a) * flat);
+    if (view.name === "chest" || view.name === "hem") {
+      const boxes: Box[] = [];
+      scene.traverse((o) => {
+        if (!(o as THREE.Mesh).isMesh || !isFabric(o)) return;
+        const b = new THREE.Box3().setFromObject(o);
+        if (!b.isEmpty()) boxes.push({ minY: b.min.y, maxY: b.max.y });
+      });
+      const y = closeUpY(view.name, boxes, primary, {
+        chestY: params.anchors.chest.y,
+        shoulderY: params.anchors.shoulder.y,
+        hipY: params.anchors.hip.y,
+      });
+      // Um pouco de lado e de cima: o brilho do tecido e a trama aparecem.
+      const a = 0.35;
+      goal.current = {
+        target: new THREE.Vector3(0, y, 0),
+        pos: new THREE.Vector3(Math.sin(a) * CLOSE_DISTANCE, y + 0.08, Math.cos(a) * CLOSE_DISTANCE),
+        close: true,
+      };
+    } else {
+      const a = VIEW_ANGLE[view.name];
+      // Saindo do close, volta para a distância e a altura do começo.
+      const from = goal.current?.close || close.current;
+      const t = from ? new THREE.Vector3(0, home.targetY, 0) : controls.target.clone();
+      const offset = camera.position.clone().sub(controls.target);
+      const flat = from ? home.dist : Math.hypot(offset.x, offset.z);
+      const y = from ? home.y : camera.position.y;
+      goal.current = {
+        target: t,
+        pos: new THREE.Vector3(t.x + Math.sin(a) * flat, y, t.z + Math.cos(a) * flat),
+        close: false,
+      };
+    }
+    // Deixa chegar perto durante o caminho; volta ao limite no fim.
+    setMinDistance(controls, 0.3);
+  }, [view, camera, controls, scene, params, primary, home]);
+
+  useFrame((_, dt) => {
+    const g = goal.current;
+    if (!g || !controls) return;
+    const k = 1 - Math.exp(-dt * 7);
+    camera.position.lerp(g.pos, k);
+    controls.target.lerp(g.target, k);
     controls.update();
-  }, [view, camera, controls]);
+    if (camera.position.distanceTo(g.pos) < 0.002 && controls.target.distanceTo(g.target) < 0.002) {
+      camera.position.copy(g.pos);
+      controls.target.copy(g.target);
+      close.current = g.close;
+      setMinDistance(controls, g.close ? 0.3 : MIN_DISTANCE);
+      controls.update();
+      goal.current = null;
+    }
+  });
   return null;
 }
 
@@ -328,6 +420,10 @@ export function TryOnScene({
   // Câmera "afasta" se o avatar for mais alto
   const camY = avatarParams.totalHeight * 0.55;
   const camDist = 2.4 + avatarParams.totalHeight * 0.5;
+  const home = useMemo(
+    () => ({ y: camY, dist: camDist, targetY: avatarParams.totalHeight * 0.5 }),
+    [camY, camDist, avatarParams.totalHeight],
+  );
 
   // Modo leve (src/lib/render-quality.ts): pelo aparelho ou se travar.
   const device = useSyncExternalStore(noSubscribe, readDeviceMode, () => FULL);
@@ -371,14 +467,13 @@ export function TryOnScene({
       <OrbitControls
         makeDefault
         target={[0, avatarParams.totalHeight * 0.5, 0]}
-        minDistance={1.5}
         maxDistance={6}
         maxPolarAngle={Math.PI / 1.8}
         minPolarAngle={Math.PI / 4}
         autoRotate={autoRotate}
         autoRotateSpeed={1.6}
       />
-      <CameraRig view={view} />
+      <CameraRig view={view} params={avatarParams} primary={primary} home={home} />
     </Canvas>
   );
 }
