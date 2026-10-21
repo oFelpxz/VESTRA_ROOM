@@ -19,6 +19,7 @@ import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
 import { BareAvatar, BottomGarment, Shoes, hemHeight } from "./bottom-garment";
 import { LiteContext } from "./lite-context";
+import { StudioAO } from "./studio-ao";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
@@ -433,7 +434,7 @@ export function TryOnScene({
   return (
     <Canvas
       shadows={!lite}
-      dpr={lite ? 1 : [1, 2]}
+      dpr={lite ? 1 : [1.5, 2]}
       data-lite={lite ? "1" : undefined}
       camera={{ position: [0, camY, camDist], fov: 38 }}
       // Mantém a imagem para o botão "Baixar foto do look".
@@ -481,6 +482,7 @@ export function TryOnScene({
         autoRotateSpeed={1.6}
       />
       <CameraRig view={view} params={avatarParams} primary={primary} home={home} />
+      {!lite && <StudioAO />}
     </Canvas>
   );
 }

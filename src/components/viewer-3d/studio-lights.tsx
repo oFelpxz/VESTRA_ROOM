@@ -64,6 +64,9 @@ export function StudioLights({ shadows = true }: { shadows?: boolean }) {
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-bias={-0.0002}
+        // Borda da sombra macia, como de softbox (o three 0.184 só tem PCF;
+        // o PCFSoft virou PCF e a sombra saía com recorte duro).
+        shadow-radius={5}
         shadow-normalBias={0.02}
         shadow-camera-left={-1.6}
         shadow-camera-right={1.6}

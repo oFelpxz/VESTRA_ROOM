@@ -167,6 +167,9 @@ const FRAGMENT_BODY = /* glsl */ `
   vec3 fw = pow( abs( fn ), vec3( 4.0 ) );
   fw /= fw.x + fw.y + fw.z + 1e-5;
   vec3 fp = vFabricPos * fabricScale;
+  // De longe o fio fica menor que um pixel e bate com a grade da tela (moiré
+  // em anéis na calça): relevo e tom dos fios somem aos poucos.
+  float fabricFine = 1.0 - smoothstep( 0.015, 0.045, length( fwidth( fp ) ) );
   vec4 tX = texture2D( fabricMap, fp.zy );
   vec4 tY = texture2D( fabricMap, fp.xz );
   vec4 tZ = texture2D( fabricMap, fp.xy );
@@ -174,7 +177,7 @@ const FRAGMENT_BODY = /* glsl */ `
   vec2 nY = tY.rg * 2.0 - 1.0;
   vec2 nZ = tZ.rg * 2.0 - 1.0;
   vec3 fabricBump = vec3( 0.0, nX.y, nX.x ) * fw.x + vec3( nY.x, 0.0, nY.y ) * fw.y + vec3( nZ.x, nZ.y, 0.0 ) * fw.z;
-  normal = normalize( normal + faceDirection * ( normalMatrix * fabricBump ) * fabricRelief );
+  normal = normalize( normal + faceDirection * ( normalMatrix * fabricBump ) * fabricRelief * fabricFine );
 
 #ifndef FABRIC_LITE
   // Dobras de caimento: ondas que inclinam a normal (a malha não muda).
@@ -217,7 +220,7 @@ const FRAGMENT_BODY = /* glsl */ `
 #endif
 
   float fabricTone = tX.a * fw.x + tY.a * fw.y + tZ.a * fw.z + 0.5;
-  diffuseColor.rgb *= mix( 1.0, fabricTone, fabricThreads );
+  diffuseColor.rgb *= mix( 1.0, fabricTone, fabricThreads * fabricFine );
 
   vec3 mp = vFabricPos * fabricMottleScale;
   float mottle = texture2D( fabricMap, mp.zy ).b * fw.x + texture2D( fabricMap, mp.xz ).b * fw.y + texture2D( fabricMap, mp.xy ).b * fw.z;

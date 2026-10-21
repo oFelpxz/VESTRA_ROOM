@@ -21,6 +21,7 @@ import {
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { isFittedToMannequin } from "./mannequin-mark";
+import { StudioAO } from "./studio-ao";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { useTintedScene } from "./tinted-scene";
 
@@ -182,7 +183,7 @@ export function Viewer3D({
     >
       <Canvas
         shadows
-        dpr={[1, 2]}
+        dpr={[1.5, 2]}
         camera={{ position: [3, 2, 5], fov: 50 }}
         gl={{ toneMapping: STUDIO_TONE_MAPPING }}
       >
@@ -227,6 +228,7 @@ export function Viewer3D({
           enableRotate={interactive}
           enableZoom={interactive}
         />
+        <StudioAO />
       </Canvas>
 
       {mannequin && fitted && (

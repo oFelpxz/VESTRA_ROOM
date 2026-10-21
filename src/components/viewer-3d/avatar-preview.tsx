@@ -20,6 +20,7 @@ export function AvatarPreview({ measures }: { measures: MeasurementInput }) {
   return (
     <Canvas
       shadows
+      dpr={[1.5, 2]}
       camera={{ position: [0, camY, camDist], fov: 38 }}
       gl={{ toneMapping: STUDIO_TONE_MAPPING }}
     >
