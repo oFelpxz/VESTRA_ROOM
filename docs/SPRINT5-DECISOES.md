@@ -368,6 +368,34 @@ as duas peças (ex.: Tee M × GG com a calça; Saia P × G).
 
 ---
 
+## Roupa sem "cara de massinha" (lista 3)
+
+> **Aprovada em 20/10:** "Pode fazer todos, avatar opção a". Feita em 20 e
+> 21/10 na branch `feat/sprint5-tecido`. Ponto seguro para voltar: tag local
+> `apresentacao-estavel`. Prints em
+> [apresentacao/tecido/](apresentacao/tecido/README.md).
+
+| # | Item | Situação | Como ficou |
+|---|---|---|---|
+| 1 | Trama do tecido | Feito | Gerada por código (`fabric-weave.ts`), sem imagem para baixar: malha, sarja, denim, tricô, cetim e moletom, projetada nos 3 eixos (a UV dos moldes é ruim) |
+| 2 | Material de tecido | Feito | `fabric.ts`: sheen (brilho de fibra), reflexo fraco, mancha suave, avesso mais escuro e um piso de cor para o preto não virar recorte. Cada `.glb` diz o tecido (`scripts/marcar-tecido.ts`) |
+| 3 | Luz de estúdio | Feito | `studio-lights.tsx`: softboxes, contra-luz e tone mapping Neutral |
+| 4 | Sombras | Feito | Braço e peça de cima fazem sombra na roupa. Testei também escurecer as dobras pela curvatura da malha: as malhas são lisas demais e não fez diferença, então saiu |
+| 5 | Quinas nítidas | Feito | Peças de baixo com quina acima de 30° (pregas da saia, cós, bolsos) |
+| 6 | Barra e pesponto | Feito | Distância até a borda calculada uma vez por peça (`fabric-edge.ts`, com teste); o shader desenha o vinco da barra e o pesponto tracejado (duplo e dourado no jeans). Ribanas e peças retalhadas (moletom) ficam sem, para não riscar tudo |
+| 7 | Espessura / avesso | **Cortado** | A barra teria 2–3 mm, uns 2 pixels no corpo inteiro. Pouco ganho para o risco |
+| 8 | Dobras | Feito | Só na luz (a malha não muda): em pé na camiseta, saia e vestido; deitadas na calça, acumulando na barra. Fora da barra aparecem só em manchas, porque o padrão regular parecia listra. Força por tecido: tricô sem, cetim mais suave |
+| 9 | Simulação de pano no Blender | **Cortado** | Teria de refazer o caimento de 9 moldes e conferir tamanho por tamanho a 5 dias da entrega. Fica como próximo passo |
+| 10 | Pele do avatar | Feito (opção a) | `skin-material.tsx`: tom mais quente, reflexo leve e sheen avermelhado nas bordas |
+
+**Custo:** tudo roda no shader que já existia (algumas leituras de textura a
+mais por pixel). A borda do tecido leva menos de 30 ms por peça, uma vez só.
+Testado no celular (375 px): abre igual e sem erro no console.
+
+**Peça nova:** marcar o tecido em `scripts/marcar-tecido.ts` e rodar o
+script (passo no [guia dos moldes](../scripts/molde/README.md#peça-nova)).
+Sem a marca, o provador usa algodão.
+
 ## Decisões dos itens 21, 22 e 25
 
 > **Aprovadas pelo grupo em 19/10:** todas as sugestões abaixo.

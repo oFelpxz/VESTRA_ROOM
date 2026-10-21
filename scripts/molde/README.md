@@ -168,5 +168,8 @@ npx tsx scripts/attach-accessory-models.ts   # liga ao produto (sem tabela)
    para manga longa (medir o ângulo das mangas do arquivo).
 2. `empurrar.py` → `posar_roupa.py` → `empurrar.py` (no `avatar_v3.glb`) →
    `marcar.py` (com a altura da ribana da barra, em m, se a peça tiver).
-3. Conferir com `render.py` e no provador (`/produto/<id>/provador`, painel
+3. Dizer o tecido: adicionar o `.glb` em `TECIDO` no
+   `scripts/marcar-tecido.ts` (algodao, sarja, denim, trico, cetim ou moletom)
+   e rodar `npx tsx scripts/marcar-tecido.ts`. Sem isso, a peça sai de algodão.
+4. Conferir com `render.py` e no provador (`/produto/<id>/provador`, painel
    "Simular corpo (dev)").
