@@ -20,6 +20,7 @@ import { clothMaterial, fabricOf } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL } from "./avatar-url";
+import { SkinMaterial } from "./skin-material";
 
 /**
  * Avatar do cliente vestindo uma peça ajustada ao corpo de referência
@@ -244,7 +245,7 @@ function FittedAvatar({
   return (
     <group>
       <mesh geometry={bodyGeometry} castShadow receiveShadow>
-        <meshStandardMaterial color="#d6c6b3" roughness={0.85} />
+        <SkinMaterial />
       </mesh>
       {clothGeometries.map((g, i) => (
         <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />

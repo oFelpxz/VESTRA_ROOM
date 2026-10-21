@@ -11,6 +11,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
 import { shapeBody } from "@/lib/garment-dress";
+import { SkinMaterial } from "./skin-material";
 
 /**
  * Avatar do VESTRA FIT.
@@ -272,7 +273,6 @@ export class AvatarErrorBoundary extends Component<
 
 function PrimitiveAvatar({ params }: { params: AvatarParams }) {
   const a = params.anchors;
-  const skinColor = "#d6c6b3";
   const accentColor = "#b9a78f";
 
   // Comprimentos derivados
@@ -309,13 +309,13 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
       {/* Cabeça */}
       <mesh position={[0, headY, 0]} castShadow>
         <sphereGeometry args={[headRadius, 32, 32]} />
-        <meshStandardMaterial color={skinColor} roughness={0.85} />
+        <SkinMaterial />
       </mesh>
 
       {/* Pescoço */}
       <mesh position={[0, neckY, 0]} castShadow>
         <cylinderGeometry args={[neckRadius, neckRadius * 1.1, neckHeight, 16]} />
-        <meshStandardMaterial color={skinColor} roughness={0.9} />
+        <SkinMaterial />
       </mesh>
 
       {/* Torso (elipsoide aproximado por sphere escalado) */}
@@ -374,7 +374,7 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
             <cylinderGeometry
               args={[armRadius, armRadius * 0.85, armLength, 16]}
             />
-            <meshStandardMaterial color={skinColor} roughness={0.9} />
+            <SkinMaterial />
           </mesh>
           {/* Mão */}
           <mesh
@@ -382,7 +382,7 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
             castShadow
           >
             <sphereGeometry args={[armRadius * 0.95, 16, 16]} />
-            <meshStandardMaterial color={skinColor} roughness={0.9} />
+            <SkinMaterial />
           </mesh>
         </group>
       ))}
@@ -394,7 +394,7 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
             <cylinderGeometry
               args={[legRadius, legRadius * 0.7, legLength, 16]}
             />
-            <meshStandardMaterial color={skinColor} roughness={0.9} />
+            <SkinMaterial />
           </mesh>
           {/* Pé */}
           <mesh position={[side * legOffsetX, 0.03, 0.06]} castShadow>

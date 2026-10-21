@@ -9,6 +9,7 @@ import { shapeBody } from "@/lib/garment-dress";
 import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
+import { SkinMaterial } from "./skin-material";
 
 /**
  * Peças de baixo (marca `vestra_peca = "baixo"`) e o corpo sem peça de cima.
@@ -45,7 +46,7 @@ export function BareAvatar({ params }: { params: AvatarParams }) {
   useEffect(() => () => geometry.dispose(), [geometry]);
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color="#d6c6b3" roughness={0.85} />
+      <SkinMaterial />
     </mesh>
   );
 }
