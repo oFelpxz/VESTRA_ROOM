@@ -221,7 +221,7 @@ function FittedAvatar({
   );
 
   const materials = useMemo(
-    () => parts.map((p) => clothMaterial(p.material, selectedColor, p.fabric)),
+    () => parts.map((p) => clothMaterial(p.material, selectedColor, p.fabric, "caimento")),
     [parts, selectedColor],
   );
 

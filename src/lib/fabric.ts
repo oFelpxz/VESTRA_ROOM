@@ -16,6 +16,8 @@ import { EDGE_CAP, edgeDistance } from "./fabric-edge";
  *   cava) mais escuro.
  * - Acabamento perto da borda do tecido (`addFabricEdge`): vinco da barra
  *   dobrada e pesponto tracejado — dourado no jeans.
+ * - Dobras de caimento (`Wrinkle`): só na luz (a malha não muda) — em pé na
+ *   camiseta, saia e vestido; deitadas na calça, juntando na barra.
  *
  * A cor escolhida entra como no `tintMaterial` (`garment-color.ts`).
  */
@@ -44,15 +46,23 @@ type FabricLook = {
   stitches: number[];
   /** Cor da linha do pesponto; sem ela, a cor da peça um pouco mais clara. */
   thread?: string;
+  /** Força das dobras de caimento (0 = sem). */
+  wrinkle: number;
 };
 
+/**
+ * Jeito das dobras: "caimento" = em pé, pendendo do peito/cintura (camiseta,
+ * saia, vestido); "calca" = deitadas, juntando no tornozelo, joelho e cós.
+ */
+export type Wrinkle = "caimento" | "calca";
+
 export const FABRIC_LOOK: Record<FabricName, FabricLook> = {
-  algodao: { tile: 0.036, roughness: 0.9, specular: 0.3, sheen: 0.7, sheenRoughness: 0.75, sheenWhite: 0.35, relief: 0.6, threads: 1, mottle: 0.06, hem: 0.022, stitches: [0.015] },
-  sarja: { tile: 0.028, roughness: 0.88, specular: 0.3, sheen: 0.45, sheenRoughness: 0.7, sheenWhite: 0.3, relief: 0.7, threads: 1, mottle: 0.08, hem: 0.025, stitches: [0.009] },
-  denim: { tile: 0.05, roughness: 0.92, specular: 0.25, sheen: 0.5, sheenRoughness: 0.8, sheenWhite: 0.45, relief: 1, threads: 1.3, mottle: 0.22, streak: 6, hem: 0.02, stitches: [0.006, 0.013], thread: "#c8923e" },
-  trico: { tile: 0.05, roughness: 0.95, specular: 0.2, sheen: 0.9, sheenRoughness: 0.85, sheenWhite: 0.3, relief: 1, threads: 1, mottle: 0.05, hem: 0, stitches: [] },
-  cetim: { tile: 0.06, roughness: 0.2, specular: 1, sheen: 0.6, sheenRoughness: 0.3, sheenWhite: 0.6, relief: 0.25, threads: 1, mottle: 0.03, hem: 0.005, stitches: [] },
-  moletom: { tile: 0.03, roughness: 0.92, specular: 0.25, sheen: 0.8, sheenRoughness: 0.85, sheenWhite: 0.35, relief: 0.4, threads: 1, mottle: 0.05, hem: 0.02, stitches: [0.009] },
+  algodao: { tile: 0.036, roughness: 0.9, specular: 0.3, sheen: 0.7, sheenRoughness: 0.75, sheenWhite: 0.35, relief: 0.6, threads: 1, mottle: 0.06, hem: 0.022, stitches: [0.015], wrinkle: 1 },
+  sarja: { tile: 0.028, roughness: 0.88, specular: 0.3, sheen: 0.45, sheenRoughness: 0.7, sheenWhite: 0.3, relief: 0.7, threads: 1, mottle: 0.08, hem: 0.025, stitches: [0.009], wrinkle: 1 },
+  denim: { tile: 0.05, roughness: 0.92, specular: 0.25, sheen: 0.5, sheenRoughness: 0.8, sheenWhite: 0.45, relief: 1, threads: 1.3, mottle: 0.22, streak: 6, hem: 0.02, stitches: [0.006, 0.013], thread: "#c8923e", wrinkle: 1.2 },
+  trico: { tile: 0.05, roughness: 0.95, specular: 0.2, sheen: 0.9, sheenRoughness: 0.85, sheenWhite: 0.3, relief: 1, threads: 1, mottle: 0.05, hem: 0, stitches: [], wrinkle: 0 },
+  cetim: { tile: 0.06, roughness: 0.2, specular: 1, sheen: 0.6, sheenRoughness: 0.3, sheenWhite: 0.6, relief: 0.25, threads: 1, mottle: 0.03, hem: 0.005, stitches: [], wrinkle: 0.5 },
+  moletom: { tile: 0.03, roughness: 0.92, specular: 0.25, sheen: 0.8, sheenRoughness: 0.85, sheenWhite: 0.35, relief: 0.4, threads: 1, mottle: 0.05, hem: 0.02, stitches: [0.009], wrinkle: 1 },
 };
 
 /** Tamanho da mancha grande (m): ela se repete a cada ~0,7 m. */
@@ -140,6 +150,7 @@ uniform float fabricInside;
 uniform float fabricHem;
 uniform vec2 fabricStitches;
 uniform vec3 fabricThread;
+uniform vec2 fabricWrinkle;
 uniform mat3 normalMatrix;
 varying vec3 vFabricPos;
 varying vec3 vFabricNormal;
@@ -167,6 +178,41 @@ const FRAGMENT_BODY = /* glsl */ `
   vec2 nZ = tZ.rg * 2.0 - 1.0;
   vec3 fabricBump = vec3( 0.0, nX.y, nX.x ) * fw.x + vec3( nY.x, 0.0, nY.y ) * fw.y + vec3( nZ.x, nZ.y, 0.0 ) * fw.z;
   normal = normalize( normal + faceDirection * ( normalMatrix * fabricBump ) * fabricRelief );
+
+  // Dobras de caimento: ondas que inclinam a normal (a malha não muda).
+  // O desenho vem da mancha da trama, então cada dobra tem largura e força
+  // diferentes, sem virar sanfona.
+  if ( fabricWrinkle.x > 0.5 ) {
+    vec3 wp = vFabricPos;
+    vec3 wdir;
+    float wphase;
+    float wamp;
+    if ( fabricWrinkle.x < 1.5 ) {
+      // Em pé: em volta do corpo, mais forte do peito para baixo.
+      float wl = length( wp.xz ) + 1e-4;
+      float ws = atan( wp.z, wp.x ) * 0.17;
+      wdir = vec3( - wp.z, 0.0, wp.x ) / wl;
+      float warp = texture2D( fabricMap, vec2( ws * 1.7, wp.y * 0.3 ) ).b;
+      wphase = ws / 0.055 + ( warp - 0.5 ) * 1.6;
+      wamp = 0.2 * smoothstep( 1.32, 1.02, wp.y );
+    } else {
+      // Deitadas: barra (acumula no sapato), joelho e cós.
+      wdir = vec3( 0.0, 1.0, 0.0 );
+      float warp = texture2D( fabricMap, vec2( ( wp.x + wp.z ) * 1.4, wp.y * 0.35 ) ).b;
+      float near = 1.0 - smoothstep( 0.06, 0.26, wp.y );
+      wphase = wp.y / mix( 0.06, 0.04, near ) + ( warp - 0.5 ) * 4.0;
+      wamp = 0.05 + 0.32 * near
+        + 0.1 * ( 1.0 - smoothstep( 0.0, 0.08, abs( wp.y - 0.5 ) ) )
+        + 0.1 * ( 1.0 - smoothstep( 0.0, 0.05, abs( wp.y - 1.0 ) ) );
+    }
+    float patchy = texture2D( fabricMap, wp.xy * 1.9 + wp.zy * 1.3 ).b;
+    wamp *= fabricWrinkle.y * ( 0.35 + 1.3 * patchy );
+    // Crista mais estreita que o vale, como pano de verdade.
+    float wc = cos( wphase * 6.2832 );
+    vec3 wtilt = wdir * ( - wamp * sign( wc ) * pow( abs( wc ), 0.6 ) );
+    wtilt -= fn * dot( wtilt, fn );
+    normal = normalize( normal + faceDirection * ( normalMatrix * wtilt ) );
+  }
 
   float fabricTone = tX.a * fw.x + tY.a * fw.y + tZ.a * fw.z + 0.5;
   diffuseColor.rgb *= mix( 1.0, fabricTone, fabricThreads );
@@ -201,6 +247,7 @@ export function clothMaterial(
   source: THREE.Material,
   color: string | undefined,
   fabric: FabricName,
+  wrinkle: Wrinkle | null = null,
 ): THREE.MeshPhysicalMaterial {
   const look = FABRIC_LOOK[fabric];
   const m = toPhysical(source);
@@ -233,6 +280,7 @@ export function clothMaterial(
       fabricInside: { value: INSIDE },
       fabricHem: { value: look.hem },
       fabricStitches: { value: new THREE.Vector2(look.stitches[0] ?? 0, look.stitches[1] ?? 0) },
+      fabricWrinkle: { value: new THREE.Vector2(wrinkle === "calca" ? 2 : wrinkle ? 1 : 0, look.wrinkle) },
       fabricThread: {
         value: look.thread
           ? new THREE.Color(look.thread)

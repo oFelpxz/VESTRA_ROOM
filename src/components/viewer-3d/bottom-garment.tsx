@@ -7,12 +7,22 @@ import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.j
 import type { AvatarParams } from "@/lib/avatar-builder";
 import { bindBottom, fitBottom } from "@/lib/bottom-fit";
 import { shapeBody } from "@/lib/garment-dress";
-import { clothMaterial } from "@/lib/fabric";
+import { clothMaterial, type Wrinkle } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
 import { SkinMaterial } from "./skin-material";
 
 const CREASE_ANGLE = (30 * Math.PI) / 180;
+
+/**
+ * Calça ou saia? Na altura do joelho a calça tem um vão entre as pernas; a
+ * saia (e o vestido) passa pelo meio. A bermuda nem chega lá: calça.
+ */
+function wrinkleOf(base: Float32Array): Wrinkle {
+  for (let i = 0; i < base.length; i += 3)
+    if (Math.abs(base[i]) < 0.015 && base[i + 1] > 0.42 && base[i + 1] < 0.55) return "caimento";
+  return "calca";
+}
 
 /**
  * Peças de baixo (marca `vestra_peca = "baixo"`) e o corpo sem peça de cima.
@@ -98,7 +108,7 @@ export function BottomGarment({
   const materials = useMemo(
     () =>
       parts.map((p) => {
-        const m = clothMaterial(p.material, selectedColor, p.fabric);
+        const m = clothMaterial(p.material, selectedColor, p.fabric, wrinkleOf(p.base));
         // Onde encosta na peça de cima, a de cima aparece por fora.
         m.polygonOffset = true;
         m.polygonOffsetFactor = 1;
