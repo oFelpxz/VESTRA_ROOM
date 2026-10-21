@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { AvatarParams } from "@/lib/avatar-builder";
 import { bindBottom, fitBottom } from "@/lib/bottom-fit";
 import { shapeBody } from "@/lib/garment-dress";
@@ -10,6 +11,8 @@ import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
 import { SkinMaterial } from "./skin-material";
+
+const CREASE_ANGLE = (30 * Math.PI) / 180;
 
 /**
  * Peças de baixo (marca `vestra_peca = "baixo"`) e o corpo sem peça de cima.
@@ -85,8 +88,9 @@ export function BottomGarment({
           "position",
           new THREE.BufferAttribute(fitBottom(bindings[i], pos, ease, tuckY, length), 3),
         );
-        g.computeVertexNormals();
-        return g;
+        // Prega, cós e lapela de bolso com quina: acima de 30° entre as faces a
+        // luz não é mais alisada (sem isso a saia vira um cone ondulado).
+        return toCreasedNormals(g, CREASE_ANGLE);
       }),
     [parts, bindings, pos, ease, tuckY, length],
   );
