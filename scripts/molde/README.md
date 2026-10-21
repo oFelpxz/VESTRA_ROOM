@@ -87,7 +87,7 @@ idênticos (byte a byte) aos do repositório. O manequim sai com os mesmos
 vértices; só as normais variam até 0,03° (invisível) desde que o avatar
 ganhou as keys de gênero, então o do repositório foi mantido.
 
-## 5. Calças, bermuda e saia (Cargo Pant 02, Wide Denim e Bermuda Utility no molde 40, Saia Midi Plissada no M)
+## 5. Calças, bermuda, saia e vestido (Cargo Pant 02, Wide Denim e Bermuda Utility no molde 40, Saia Midi Plissada e Vestido Slip no M)
 
 As peças de baixo saem do próprio avatar: `calca.py` corta o corpo entre a
 cintura e a barra, afasta o tecido da pele, deixa as pernas retas e faz o cós
@@ -110,8 +110,18 @@ pernas. No site, a parte solta segue as duas pernas juntas.
 mb saia.py -- avatar_base.glb saia_midi_plissada.glb
 ```
 
+O vestido (Vestido Slip Acetinado, molde M) segue o mesmo esquema com
+`vestido.py`: corpete do decote reto (acima do busto) até a cintura, saia
+evasê sem pregas até abaixo do joelho e duas alcinhas por cima dos ombros.
+Também é marcado como peça de baixo: no site ele segue a pele inteira e
+ocupa os dois lugares do look.
+
+```bash
+mb vestido.py -- avatar_base.glb vestido_slip.glb
+```
+
 Depois de copiar os .glb para `public/models/`, ligar aos produtos e criar a
-tabela de medidas (cargo e bermuda 38–44, wide 38–42, saia P/M/G) no banco:
+tabela de medidas (cargo e bermuda 38–44, wide 38–42, saia e vestido P/M/G) no banco:
 
 ```bash
 npx tsx scripts/attach-bottom-models.ts

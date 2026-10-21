@@ -53,7 +53,7 @@ export async function saveLookAction(
     { kind: garmentKind(own!.product.category.slug), value: own!.id },
     { kind: garmentKind(companion!.product.category.slug), value: companion!.id },
   );
-  if (!roles) return { error: "O look junta uma peça de cima e uma de baixo." };
+  if (!roles) return { error: "O look junta uma peça de cima e uma de baixo (ou um vestido)." };
 
   const photo = parseLookPhoto(formData.get("previewImage"));
   // Sem foto nova (provador sem 3D), a da última vez fica.
@@ -118,7 +118,11 @@ export async function addLookToCartAction(
   });
   if (!look) return { error: "Look não encontrado." };
 
-  const pieces = [look.topVariant, look.bottomVariant];
+  // Vestido: a mesma peça nos dois lugares entra uma vez só.
+  const pieces =
+    look.topVariantId === look.bottomVariantId
+      ? [look.topVariant]
+      : [look.topVariant, look.bottomVariant];
   if (pieces.some((v) => v == null)) {
     return { error: "Uma das peças do look saiu da loja. Monte o look de novo no provador." };
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useState, type FormEvent } from "react";
 import { saveLookAction, type LookFormState } from "@/lib/look-actions";
 import {
   overallFit,
@@ -24,7 +24,7 @@ const chip = (active: boolean, enabled = true) =>
 
 /**
  * Item 15: monta um look com a peça do provador (de cima ou de baixo) e uma
- * peça que a completa. A escolha (peça, cor, tamanho) sobe por `onChange`:
+ * peça que a completa. O vestido é o look inteiro: só nome e salvar. A escolha (peça, cor, tamanho) sobe por `onChange`:
  * se a peça tiver molde 3D, o provador veste as duas no avatar. Sem molde, ela
  * aparece só como cartão, com o caimento estimado pelas medidas.
  */
@@ -47,7 +47,7 @@ export function LookBuilder({
   onChange,
   takePhoto,
 }: {
-  role: "top" | "bottom";
+  role: "top" | "bottom" | "dress";
   /** Variante da peça do provador (cor + tamanho escolhidos), com ou sem estoque. */
   ownVariantId: string | null;
   ownLabel: string;
@@ -109,6 +109,73 @@ export function LookBuilder({
     setSize(null);
   }
 
+  // A foto sai do canvas na hora de salvar, então entra no envio aqui.
+  function submitWithPhoto(e: FormEvent<HTMLFormElement>) {
+    const photo = takePhoto?.();
+    if (!photo) return;
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    data.set("previewImage", photo);
+    startTransition(() => formAction(data));
+  }
+
+  const nameAndSave = (disabled: boolean) => (
+    <>
+      <input
+        name="name"
+        required
+        maxLength={LOOK_NAME_LIMIT}
+        defaultValue={openLook?.name ?? ""}
+        placeholder="Nome do look (ex.: Fim de semana)"
+        aria-label="Nome do look"
+        className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
+      />
+
+      {state.error && (
+        <p className="rounded-sm bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
+      )}
+      {state.success && (
+        <p className="rounded-sm bg-acid/20 px-3 py-2 text-sm">
+          Look salvo.{" "}
+          <Link href="/perfil/looks" className="font-semibold underline">
+            Ver meus looks
+          </Link>
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={pending || disabled}
+        className="inline-flex h-10 items-center justify-center rounded-sm border border-foreground px-6 text-xs font-semibold uppercase tracking-[0.15em] transition-colors hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {pending ? "Salvando..." : openLook ? "Salvar alterações" : "Salvar look"}
+      </button>
+    </>
+  );
+
+  if (role === "dress") {
+    return (
+      <form
+        action={formAction}
+        onSubmit={submitWithPhoto}
+        className="flex flex-col gap-4 rounded-sm border border-border p-4"
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            {openLook ? "Editar look" : "Salvar look"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {ownLabel}: o vestido é o look inteiro (de cima e de baixo).
+          </p>
+        </div>
+        {openLook && <input type="hidden" name="lookId" value={openLook.id} />}
+        <input type="hidden" name="ownVariantId" value={ownVariantId ?? ""} />
+        <input type="hidden" name="companionVariantId" value={ownVariantId ?? ""} />
+        {nameAndSave(!ownVariantId)}
+      </form>
+    );
+  }
+
   if (companions.length === 0) {
     return (
       <div className="rounded-sm border border-dashed border-border p-4 text-xs text-muted-foreground">
@@ -121,15 +188,7 @@ export function LookBuilder({
   return (
     <form
       action={formAction}
-      onSubmit={(e) => {
-        // A foto sai do canvas na hora de salvar, então entra no envio aqui.
-        const photo = takePhoto?.();
-        if (!photo) return;
-        e.preventDefault();
-        const data = new FormData(e.currentTarget);
-        data.set("previewImage", photo);
-        startTransition(() => formAction(data));
-      }}
+      onSubmit={submitWithPhoto}
       className="flex flex-col gap-4 rounded-sm border border-border p-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
@@ -232,35 +291,7 @@ export function LookBuilder({
         </div>
       )}
 
-      <input
-        name="name"
-        required
-        maxLength={LOOK_NAME_LIMIT}
-        defaultValue={openLook?.name ?? ""}
-        placeholder="Nome do look (ex.: Fim de semana)"
-        aria-label="Nome do look"
-        className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
-      />
-
-      {state.error && (
-        <p className="rounded-sm bg-destructive/10 px-3 py-2 text-sm text-destructive">{state.error}</p>
-      )}
-      {state.success && (
-        <p className="rounded-sm bg-acid/20 px-3 py-2 text-sm">
-          Look salvo.{" "}
-          <Link href="/perfil/looks" className="font-semibold underline">
-            Ver meus looks
-          </Link>
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={pending || !ownVariantId || !variant}
-        className="inline-flex h-10 items-center justify-center rounded-sm border border-foreground px-6 text-xs font-semibold uppercase tracking-[0.15em] transition-colors hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {pending ? "Salvando..." : openLook ? "Salvar alterações" : "Salvar look"}
-      </button>
+      {nameAndSave(!ownVariantId || !variant)}
     </form>
   );
 }

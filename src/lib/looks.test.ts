@@ -28,6 +28,12 @@ describe("lookRoles", () => {
     assert.equal(lookRoles({ kind: "dress", value: 1 }, { kind: "bottom", value: 2 }), null);
     assert.equal(lookRoles({ kind: "other", value: 1 }, { kind: "top", value: 2 }), null);
   });
+
+  it("vestido sozinho ocupa os dois lugares; dois vestidos diferentes, não", () => {
+    const dress = { kind: "dress" as const, value: "slip" };
+    assert.deepEqual(lookRoles(dress, dress), { top: "slip", bottom: "slip" });
+    assert.equal(lookRoles(dress, { kind: "dress", value: "outro" }), null);
+  });
 });
 
 describe("companionKind", () => {

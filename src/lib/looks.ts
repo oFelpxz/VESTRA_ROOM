@@ -1,6 +1,7 @@
 /**
  * Looks salvos (item 15): uma peça de cima + uma de baixo, sem camadas
- * (decisão do grupo em 05/10). Regras puras, sem banco.
+ * (decisão do grupo em 05/10). O vestido é uma peça só e ocupa os dois
+ * lugares. Regras puras, sem banco.
  */
 
 import type { GarmentKind } from "./fit-regions";
@@ -27,12 +28,16 @@ export function companionKind(kind: GarmentKind): "top" | "bottom" | null {
 
 /**
  * Qual das duas peças vai em cima e qual embaixo. Null se não forem uma de
- * cima e uma de baixo.
+ * cima e uma de baixo. O vestido vem duas vezes (a mesma peça) e fica nos
+ * dois lugares.
  */
 export function lookRoles<T>(
   a: { kind: GarmentKind; value: T },
   b: { kind: GarmentKind; value: T },
 ): { top: T; bottom: T } | null {
+  if (a.kind === "dress" && b.kind === "dress" && a.value === b.value) {
+    return { top: a.value, bottom: a.value };
+  }
   if (a.kind === "top" && b.kind === "bottom") return { top: a.value, bottom: b.value };
   if (a.kind === "bottom" && b.kind === "top") return { top: b.value, bottom: a.value };
   return null;

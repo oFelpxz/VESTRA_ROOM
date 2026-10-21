@@ -192,7 +192,8 @@ export function TryOnExperience({
   // Item 15: a peça escolhida em "Montar look" veste junto no avatar.
   const [companionSel, setCompanionSel] = useState<LookSelection | null>(null);
   const onCompanionChange = useCallback((sel: LookSelection | null) => setCompanionSel(sel), []);
-  const ownRole = kind === "bottom" ? "bottom" : "top";
+  // O vestido veste como as peças de baixo (segue a pele) e não tem outra peça.
+  const ownRole = kind === "bottom" || kind === "dress" ? "bottom" : "top";
 
   // Peça do provador num tamanho: a de cima pela graduação, a de baixo pela folga.
   const ownPiece = useCallback(
@@ -679,8 +680,8 @@ export function TryOnExperience({
           </button>
         </form>
 
-        {/* Item 15: look com uma peça de cima e uma de baixo */}
-        {(kind === "top" || kind === "bottom") && (
+        {/* Item 15: look com uma peça de cima e uma de baixo (ou um vestido) */}
+        {(kind === "top" || kind === "bottom" || kind === "dress") && (
           <LookBuilder
             role={kind}
             ownVariantId={lookOwnVariant?.id ?? null}

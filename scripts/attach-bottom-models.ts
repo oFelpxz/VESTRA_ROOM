@@ -2,9 +2,9 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-// Liga os moldes das peças de baixo (feitos com scripts/molde/calca.py e
-// saia.py) aos produtos e cria a tabela de medidas deles, que o provador usa
-// para a folga de cada tamanho e o caimento por região (cintura, quadril, barra).
+// Liga os moldes das peças de baixo (feitos com scripts/molde/calca.py,
+// saia.py e vestido.py) aos produtos e cria a tabela de medidas deles, que o
+// provador usa para a folga de cada tamanho e o caimento por região (cintura, quadril, barra).
 //
 // Uso: npx tsx scripts/attach-bottom-models.ts
 
@@ -18,6 +18,8 @@ type Row = {
   waist: [number, number];
   hip: [number, number];
   leg: [number, number] | null;
+  /** Só no vestido (o corpete). */
+  chest?: [number, number];
 };
 
 // Numeração 38–44: +4 cm de cintura e quadril por número. A perna (entrepernas)
@@ -42,11 +44,19 @@ const SAIA: Row[] = [
   { size: "G", waist: [72, 76], hip: [98, 102], leg: null },
 ];
 
+// Vestido Slip (P/M/G): mesma cintura e quadril da saia, mais o busto.
+const VESTIDO: Row[] = [
+  { size: "P", chest: [82, 86], waist: [64, 68], hip: [90, 94], leg: null },
+  { size: "M", chest: [86, 90], waist: [68, 72], hip: [94, 98], leg: null },
+  { size: "G", chest: [90, 94], waist: [72, 76], hip: [98, 102], leg: null },
+];
+
 const pieces = [
   { slug: "cargo-pant-02", fileUrl: "/models/cargo_pant_02.glb", chart: CALCA },
   { slug: "bermuda-utility", fileUrl: "/models/bermuda_utility.glb", chart: BERMUDA },
   { slug: "wide-denim", fileUrl: "/models/wide_denim.glb", chart: WIDE },
   { slug: "saia-midi-plissada", fileUrl: "/models/saia_midi_plissada.glb", chart: SAIA },
+  { slug: "vestido-slip-acetinado", fileUrl: "/models/vestido_slip.glb", chart: VESTIDO },
 ];
 
 async function main() {
@@ -83,6 +93,8 @@ async function main() {
 
     const measures = chart.map((r) => ({
       size: r.size,
+      chestMinCm: r.chest?.[0] ?? null,
+      chestMaxCm: r.chest?.[1] ?? null,
       waistMinCm: r.waist[0],
       waistMaxCm: r.waist[1],
       hipMinCm: r.hip[0],
