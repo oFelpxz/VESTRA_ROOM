@@ -28,8 +28,8 @@ arquivo).
 - [ ] O cliente tem **medidas preenchidas** (`/perfil/medidas`) e um endereço.
 - [ ] A peça da compra tem estoque (ex.: Boxy Tee 01 numa cor e tamanho com
   estoque).
-- [ ] Abrir uma vez o provador da Cargo Pant 02 e da Saia Midi Plissada: o 3D
-  leva uns **20 s** na primeira carga e depois fica em cache.
+- [ ] Abrir uma vez o provador da Boxy Tee 01, da Cargo Pant 02 e do Vestido
+  Slip Acetinado: a primeira carga demora mais, depois fica em cache.
 - [ ] Ter pelo menos **um look salvo** (com foto) para não depender de salvar
   ao vivo.
 - [ ] Navegador em tela cheia, zoom 100%.
@@ -60,6 +60,9 @@ arquivo).
   por baixo da camiseta.
 - Trocar a calça por **Bermuda Utility**, **Wide Denim** e **Saia Midi
   Plissada**.
+- Em "Acessório", pôr o **Knit Beanie**: o gorro entra como 3ª peça do look.
+- (Se der tempo) abrir o **Vestido Slip Acetinado**: ocupa cima e baixo do
+  look; e a **Oversized Shirt**, mais larga e comprida que a Boxy Tee.
 - Trocar o tamanho da calça: um tamanho maior fica mais largo e mais longo;
   um menor fica justo no quadril e mais curto.
 - **Falar:** os moldes foram feitos no Blender a partir do próprio avatar, por
@@ -133,14 +136,11 @@ Usar um pedido **já entregue** do cliente.
 
 ## Limitações conhecidas (evitar ao vivo)
 
-- Calça muito maior que o corpo (ex.: 44 num quadril de 80 cm) mostra um
-  defeito branco no entrepernas.
-- Na **página do produto** (não no provador), o 3D da camiseta não troca de
-  cor quando se escolhe outra cor.
-- A primeira carga do 3D é lenta (~20 s); por isso abrir os provadores antes.
+- A primeira carga do 3D é mais lenta; por isso abrir os provadores antes.
+- Oversized Shirt e Vestido só têm P/M/G; o gorro é tamanho único.
 
 ## Plano B
 
-- [ ] Prints de cada passo (catálogo, provador com calça, comparação, Meus
-  looks, PIX pago, admin).
+- [x] Prints de cada passo: [`apresentacao/`](apresentacao/README.md)
+  (13 prints, com a tabela de qual passo cada um mostra).
 - [ ] Vídeo curto (~3 min) do provador e da compra.

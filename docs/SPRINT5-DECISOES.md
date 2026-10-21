@@ -332,13 +332,39 @@ as duas peças (ex.: Tee M × GG com a calça; Saia P × G).
   caracteres. Os filtros de categoria mantêm a busca.
 - O "Cesto" mostra a quantidade real da sacola e leva para `/carrinho`.
 
+### Mais peças e ajustes do provador (20/10, tarde)
+
+**Migration nova:** `20261020130000_sprint5_look_acessorio` (coluna
+`accessoryVariantId` em `SavedLook`), aplicada com `npx prisma migrate deploy`.
+
+| Peça | Como foi feita | Tamanhos na tabela |
+|---|---|---|
+| Vestido Slip Acetinado | `scripts/molde/vestido.py`: corpete reto, saia evasê até abaixo do joelho, alcinhas | P/M/G (busto, cintura e quadril) |
+| Oversized Shirt | `scripts/derivar-oversized.ts`, a partir do molde da Boxy Tee 01 (tronco mais largo e 6 cm mais comprido, manga 30% mais longa) | P/M/G (peito e cintura) |
+| Knit Beanie | `scripts/molde/gorro.py`, saído da cabeça do avatar, com canelado e barra dobrada | Tamanho único (sem tabela) |
+
+- **Vestido:** é marcado como peça de baixo (segue a pele inteira) e ocupa
+  os dois lugares do look; "Meus looks" e a sacola contam a peça uma vez só.
+- **Gorro = 3ª peça do look ("Acessório"):** acompanha a cabeça do cliente
+  e vai junto no salvar, em "Meus looks" e no "pôr na sacola".
+- **Cor:** na página do produto, o 3D (também o do manequim) troca para a
+  cor escolhida, com o mesmo tingimento do provador.
+- **Entrepernas:** a calça bem maior que o corpo não mostra mais o buraco
+  branco no gancho (o lado de dentro da perna não ganha folga ali).
+- **Mais leve:** a Tech Vest caiu de 38 MB para 5 MB
+  (`scripts/simplificar-modelo.ts`), e a página do produto já baixa o
+  avatar do provador quando fica ociosa.
+- **Celular:** no "Comparar", os dois tamanhos ficam um embaixo do outro;
+  os botões da cena cabem numa linha.
+- **Relugar T-Shirt:** usa o mesmo 3D da Boxy Tee 01 e agora também a mesma
+  tabela P/M/G/GG (`scripts/copy-size-chart.ts`).
+
 ### Limitações conhecidas
 
-- Calça muito maior que o corpo (ex.: 44 num quadril de 80 cm) mostra um
-  defeito branco no entrepernas.
-- Na **página do produto** (não no provador), o 3D da camiseta não troca de
-  cor quando se escolhe outra (ex.: continua branca no Preto).
-- A primeira carga do 3D leva ~20 s no `npm run dev`.
+- A primeira carga do 3D no `npm run dev` ainda demora (o Next compila a
+  página e o avatar é baixado); a partir da segunda é rápida.
+- Oversized Shirt e Vestido só têm P/M/G na tabela.
+- O gorro tem tamanho único: não muda com a medida da cabeça.
 
 ---
 
