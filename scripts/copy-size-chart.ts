@@ -28,9 +28,14 @@ async function main() {
   if (!from?.sizeChart) throw new Error(`Sem tabela de medidas: ${fromSlug}`);
   if (!to) throw new Error(`Produto nao encontrado: ${toSlug}`);
 
-  const measures = from.sizeChart.measures.map(
-    ({ id: _id, sizeChartId: _chart, createdAt: _created, ...m }) => m,
-  );
+  // Sem id, tabela e data: a medida é criada de novo na tabela de destino.
+  const measures = from.sizeChart.measures.map((row) => {
+    const m: Partial<typeof row> = { ...row };
+    delete m.id;
+    delete m.sizeChartId;
+    delete m.createdAt;
+    return m as Omit<typeof row, "id" | "sizeChartId" | "createdAt">;
+  });
 
   if (to.sizeChart) {
     await prisma.$transaction([
