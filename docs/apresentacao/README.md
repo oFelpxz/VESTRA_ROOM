@@ -3,7 +3,8 @@
 Um print por passo do [roteiro de 26/10](../ROTEIRO-APRESENTACAO-26-10.md),
 para usar se o 3D ou a internet falharem ao vivo. Tirados em 20/10/2026 no
 `npm run dev`, com a conta de admin de teste (por isso aparece "Admin" no
-topo da loja).
+topo da loja). Os do provador (02 a 05 e 13) foram refeitos em 21/10/2026,
+já com o tecido novo e o botão "Tecido de perto".
 
 | Passo do roteiro | Arquivo | O que mostra |
 |---|---|---|
@@ -19,7 +20,8 @@ topo da loja).
 | 7. Admin | `10-admin-pedido-logistica.jpg` | Pedido: linha do status e "Iniciar preparação" |
 | 8. Troca/devolução | `11-admin-devolucao.jpg` | Devolução concluída: histórico, estoque e reembolso |
 | 9. Relatórios | `12-admin-relatorios.jpg` | Vendas dos últimos 30 dias, com CSV |
-| Extra | `13-provador-celular.jpg` | Provador no celular (375 px) |
+| Extra | `13-provador-celular.jpg` | Provador no celular (375 px): Boxy Tee 01 + Cargo Pant 02 preta |
+| 2b. Tecido | [`tecido/`](tecido/README.md) | Antes × depois do tecido (7 prints) |
 
 O pedido `#PXIIOS28` dos prints 07–10 era de teste e foi cancelado depois
 (o estoque voltou).

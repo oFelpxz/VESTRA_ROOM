@@ -1,8 +1,8 @@
 # Entrega final (26/10) — roteiro da apresentação
 
-> Roteiro para mostrar a VESTRA ROOM ao professor em cerca de **12 minutos**,
+> Roteiro para mostrar a VESTRA ROOM ao professor em cerca de **13 minutos**,
 > com foco no que a Sprint 5 trouxe: provador com peça de cima e de baixo,
-> looks com foto, trocas e devoluções. Decisões e resultados dos testes em
+> roupa com cara de tecido, looks com foto, trocas e devoluções. Decisões e resultados dos testes em
 > [`SPRINT5-DECISOES.md`](SPRINT5-DECISOES.md); o roteiro da Sprint 4
 > (frete, cartão, boleto, reembolso) continua em
 > [`SPRINT4-ROTEIRO-APRESENTACAO.md`](SPRINT4-ROTEIRO-APRESENTACAO.md).
@@ -36,7 +36,7 @@ arquivo).
 
 ---
 
-## Roteiro (≈ 12 min)
+## Roteiro (≈ 13 min)
 
 ### 1. Catálogo com busca (1 min)
 
@@ -68,6 +68,22 @@ arquivo).
 - **Falar:** os moldes foram feitos no Blender a partir do próprio avatar, por
   script (`scripts/molde/`). A peça de baixo acompanha a pele do cliente, a
   folga vem da diferença de quadril e o comprimento vem da perna.
+
+### 2b. Tecido de perto: antes × depois (1 min)
+
+Ainda no provador da Boxy Tee 01 com a Cargo Pant 02 (ou a Wide Denim):
+
+- Clicar **"Tecido de perto"**: a câmera chega na gola e mostra a malha e o
+  pesponto. Clicar de novo (**"Ver a barra"**): desce até a barra. **"Voltar"**
+  volta para o corpo inteiro.
+- Mostrar no slide ou no celular os prints de
+  [`apresentacao/tecido/`](apresentacao/tecido/README.md): a mesma roupa antes
+  (preto de plástico, "massinha") e depois (trama, barra, pesponto, dobras).
+- **Falar:** cada peça tem um tipo de tecido (malha, sarja, jeans, cetim,
+  tricô). A trama é gerada pelo próprio código e a barra, a costura e as
+  dobras são calculadas na placa de vídeo: nenhuma imagem extra para baixar. Em celular fraco o provador
+  entra sozinho no **modo leve** (sem dobras e sem sombras) para não travar.
+- O 3D da página do produto usa o mesmo tecido.
 
 ### 3. Corpo diferente (1 min)
 
@@ -129,7 +145,8 @@ Usar um pedido **já entregue** do cliente.
 
 | Pergunta | Resposta curta |
 |---|---|
-| A roupa é simulada como tecido? | Não. É um encaixe geométrico em cima do corpo do cliente, que roda no navegador sem travar. |
+| A roupa é simulada como tecido? | O caimento não: é um encaixe geométrico em cima do corpo do cliente, que roda no navegador sem travar. A aparência sim: cada peça tem material de tecido (trama, barra, pesponto e dobras). |
+| E num celular fraco? | Entra sozinho no modo leve (sem dobras, sombras e resolução dupla). Para comparar: `?leve=1` força o leve e `?leve=0` o completo. |
 | De onde vêm as medidas das peças? | Da tabela de medidas de cada produto (cadastrada no banco). |
 | Por que "estimativa"? | O avatar é paramétrico (medidas digitadas, não escaneamento). |
 | E as senhas e chaves? | Ficam fora do Git, em `.env`. As chaves do Stripe são de modo teste. |
@@ -143,4 +160,6 @@ Usar um pedido **já entregue** do cliente.
 
 - [x] Prints de cada passo: [`apresentacao/`](apresentacao/README.md)
   (13 prints, com a tabela de qual passo cada um mostra).
+- [x] Antes × depois do tecido: [`apresentacao/tecido/`](apresentacao/tecido/README.md)
+  (7 prints).
 - [ ] Vídeo curto (~3 min) do provador e da compra.
