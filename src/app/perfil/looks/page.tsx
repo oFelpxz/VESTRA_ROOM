@@ -42,6 +42,7 @@ export default async function LooksPage() {
     include: {
       topVariant: { select: pieceSelect },
       bottomVariant: { select: pieceSelect },
+      accessoryVariant: { select: pieceSelect },
     },
   });
 
@@ -57,7 +58,7 @@ export default async function LooksPage() {
         Looks salvos
       </h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        Uma peça de cima e uma de baixo (ou um vestido), montadas no provador. Para criar um
+        Uma peça de cima e uma de baixo (ou um vestido), com um acessório se quiser, montadas no provador. Para criar um
         look, abra o{" "}
         <Link
           href="/catalogo?provador=1"
@@ -77,13 +78,15 @@ export default async function LooksPage() {
           <ul className="flex flex-col gap-4">
             {looks.map((look) => {
               // Vestido: a mesma peça nos dois lugares aparece uma vez só.
-              const pieces =
-                look.topVariantId === look.bottomVariantId
+              const pieces = [
+                ...(look.topVariantId === look.bottomVariantId
                   ? [{ role: "Vestido", v: look.topVariant }]
                   : [
                       { role: "De cima", v: look.topVariant },
                       { role: "De baixo", v: look.bottomVariant },
-                    ];
+                    ]),
+                ...(look.accessoryVariantId ? [{ role: "Acessório", v: look.accessoryVariant }] : []),
+              ];
               const available = (v: (typeof pieces)[number]["v"]) =>
                 v != null &&
                 v.status === "ACTIVE" &&

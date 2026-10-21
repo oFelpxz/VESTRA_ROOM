@@ -141,6 +141,18 @@ npx tsx scripts/attach-top-models.ts   # liga ao produto + tabela P/M/G
 O gltf-transform grava os atributos entrelaçados num buffer só; o provador
 separa eles ao ler a peça (`src/lib/deinterleave.ts`).
 
+## 7. Gorro (Knit Beanie) — acessório, tamanho único
+
+`gorro.py` sai da cabeça do avatar: raios de dentro para fora acham o crânio,
+o tecido fica 7 mm afastado (mais no topo), com canelado e barra dobrada de
+4,5 cm. Marca a cena com `vestra_peca = "acessorio"`; no site ele acompanha a
+cabeça do cliente e entra no look como 3ª peça ("Acessório").
+
+```bash
+mb gorro.py -- avatar_base.glb knit_beanie.glb
+npx tsx scripts/attach-accessory-models.ts   # liga ao produto (sem tabela)
+```
+
 ## Ferramentas de conferência
 
 | Script | Para quê |

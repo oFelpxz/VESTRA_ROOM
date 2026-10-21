@@ -3,6 +3,7 @@ import { formatBRL } from "@/lib/format";
 import { resolveModelUrl } from "@/lib/storage";
 import { sortSizes } from "@/lib/sizes";
 import { categoriesOfKind, type ChartRow } from "@/lib/fit-regions";
+import { ACCESSORY_CATEGORY } from "@/lib/looks";
 
 /** Peça que pode completar um look no provador (item 15). */
 export type LookProduct = {
@@ -19,11 +20,20 @@ export type LookProduct = {
 };
 
 /** Peças à venda de um tipo (as de baixo para quem prova uma de cima, e vice-versa). */
-export async function getLookCompanions(kind: "top" | "bottom"): Promise<LookProduct[]> {
+export function getLookCompanions(kind: "top" | "bottom"): Promise<LookProduct[]> {
+  return lookProducts(categoriesOfKind(kind));
+}
+
+/** Acessórios à venda (touca), a terceira peça opcional do look. */
+export function getLookAccessories(): Promise<LookProduct[]> {
+  return lookProducts([ACCESSORY_CATEGORY]);
+}
+
+async function lookProducts(categories: string[]): Promise<LookProduct[]> {
   const products = await prisma.product.findMany({
     where: {
       status: "ACTIVE",
-      category: { slug: { in: categoriesOfKind(kind) } },
+      category: { slug: { in: categories } },
       variants: { some: { status: "ACTIVE" } },
     },
     include: {
@@ -78,6 +88,8 @@ export type OpenLook = {
   /** Variante da outra peça. */
   companionVariantId: string | null;
   companionProductId: string | null;
+  /** Acessório do look (touca), se tiver. */
+  accessoryVariantId: string | null;
 };
 
 export async function getOpenLook(
@@ -106,5 +118,6 @@ export async function getOpenLook(
     ownVariantId: own.id,
     companionVariantId: other?.id ?? null,
     companionProductId: other?.productId ?? null,
+    accessoryVariantId: look.accessoryVariantId,
   };
 }

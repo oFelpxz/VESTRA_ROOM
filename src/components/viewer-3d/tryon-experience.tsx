@@ -106,6 +106,8 @@ export function TryOnExperience({
   kind,
   toleranceCm,
   companions,
+  accessories,
+  isAccessory,
   openLook,
 }: {
   productName: string;
@@ -122,6 +124,10 @@ export function TryOnExperience({
   toleranceCm: number;
   /** Peças que completam um look (item 15). */
   companions: LookProduct[];
+  /** Acessórios (touca) que podem entrar no look como terceira peça. */
+  accessories: LookProduct[];
+  /** O produto do provador é um acessório (a touca). */
+  isAccessory: boolean;
   /** Look aberto pelo `?look=`. */
   openLook: OpenLook | null;
 }) {
@@ -192,6 +198,8 @@ export function TryOnExperience({
   // Item 15: a peça escolhida em "Montar look" veste junto no avatar.
   const [companionSel, setCompanionSel] = useState<LookSelection | null>(null);
   const onCompanionChange = useCallback((sel: LookSelection | null) => setCompanionSel(sel), []);
+  const [accessorySel, setAccessorySel] = useState<LookSelection | null>(null);
+  const onAccessoryChange = useCallback((sel: LookSelection | null) => setAccessorySel(sel), []);
   // O vestido veste como as peças de baixo (segue a pele) e não tem outra peça.
   const ownRole = kind === "bottom" || kind === "dress" ? "bottom" : "top";
 
@@ -221,6 +229,16 @@ export function TryOnExperience({
     };
   }, [companionSel, body.hipCm, avatarLegCm]);
 
+  // Acessório: tamanho único, segue a pele da cabeça (só a cor muda).
+  const accessoryPiece = useMemo((): ScenePiece | null => {
+    const p = accessorySel?.product;
+    if (!accessorySel || !p?.modelUrl) return null;
+    return {
+      url: p.modelUrl,
+      color: accessorySel.color ? colorToHex(accessorySel.color) : undefined,
+    };
+  }, [accessorySel]);
+
   // Vista da câmera, giro automático e foto do look
   const [view, setView] = useState<{ name: CameraView; n: number } | null>(null);
   const [autoRotate, setAutoRotate] = useState(false);
@@ -230,7 +248,9 @@ export function TryOnExperience({
     if (!canvas) return;
     const a = document.createElement("a");
     a.href = canvas.toDataURL("image/png");
-    const name = [productName, companionSel?.product.name].filter(Boolean).join(" + ");
+    const name = [productName, companionSel?.product.name, accessorySel?.product.name]
+      .filter(Boolean)
+      .join(" + ");
     a.download = `VESTRA look - ${name}.png`;
     a.click();
   }
@@ -330,6 +350,7 @@ export function TryOnExperience({
               avatarParams={avatarParams}
               top={ownRole === "top" ? own : companionPiece}
               bottom={ownRole === "bottom" ? own : companionPiece}
+              accessory={accessoryPiece}
               primary={ownRole}
               view={view}
               autoRotate={autoRotate}
@@ -421,6 +442,11 @@ export function TryOnExperience({
             a={{ size: selectedSize, regions: fit.regions }}
             b={{ size: compareSize, regions: compareFit.regions }}
           />
+        ) : isAccessory ? (
+          // Tamanho único: a touca segue a cabeça, não há medida para comparar.
+          <p className="rounded-sm border border-border p-4 text-xs text-muted-foreground">
+            Tamanho único: a peça acompanha o formato da cabeça do avatar.
+          </p>
         ) : (
           <FitIndicator
             size={selectedSize}
@@ -691,13 +717,21 @@ export function TryOnExperience({
                 : productName
             }
             companions={companions}
+            accessories={accessories}
             body={body}
             preference={preference}
             toleranceCm={toleranceCm}
             openLook={openLook}
             onChange={onCompanionChange}
+            onAccessoryChange={onAccessoryChange}
             takePhoto={takeLookPhoto}
           />
+        )}
+        {isAccessory && (
+          <p className="rounded-sm border border-dashed border-border p-4 text-xs text-muted-foreground">
+            Para montar um look com esta peça, abra o provador de uma peça de cima, de baixo ou de
+            um vestido e escolha ela em &quot;Acessório&quot;.
+          </p>
         )}
       </aside>
     </div>

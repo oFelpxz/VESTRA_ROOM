@@ -1,7 +1,8 @@
 /**
  * Looks salvos (item 15): uma peça de cima + uma de baixo, sem camadas
  * (decisão do grupo em 05/10). O vestido é uma peça só e ocupa os dois
- * lugares. Regras puras, sem banco.
+ * lugares. Um acessório (touca) pode entrar como terceira peça, opcional.
+ * Regras puras, sem banco.
  */
 
 import type { GarmentKind } from "./fit-regions";
@@ -9,6 +10,8 @@ import type { GarmentKind } from "./fit-regions";
 export const LOOK_NAME_LIMIT = 60;
 /** Looks por cliente: evita a lista crescer sem fim. */
 export const MAX_LOOKS = 50;
+/** Categoria dos acessórios que entram no look (terceira peça, opcional). */
+export const ACCESSORY_CATEGORY = "acessorios";
 
 export function parseLookName(raw: unknown): { name: string } | { error: string } {
   const name = String(raw ?? "").trim().replace(/\s+/g, " ");

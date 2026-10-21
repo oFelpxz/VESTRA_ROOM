@@ -256,6 +256,7 @@ model ProductVariant {
   exchangeRequests  ReturnRequest[]
   looksAsTop        SavedLook[]     @relation("LookTop")
   looksAsBottom     SavedLook[]     @relation("LookBottom")
+  looksAsAccessory  SavedLook[]     @relation("LookAccessory")
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 }
@@ -608,18 +609,21 @@ model ReturnPhoto {
 // ---------------------------------------------------------------------------
 
 model SavedLook {
-  id              String          @id @default(cuid())
-  userId          String
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name            String
-  topVariantId    String?
-  topVariant      ProductVariant? @relation("LookTop", fields: [topVariantId], references: [id], onDelete: SetNull)
-  bottomVariantId String?
-  bottomVariant   ProductVariant? @relation("LookBottom", fields: [bottomVariantId], references: [id], onDelete: SetNull)
+  id                 String          @id @default(cuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  topVariantId       String?
+  topVariant         ProductVariant? @relation("LookTop", fields: [topVariantId], references: [id], onDelete: SetNull)
+  bottomVariantId    String?
+  bottomVariant      ProductVariant? @relation("LookBottom", fields: [bottomVariantId], references: [id], onDelete: SetNull)
+  /// Acessório opcional (ex.: touca), por cima das outras duas peças.
+  accessoryVariantId String?
+  accessoryVariant   ProductVariant? @relation("LookAccessory", fields: [accessoryVariantId], references: [id], onDelete: SetNull)
   /// Foto do avatar vestido, tirada no provador ao salvar (JPEG pequeno em data URL).
-  previewImage    String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  previewImage       String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   @@index([userId, createdAt])
 }

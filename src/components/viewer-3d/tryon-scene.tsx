@@ -15,7 +15,7 @@ import { tintMaterial } from "@/lib/garment-color";
 import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
 import { BareAvatar, BottomGarment, hemHeight } from "./bottom-garment";
-import { isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
+import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
 /**
  * Peça ajustada ao corpo de referência (marca `vestra_fit`) aparece vestida
@@ -210,6 +210,17 @@ function DressedLook({
   );
 }
 
+/** Acessório (touca) preso à pele da cabeça, por cima das outras peças. */
+function Accessory({ params, piece }: { params: AvatarParams; piece: ScenePiece }) {
+  return (
+    <AvatarErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <BottomGarment url={piece.url} params={params} ease={0} selectedColor={piece.color} />
+      </Suspense>
+    </AvatarErrorBoundary>
+  );
+}
+
 /**
  * Escolhe como vestir: com peça de baixo moldada, o look inteiro; senão, só a
  * peça do provador (`primary`), como antes.
@@ -226,11 +237,21 @@ function Outfit({
   primary: "top" | "bottom";
 }) {
   const bottomScene = useGLTF(bottom?.url ?? top?.url ?? AVATAR_URL).scene;
+  const piece = primary === "bottom" ? bottom : top;
+  const pieceScene = useGLTF(piece?.url ?? AVATAR_URL).scene;
   if (bottom && isBottomPiece(bottomScene)) {
     return <DressedLook params={params} top={top} bottom={bottom} />;
   }
-  const piece = primary === "bottom" ? bottom : top;
   if (!piece) return null;
+  // Provador do próprio acessório: o corpo sem roupa com ele na cabeça.
+  if (isAccessoryPiece(pieceScene)) {
+    return (
+      <>
+        <BareAvatar params={params} />
+        <Accessory params={params} piece={piece} />
+      </>
+    );
+  }
   return (
     <TryOnGarment
       url={piece.url}
@@ -270,6 +291,7 @@ export function TryOnScene({
   avatarParams,
   top,
   bottom,
+  accessory = null,
   primary,
   view = null,
   autoRotate = false,
@@ -277,6 +299,8 @@ export function TryOnScene({
   avatarParams: AvatarParams;
   top: ScenePiece | null;
   bottom: ScenePiece | null;
+  /** Acessório do look (touca), por cima das outras peças. */
+  accessory?: ScenePiece | null;
   /** Peça do provador (a outra é a que completa o look). */
   primary: "top" | "bottom";
   /** Vista pedida pelos botões (n muda a cada clique). */
@@ -309,9 +333,12 @@ export function TryOnScene({
       <directionalLight position={[-4, 3, -2]} intensity={0.5} />
 
       <Suspense fallback={<Loader />}>
-        {(top || bottom) && (
+        {top || bottom ? (
           <Outfit params={avatarParams} top={top} bottom={bottom} primary={primary} />
+        ) : (
+          accessory && <BareAvatar params={avatarParams} />
         )}
+        {accessory && <Accessory params={avatarParams} piece={accessory} />}
         <ContactShadows
           position={[0, 0.005, 0]}
           opacity={0.45}

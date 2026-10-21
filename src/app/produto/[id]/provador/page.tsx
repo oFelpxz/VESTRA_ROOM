@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getProductDetail } from "@/lib/products";
 import { getStoreSettings } from "@/lib/store-settings-db";
 import { garmentKind } from "@/lib/fit-regions";
-import { companionKind } from "@/lib/looks";
-import { getLookCompanions, getOpenLook } from "@/lib/look-data";
+import { ACCESSORY_CATEGORY, companionKind } from "@/lib/looks";
+import { getLookAccessories, getLookCompanions, getOpenLook } from "@/lib/look-data";
 import { TryOnExperience } from "@/components/viewer-3d/tryon-experience";
 
 export const metadata = { title: "Provador virtual | VESTRA FIT" };
@@ -62,9 +62,11 @@ export default async function ProvadorPage({
   const sizeRows = product.sizeChart?.rows ?? [];
   const kind = garmentKind(product.categorySlug);
   const companion = companionKind(kind);
-  const [settings, companions, openLook] = await Promise.all([
+  const inLook = kind === "top" || kind === "bottom" || kind === "dress";
+  const [settings, companions, accessories, openLook] = await Promise.all([
     getStoreSettings(),
     companion ? getLookCompanions(companion) : [],
+    inLook ? getLookAccessories() : [],
     typeof look === "string" ? getOpenLook(look, userId, product.id) : null,
   ]);
 
@@ -91,6 +93,8 @@ export default async function ProvadorPage({
       kind={kind}
       toleranceCm={settings.fitToleranceCm}
       companions={companions}
+      accessories={accessories}
+      isAccessory={product.categorySlug === ACCESSORY_CATEGORY}
       openLook={openLook}
     />
   );

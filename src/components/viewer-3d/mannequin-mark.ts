@@ -32,3 +32,16 @@ export function isBottomPiece(root: Object3D) {
   });
   return bottom;
 }
+
+/**
+ * Acessório feito sobre o manequim (touca): marca `vestra_peca = "acessorio"`
+ * (ver scripts/molde/gorro.py). Segue a pele como as peças de baixo e entra
+ * no look por cima das outras duas.
+ */
+export function isAccessoryPiece(root: Object3D) {
+  let accessory = false;
+  root.traverse((obj) => {
+    if (obj.userData?.vestra_peca === "acessorio") accessory = true;
+  });
+  return accessory;
+}

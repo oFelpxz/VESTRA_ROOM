@@ -26,7 +26,8 @@ const chip = (active: boolean, enabled = true) =>
  * Item 15: monta um look com a peça do provador (de cima ou de baixo) e uma
  * peça que a completa. O vestido é o look inteiro: só nome e salvar. A escolha (peça, cor, tamanho) sobe por `onChange`:
  * se a peça tiver molde 3D, o provador veste as duas no avatar. Sem molde, ela
- * aparece só como cartão, com o caimento estimado pelas medidas.
+ * aparece só como cartão, com o caimento estimado pelas medidas. Um acessório
+ * (touca) pode entrar como terceira peça, opcional (`onAccessoryChange`).
  */
 
 /** Peça escolhida para completar o look, como o provador precisa para vestir. */
@@ -40,11 +41,13 @@ export function LookBuilder({
   ownVariantId,
   ownLabel,
   companions,
+  accessories = [],
   body,
   preference,
   toleranceCm,
   openLook,
   onChange,
+  onAccessoryChange,
   takePhoto,
 }: {
   role: "top" | "bottom" | "dress";
@@ -52,12 +55,16 @@ export function LookBuilder({
   ownVariantId: string | null;
   ownLabel: string;
   companions: LookProduct[];
+  /** Acessórios (tamanho único) para a terceira peça do look. */
+  accessories?: LookProduct[];
   body: BodyMeasures;
   preference: FitPreference;
   toleranceCm: number;
   openLook: OpenLook | null;
   /** Chamado a cada troca de peça, cor ou tamanho (null = nenhuma no avatar). */
   onChange?: (selection: LookSelection | null) => void;
+  /** Igual a `onChange`, para o acessório. */
+  onAccessoryChange?: (selection: LookSelection | null) => void;
   /** Foto do avatar vestido (JPEG em data URL), salva junto com o look. */
   takePhoto?: () => string | null;
 }) {
@@ -102,6 +109,65 @@ export function LookBuilder({
       product && onAvatar ? { product, color: effectiveColor, size: effectiveSize } : null,
     );
   }, [onChange, product, onAvatar, effectiveColor, effectiveSize]);
+
+  // Acessório: nenhum ou um da lista, só com a cor (tamanho único).
+  const startAccessory = accessories
+    .flatMap((p) => p.variants.map((v) => ({ productId: p.id, ...v })))
+    .find((v) => v.id === openLook?.accessoryVariantId);
+  const [accessoryId, setAccessoryId] = useState(startAccessory?.productId ?? "");
+  const [accessoryColor, setAccessoryColor] = useState<string | null>(startAccessory?.color ?? null);
+  const accessory = accessories.find((p) => p.id === accessoryId) ?? null;
+  const effectiveAccessoryColor = accessory?.colors.includes(accessoryColor ?? "")
+    ? accessoryColor
+    : (accessory?.colors[0] ?? null);
+  const accessoryVariant = accessory?.variants.find((v) => v.color === effectiveAccessoryColor);
+  useEffect(() => {
+    onAccessoryChange?.(
+      accessory ? { product: accessory, color: effectiveAccessoryColor, size: accessoryVariant?.size ?? null } : null,
+    );
+  }, [onAccessoryChange, accessory, effectiveAccessoryColor, accessoryVariant]);
+
+  const accessoryPicker =
+    accessories.length > 0 ? (
+      <div className="flex flex-col gap-2">
+        <input type="hidden" name="accessoryVariantId" value={accessoryVariant?.id ?? ""} />
+        <select
+          aria-label="Acessório"
+          value={accessoryId}
+          onChange={(e) => {
+            setAccessoryId(e.target.value);
+            setAccessoryColor(null);
+          }}
+          className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
+        >
+          <option value="">Sem acessório</option>
+          {accessories.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} · {p.price}
+            </option>
+          ))}
+        </select>
+        {accessory && (
+          <div className="flex flex-wrap gap-1.5">
+            {accessory.colors.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setAccessoryColor(c)}
+                className={chip(effectiveAccessoryColor === c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
+        {accessory && !accessory.modelUrl && (
+          <p className="text-xs text-muted-foreground">
+            Esse acessório ainda não tem modelo 3D: entra no look, mas não aparece no avatar.
+          </p>
+        )}
+      </div>
+    ) : null;
 
   function pickProduct(id: string) {
     setProductId(id);
@@ -171,6 +237,7 @@ export function LookBuilder({
         {openLook && <input type="hidden" name="lookId" value={openLook.id} />}
         <input type="hidden" name="ownVariantId" value={ownVariantId ?? ""} />
         <input type="hidden" name="companionVariantId" value={ownVariantId ?? ""} />
+        {accessoryPicker}
         {nameAndSave(!ownVariantId)}
       </form>
     );
@@ -291,6 +358,7 @@ export function LookBuilder({
         </div>
       )}
 
+      {accessoryPicker}
       {nameAndSave(!ownVariantId || !variant)}
     </form>
   );

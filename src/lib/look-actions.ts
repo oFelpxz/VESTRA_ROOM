@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { garmentKind } from "@/lib/fit-regions";
-import { lookRoles, MAX_LOOKS, parseLookName, parseLookPhoto } from "@/lib/looks";
+import { ACCESSORY_CATEGORY, lookRoles, MAX_LOOKS, parseLookName, parseLookPhoto } from "@/lib/looks";
 
 export type LookFormState = {
   error?: string;
@@ -23,8 +23,9 @@ const variantForLook = {
  * Salva um look (item 15): a peça do provador + a que completa o look.
  * Com `lookId`, atualiza um look do próprio cliente.
  *
- * formData: name, ownVariantId, companionVariantId, lookId e previewImage
- * (foto do avatar vestido; os dois opcionais).
+ * formData: name, ownVariantId, companionVariantId, accessoryVariantId
+ * (touca), lookId e previewImage (foto do avatar vestido); os três últimos
+ * são opcionais.
  */
 export async function saveLookAction(
   _prev: LookFormState,
@@ -55,12 +56,26 @@ export async function saveLookAction(
   );
   if (!roles) return { error: "O look junta uma peça de cima e uma de baixo (ou um vestido)." };
 
+  // Acessório: opcional; vazio tira o que o look tinha.
+  const accessoryId = String(formData.get("accessoryVariantId") ?? "");
+  if (accessoryId) {
+    const accessory = await prisma.productVariant.findUnique({
+      where: { id: accessoryId },
+      select: variantForLook,
+    });
+    if (!usable(accessory)) return { error: "O acessório não está mais à venda." };
+    if (accessory!.product.category.slug !== ACCESSORY_CATEGORY) {
+      return { error: "O terceiro item do look precisa ser um acessório." };
+    }
+  }
+
   const photo = parseLookPhoto(formData.get("previewImage"));
   // Sem foto nova (provador sem 3D), a da última vez fica.
   const data = {
     name: parsed.name,
     topVariantId: roles.top,
     bottomVariantId: roles.bottom,
+    accessoryVariantId: accessoryId || null,
     ...(photo ? { previewImage: photo } : {}),
   };
   const lookId = String(formData.get("lookId") ?? "");
@@ -94,7 +109,7 @@ export async function deleteLookAction(formData: FormData): Promise<void> {
 }
 
 /**
- * Põe as duas peças do look na sacola (uma de cada). Se uma delas não
+ * Põe as peças do look na sacola (uma de cada, com o acessório se tiver). Se uma delas não
  * puder entrar (fora de venda ou sem estoque), nenhuma entra, e a mensagem
  * diz qual.
  *
@@ -114,6 +129,7 @@ export async function addLookToCartAction(
     include: {
       topVariant: { include: { product: true } },
       bottomVariant: { include: { product: true } },
+      accessoryVariant: { include: { product: true } },
     },
   });
   if (!look) return { error: "Look não encontrado." };
@@ -126,6 +142,7 @@ export async function addLookToCartAction(
   if (pieces.some((v) => v == null)) {
     return { error: "Uma das peças do look saiu da loja. Monte o look de novo no provador." };
   }
+  if (look.accessoryVariant) pieces.push(look.accessoryVariant);
 
   const cart =
     (await prisma.cart.findFirst({ where: { userId, status: "ACTIVE" } })) ??
