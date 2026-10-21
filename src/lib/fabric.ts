@@ -201,9 +201,12 @@ const FRAGMENT_BODY = /* glsl */ `
       float warp = texture2D( fabricMap, vec2( ( wp.x + wp.z ) * 1.4, wp.y * 0.35 ) ).b;
       float near = 1.0 - smoothstep( 0.06, 0.26, wp.y );
       wphase = wp.y / mix( 0.06, 0.04, near ) + ( warp - 0.5 ) * 4.0;
-      wamp = 0.05 + 0.32 * near
-        + 0.1 * ( 1.0 - smoothstep( 0.0, 0.08, abs( wp.y - 0.5 ) ) )
-        + 0.1 * ( 1.0 - smoothstep( 0.0, 0.05, abs( wp.y - 1.0 ) ) );
+      // Fora da barra, só em manchas: senão vira listra.
+      float spot = smoothstep( 0.45, 0.75, texture2D( fabricMap, vec2( wp.x + wp.z, wp.y ) * 2.3 ).b );
+      wamp = 0.32 * near
+        + spot * ( 0.03
+          + 0.08 * ( 1.0 - smoothstep( 0.0, 0.08, abs( wp.y - 0.5 ) ) )
+          + 0.08 * ( 1.0 - smoothstep( 0.0, 0.05, abs( wp.y - 1.0 ) ) ) );
     }
     float patchy = texture2D( fabricMap, wp.xy * 1.9 + wp.zy * 1.3 ).b;
     wamp *= fabricWrinkle.y * ( 0.35 + 1.3 * patchy );
