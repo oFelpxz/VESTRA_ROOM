@@ -39,7 +39,8 @@ export async function addToCartAction(
 
   const productVariantId = String(formData.get("productVariantId") ?? "");
   const rawQty = Number(formData.get("quantity") ?? 1);
-  const quantity = Math.max(1, Number.isFinite(rawQty) ? rawQty : 1);
+  // Inteiro: "1.5" vindo do formulário quebraria a gravação no banco.
+  const quantity = Math.max(1, Number.isFinite(rawQty) ? Math.floor(rawQty) : 1);
 
   if (!productVariantId) {
     return { error: "Selecione cor e tamanho." };
@@ -49,7 +50,8 @@ export async function addToCartAction(
     where: { id: productVariantId },
     include: { product: true },
   });
-  if (!variant || variant.status !== "ACTIVE") {
+  // A peça também precisa estar à venda (rascunho ou desativada não entra).
+  if (!variant || variant.status !== "ACTIVE" || variant.product.status !== "ACTIVE") {
     return { error: "Variação indisponível." };
   }
 

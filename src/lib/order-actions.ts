@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { quoteShippingForLive } from "@/lib/shipping";
+import { getStoreSettings } from "@/lib/store-settings-db";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { cancelOrderInTx, CUSTOMER_CANCELABLE } from "@/lib/order-cancel";
 import { PAY_METHODS, usesStripe, type PayMethod } from "@/lib/payment-rules";
@@ -14,6 +15,9 @@ import { afterOrderCanceled, startStripeCheckout } from "@/lib/payments";
 
 /** Lançado dentro da transação para desfazer tudo quando o cupom deixa de valer no último instante. */
 class CouponUnavailableError extends Error {}
+
+/** Lançado dentro da transação quando outro pedido levou o estoque antes deste. */
+class StockTakenError extends Error {}
 
 export type CheckoutState = {
   error?: string;
@@ -46,7 +50,7 @@ async function requestOrigin() {
  * - Com Stripe configurado (itens 16 e 17), cartão, boleto e carteira vão
  *   para a página de pagamento do Stripe; o pedido só vira Pago quando o
  *   Stripe avisar (webhook). PIX, ou a loja sem chave, seguem simulados:
- *   o gateway simulado fecha o pagamento em ~3s.
+ *   o pagamento é aprovado ~3s depois, quando a página de sucesso consulta.
  *
  * Redireciona para o Stripe ou para /checkout/sucesso/[orderId].
  */
@@ -103,7 +107,7 @@ export async function createOrderFromCartAction(
       items: {
         include: {
           productVariant: {
-            include: { product: { select: { name: true } } },
+            include: { product: { select: { name: true, status: true } } },
           },
         },
       },
@@ -113,16 +117,15 @@ export async function createOrderFromCartAction(
     return { error: "Seu carrinho está vazio." };
   }
 
-  // Valida estoque
+  // Valida estoque. Peça (ou cor/tamanho) desativada pela loja depois de ir
+  // para a sacola não está mais à venda: conta como sem estoque.
   const unavailable: NonNullable<CheckoutState["unavailable"]> = [];
   for (const item of cart.items) {
-    if (item.quantity > item.productVariant.stockQuantity) {
-      unavailable.push({
-        name: item.productVariant.product.name,
-        color: item.productVariant.color,
-        size: item.productVariant.size,
-        available: item.productVariant.stockQuantity,
-      });
+    const v = item.productVariant;
+    const onSale = v.status === "ACTIVE" && v.product.status === "ACTIVE";
+    const available = onSale ? Math.max(0, v.stockQuantity) : 0;
+    if (item.quantity > available) {
+      unavailable.push({ name: v.product.name, color: v.color, size: v.size, available });
     }
   }
   if (unavailable.length > 0) {
@@ -144,6 +147,7 @@ export async function createOrderFromCartAction(
     subtotal,
     itemCount,
     postalCode: address.postalCode,
+    freeShippingFrom: (await getStoreSettings()).freeShippingFrom,
   });
 
   // Cupom: revalidado aqui. Se deixou de valer, bloqueia em vez de cobrar
@@ -223,12 +227,20 @@ export async function createOrderFromCartAction(
         include: { payment: true },
       });
 
-      // Decrementa estoque das variantes
+      // Baixa o estoque só se ainda houver o suficiente (e a peça seguir à
+      // venda), numa única operação: dois clientes comprando a última peça ao
+      // mesmo tempo não deixam o estoque negativo — o segundo recebe o aviso.
       for (const i of cart.items) {
-        await tx.productVariant.update({
-          where: { id: i.productVariantId },
+        const taken = await tx.productVariant.updateMany({
+          where: {
+            id: i.productVariantId,
+            status: "ACTIVE",
+            product: { status: "ACTIVE" },
+            stockQuantity: { gte: i.quantity },
+          },
           data: { stockQuantity: { decrement: i.quantity } },
         });
+        if (taken.count === 0) throw new StockTakenError();
       }
 
       // Marca carrinho como CONVERTED e cria um novo vazio
@@ -244,6 +256,12 @@ export async function createOrderFromCartAction(
     if (e instanceof CouponUnavailableError) {
       return {
         error: `O cupom ${cart.coupon?.code} acabou de ficar indisponível (esgotou, expirou ou foi desativado). Remova-o na sacola para continuar.`,
+      };
+    }
+    if (e instanceof StockTakenError) {
+      return {
+        error:
+          "Uma das peças da sua sacola acabou de esgotar ou saiu de venda agora. Nada foi cobrado: confira a sacola e tente de novo.",
       };
     }
     throw e;
@@ -297,21 +315,8 @@ export async function createOrderFromCartAction(
     redirect(checkoutUrl);
   }
 
-  // Gateway simulado (não bloqueia a redirect)
-  try {
-    const base =
-      process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-    fetch(`${base}/api/payments/simulate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderId: order.id }),
-    }).catch(() => {
-      // ignora — usuário verá status PENDING e pode atualizar
-    });
-  } catch {
-    // idem
-  }
-
+  // Gateway simulado: a página de sucesso consulta o pagamento a cada 2 s e
+  // ele é aprovado quando o pedido completa 3 s (ver `syncOrderPayment`).
   revalidatePath("/", "layout");
   redirect(`/checkout/sucesso/${order.id}`);
 }

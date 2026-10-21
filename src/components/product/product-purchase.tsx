@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { addToCartAction, type CartActionState } from "@/lib/cart-actions";
+import { useProductColor } from "./product-color";
 
 const initialState: CartActionState = {};
 
@@ -24,7 +25,7 @@ export function ProductPurchase({
   sizes: string[];
   isLoggedIn: boolean;
 }) {
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useProductColor();
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(
     addToCartAction,

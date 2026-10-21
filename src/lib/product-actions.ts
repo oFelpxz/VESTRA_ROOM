@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getStoreSettings } from "@/lib/store-settings-db";
 import { parseProductPrices } from "@/lib/product-prices";
 
 export type ProductFormState = {
@@ -255,6 +256,7 @@ export async function addVariantAction(
       size,
       price,
       stockQuantity,
+      lowStockThreshold: (await getStoreSettings()).lowStockThreshold,
       status: "ACTIVE",
     },
   });

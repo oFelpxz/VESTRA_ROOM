@@ -87,6 +87,72 @@ idênticos (byte a byte) aos do repositório. O manequim sai com os mesmos
 vértices; só as normais variam até 0,03° (invisível) desde que o avatar
 ganhou as keys de gênero, então o do repositório foi mantido.
 
+## 5. Calças, bermuda, saia e vestido (Cargo Pant 02, Wide Denim e Bermuda Utility no molde 40, Saia Midi Plissada e Vestido Slip no M)
+
+As peças de baixo saem do próprio avatar: `calca.py` corta o corpo entre a
+cintura e a barra, afasta o tecido da pele, deixa as pernas retas e faz o cós
+e os bolsos cargo. Marca a cena com `vestra_peca = "baixo"`; no site a peça
+acompanha a pele do cliente e ganha a folga do tamanho escolhido
+(`src/lib/bottom-fit.ts`).
+
+```bash
+mb calca.py -- avatar_base.glb cargo_pant_02.glb calca
+mb calca.py -- avatar_base.glb bermuda_utility.glb bermuda
+# Wide Denim: perna larga até o chão, sem bolsos cargo
+mb calca.py -- avatar_base.glb wide_denim.glb wide
+```
+
+A saia (Saia Midi Plissada, molde M) sai do mesmo jeito com `saia.py`: justa
+da cintura ao quadril, evasê com pregas até o meio da canela, sem entrar nas
+pernas. No site, a parte solta segue as duas pernas juntas.
+
+```bash
+mb saia.py -- avatar_base.glb saia_midi_plissada.glb
+```
+
+O vestido (Vestido Slip Acetinado, molde M) segue o mesmo esquema com
+`vestido.py`: corpete do decote reto (acima do busto) até a cintura, saia
+evasê sem pregas até abaixo do joelho e duas alcinhas por cima dos ombros.
+Também é marcado como peça de baixo: no site ele segue a pele inteira e
+ocupa os dois lugares do look.
+
+```bash
+mb vestido.py -- avatar_base.glb vestido_slip.glb
+```
+
+Depois de copiar os .glb para `public/models/`, ligar aos produtos e criar a
+tabela de medidas (cargo e bermuda 38–44, wide 38–42, saia e vestido P/M/G) no banco:
+
+```bash
+npx tsx scripts/attach-bottom-models.ts
+```
+
+## 6. Oversized Shirt — derivada da Boxy Tee 01 (sem Blender)
+
+A Oversized Shirt sai do molde M da Boxy Tee 01: tronco mais largo dos
+ombros para baixo, 6 cm mais comprido, manga 30% mais longa e 12% mais
+aberta. As marcas do provador (`vestra_fit`, `_BRACO`) continuam as mesmas:
+
+```bash
+npx tsx scripts/derivar-oversized.ts public/models/boxy_tee_01.glb public/models/oversized_shirt.glb
+npx tsx scripts/attach-top-models.ts   # liga ao produto + tabela P/M/G
+```
+
+O gltf-transform grava os atributos entrelaçados num buffer só; o provador
+separa eles ao ler a peça (`src/lib/deinterleave.ts`).
+
+## 7. Gorro (Knit Beanie) — acessório, tamanho único
+
+`gorro.py` sai da cabeça do avatar: raios de dentro para fora acham o crânio,
+o tecido fica 7 mm afastado (mais no topo), com canelado e barra dobrada de
+4,5 cm. Marca a cena com `vestra_peca = "acessorio"`; no site ele acompanha a
+cabeça do cliente e entra no look como 3ª peça ("Acessório").
+
+```bash
+mb gorro.py -- avatar_base.glb knit_beanie.glb
+npx tsx scripts/attach-accessory-models.ts   # liga ao produto (sem tabela)
+```
+
 ## Ferramentas de conferência
 
 | Script | Para quê |

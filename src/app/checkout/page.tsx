@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
 import { quoteShippingForLive } from "@/lib/shipping";
+import { getStoreSettings } from "@/lib/store-settings-db";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { formatBRL, formatCep } from "@/lib/format";
 import { deleteAddressAction } from "@/lib/address-actions";
@@ -87,6 +88,7 @@ export default async function CheckoutPage({
     subtotal,
     itemCount,
     postalCode: selectedAddress?.postalCode,
+    freeShippingFrom: (await getStoreSettings()).freeShippingFrom,
   });
 
   const couponEvaluation = cart?.coupon
@@ -245,11 +247,12 @@ function AddressStepBlock({
                     </p>
                   </div>
 
-                  <div className="relative z-10 mt-3 flex items-center justify-between">
-                    <span className="pointer-events-none text-[11px] font-semibold uppercase tracking-[0.15em] text-foreground/70">
+                  {/* A linha deixa o clique passar para o link; só o "Remover" recebe clique. */}
+                  <div className="pointer-events-none relative z-10 mt-3 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-foreground/70">
                       {selected ? "Selecionado" : "Selecionar"}
                     </span>
-                    <form action={deleteAddressAction}>
+                    <form action={deleteAddressAction} className="pointer-events-auto">
                       <input type="hidden" name="id" value={a.id} />
                       <button
                         type="submit"

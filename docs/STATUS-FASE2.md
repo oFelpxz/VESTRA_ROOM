@@ -195,12 +195,12 @@ consolidado aqui pra sobreviver à troca de chat. 32 itens, 6 categorias.
   que a quantização atual, mas adiciona dependência no cliente).
 - **B4** — Catálogo usar os `/previews/*.png` em vez de carregar o `.glb`
   inteiro só pra mostrar miniatura.
-- **C1** — Assinatura/segredo no webhook simulado de pagamento
-  (`/api/payments/simulate` hoje aceita qualquer POST com um `orderId` e
-  marca como pago, sem autenticação nenhuma).
+- ~~**C1** — Assinatura/segredo no webhook simulado de pagamento~~ —
+  resolvido na Sprint 5: o POST saiu e o pagamento simulado é aprovado na
+  consulta do próprio cliente (ver `docs/SPRINT5-DECISOES.md`).
 - **C4** — Rate limit no login (lógica + banco, sem serviço externo).
-- **C6** — Fechar corrida de estoque negativo (`UPDATE ... WHERE
-  stockQuantity >= quantidade` em vez de `decrement` cego).
+- ~~**C6** — Fechar corrida de estoque negativo~~ — resolvido na Sprint 5
+  (`updateMany` com `stockQuantity >= quantidade` no checkout).
 - **D1** — Log de auditoria (tabela nova + wiring nas actions existentes).
 - **D2** — Tela de admin pra gerenciar usuários (promover/desativar).
 - **D3** — Busca e paginação nas listas do admin (produtos/pedidos/estoque).

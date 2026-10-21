@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveCartWithItems } from "@/lib/cart";
 import { formatBRL, formatCep } from "@/lib/format";
 import { normalizePostalCode, quoteShippingOptionsLive } from "@/lib/shipping";
+import { getStoreSettings } from "@/lib/store-settings-db";
 import { evaluateCoupon, toCouponLike } from "@/lib/coupons";
 import { CartItemRow } from "@/components/cart/cart-item-row";
 import { ShippingEstimator } from "@/components/cart/shipping-estimator";
@@ -53,7 +54,12 @@ export default async function CarrinhoPage({
   const cep = normalizePostalCode(cepInput);
 
   const shippingOptions = cep
-    ? await quoteShippingOptionsLive({ subtotal, itemCount, postalCode: cep })
+    ? await quoteShippingOptionsLive({
+        subtotal,
+        itemCount,
+        postalCode: cep,
+        freeShippingFrom: (await getStoreSettings()).freeShippingFrom,
+      })
     : [];
   const selectedMethod = cart?.shippingMethod ?? "ECONOMICO";
   // Expresso pode não existir para o CEP (frete real): aí vale o Econômico,

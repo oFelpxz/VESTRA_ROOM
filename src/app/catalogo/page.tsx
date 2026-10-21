@@ -3,14 +3,18 @@ import { auth } from "@/auth";
 import { logoutAction } from "@/lib/auth-actions";
 import { ProductCard } from "@/components/product/product-card";
 import { getFavoriteProductIds } from "@/lib/favorites";
+import { getCartItemCount } from "@/lib/cart";
 import {
   getProducts,
+  parseSearch,
   getCategories,
   getFilterOptions,
   PRICE_OPTIONS,
   GENDER_LABEL,
   type ProductFilters as Filters,
 } from "@/lib/products";
+
+export const metadata = { title: "Catálogo" };
 
 type Current = Record<string, string | undefined>;
 
@@ -81,6 +85,7 @@ export default async function CatalogoPage({
     colecao: typeof sp.colecao === "string" ? sp.colecao : undefined,
     material: typeof sp.material === "string" ? sp.material : undefined,
     provador: typeof sp.provador === "string" ? sp.provador : undefined,
+    q: parseSearch(sp.q),
   };
   const filters: Filters = { ...current, provador: current.provador === "1" };
 
@@ -95,23 +100,44 @@ export default async function CatalogoPage({
   const isLoggedIn = !!session?.user;
   const isAdmin = session?.user?.role === "ADMIN";
   // Uma consulta para a página inteira, não uma por card.
-  const favoriteIds = session?.user?.id
-    ? await getFavoriteProductIds(session.user.id)
-    : new Set<string>();
+  const [favoriteIds, cartCount] = session?.user?.id
+    ? await Promise.all([
+        getFavoriteProductIds(session.user.id),
+        getCartItemCount(session.user.id),
+      ])
+    : [new Set<string>(), 0];
 
   return (
     <div className="min-h-screen px-5 py-6 md:px-8">
       {/* topo: marca + ações */}
-      <div className="flex items-start justify-between border-b border-border pb-5">
+      <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
         <Link
           href="/"
           className="font-heading text-lg font-bold uppercase tracking-[0.2em]"
         >
           VESTRA ROOM
         </Link>
-        <div className="flex items-center gap-5 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          <span>Pesquisa</span>
-          <span>Cesto 0</span>
+        {/* No celular os links quebram linha em vez de empurrar a página para o lado. */}
+        <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          {/* Busca: mantém os filtros escolhidos na lateral. */}
+          <form action="/catalogo" role="search" className="flex items-center gap-2">
+            {Object.entries(current).map(([k, v]) =>
+              k !== "q" && v ? <input key={k} type="hidden" name={k} value={v} /> : null,
+            )}
+            <label htmlFor="catalogo-busca">Pesquisa</label>
+            <input
+              id="catalogo-busca"
+              type="search"
+              name="q"
+              defaultValue={current.q ?? ""}
+              maxLength={60}
+              placeholder="Calça, algodão..."
+              className="h-7 w-36 rounded-sm border border-border bg-background px-2 text-[11px] normal-case tracking-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-foreground"
+            />
+          </form>
+          <Link href="/carrinho" className="hover:text-foreground">
+            Cesto {cartCount}
+          </Link>
           {isAdmin && (
             <Link
               href="/admin"
@@ -281,7 +307,9 @@ export default async function CatalogoPage({
         <div className="mt-8 lg:mt-0">
           {products.length === 0 ? (
             <p className="py-24 text-center text-sm text-muted-foreground">
-              Nenhuma peça encontrada com esses filtros.
+              {current.q
+                ? `Nenhuma peça encontrada para "${current.q}".`
+                : "Nenhuma peça encontrada com esses filtros."}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-x-5 gap-y-12 md:grid-cols-3">
@@ -299,6 +327,7 @@ export default async function CatalogoPage({
           <div className="mt-16 flex items-center justify-between border-t border-border pt-5 text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
             <span>
               {products.length} {products.length === 1 ? "peça" : "peças"}
+              {current.q && <> para &quot;{current.q}&quot;</>}
             </span>
             <Link href="/catalogo" className="hover:text-foreground">
               Ver tudo

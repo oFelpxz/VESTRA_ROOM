@@ -3,6 +3,7 @@ import {
   quoteCarriers,
   type CarrierService,
 } from "@/lib/melhor-envio";
+import { STORE_SETTINGS } from "@/lib/store-settings";
 
 /**
  * Frete da loja.
@@ -14,12 +15,16 @@ import {
  *  - senão: R$ 15 fixo + R$ 2 por item
  *
  * Nos dois casos o Econômico é grátis a partir de R$ 300 (a loja paga).
+ * O valor do frete grátis vem das configurações da loja (item 25), passado
+ * por quem chama; a tabela própria fica em `STORE_SETTINGS`.
  */
 
 export type ShippingInput = {
   subtotal: number;
   itemCount: number;
   postalCode?: string | null;
+  /** Frete grátis a partir de (item 25); sem valor, o padrão da loja. */
+  freeShippingFrom?: number;
 };
 
 export type ShippingQuote = {
@@ -29,21 +34,22 @@ export type ShippingQuote = {
   reason?: string;
 };
 
-const FREE_THRESHOLD = 300;
-const FIXED_BASE = 15;
-const PER_ITEM = 2;
+const FREE_THRESHOLD = STORE_SETTINGS.freeShippingFrom;
+const FIXED_BASE = STORE_SETTINGS.shippingTable.economyBase;
+const PER_ITEM = STORE_SETTINGS.shippingTable.economyPerItem;
 
 export function calculateShipping({
   subtotal,
   itemCount,
   postalCode,
+  freeShippingFrom = FREE_THRESHOLD,
 }: ShippingInput): ShippingQuote {
-  if (subtotal >= FREE_THRESHOLD) {
+  if (subtotal >= freeShippingFrom) {
     return {
       amount: 0,
       free: true,
       estimatedDays: 5,
-      reason: `Frete grátis acima de R$ ${FREE_THRESHOLD}.`,
+      reason: `Frete grátis acima de ${brl(freeShippingFrom)}.`,
     };
   }
 
@@ -81,8 +87,8 @@ export type ShippingOption = ShippingQuote & {
   service: string | null;
 };
 
-const EXPRESS_BASE = 25;
-const EXPRESS_PER_ITEM = 3;
+const EXPRESS_BASE = STORE_SETTINGS.shippingTable.expressBase;
+const EXPRESS_PER_ITEM = STORE_SETTINGS.shippingTable.expressPerItem;
 
 /** Lê a modalidade vinda de formulário. Qualquer valor desconhecido vira ECONOMICO. */
 export function parseShippingMethod(value?: string | null): ShippingMethod {
@@ -120,10 +126,11 @@ export function quoteShippingOptions(input: ShippingInput): ShippingOption[] {
 export function optionsFromCarriers(
   services: CarrierService[],
   subtotal: number,
+  freeShippingFrom: number = FREE_THRESHOLD,
 ): ShippingOption[] {
   const picked = pickModalities(services);
   if (!picked) return [];
-  const free = subtotal >= FREE_THRESHOLD;
+  const free = subtotal >= freeShippingFrom;
   const options: ShippingOption[] = [
     {
       method: "ECONOMICO",
@@ -132,7 +139,7 @@ export function optionsFromCarriers(
       amount: free ? 0 : round2(picked.ECONOMICO.price),
       free,
       estimatedDays: picked.ECONOMICO.days,
-      reason: free ? `Frete grátis acima de R$ ${FREE_THRESHOLD}.` : undefined,
+      reason: free ? `Frete grátis acima de ${brl(freeShippingFrom)}.` : undefined,
     },
   ];
   if (picked.EXPRESSO) {
@@ -146,6 +153,15 @@ export function optionsFromCarriers(
     });
   }
   return options;
+}
+
+/** "R$ 300" ou "R$ 249,90" — sem centavos quando o valor é redondo. */
+function brl(n: number) {
+  return n.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+  });
 }
 
 function round2(n: number) {
@@ -163,7 +179,9 @@ export async function quoteShippingOptionsLive(
       itemCount: input.itemCount,
       subtotal: input.subtotal,
     });
-    const options = services ? optionsFromCarriers(services, input.subtotal) : [];
+    const options = services
+      ? optionsFromCarriers(services, input.subtotal, input.freeShippingFrom)
+      : [];
     if (options.length > 0) return options;
   }
   return quoteShippingOptions(input);

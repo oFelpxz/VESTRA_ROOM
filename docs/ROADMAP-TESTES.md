@@ -295,7 +295,7 @@ Caso queiram testar **cada funcionalidade** isoladamente fora do roteiro encenad
 |---|---|
 | **3D não carrega** (cube vazio cinza) | Abrir DevTools → Network — checar se `.glb` retorna 200. Se 404, é caminho errado. Se 500, problema de serving. |
 | **Avatar muito pequeno/gigante** | Medidas zeradas ou negativas. Voltar em `/perfil/medidas` e refazer. |
-| **Pagamento não vira PAID em 3s** | Pode ser que o webhook não saiu. Olhar logs do servidor. Recurso: abrir `/api/payments/simulate?orderId=...` direto na aba e ver o JSON. |
+| **Pagamento não vira PAID em 3s** | O pagamento simulado é aprovado na consulta da página de sucesso (a cada 2 s). Recurso: logado como o dono, abrir `/api/payments/simulate?orderId=...` direto na aba e ver o JSON. |
 | **Mudança no admin não reflete no cliente** | Polling é a cada 10s — pode esperar. Ou apertar F5 na aba do cliente como último recurso. |
 | **Erro de conexão Postgres** | Banco pausou. Restaurar no Supabase. |
 | **Produto não aparece no catálogo** | Status precisa ser ACTIVE. Conferir em `/admin/produtos`. |

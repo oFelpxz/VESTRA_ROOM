@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   saveMeasurementsAction,
@@ -98,7 +99,11 @@ export function MeasurementForm({
         <span>
           Autorizo o uso das minhas medidas corporais exclusivamente para
           recomendação de tamanho e para o provador virtual VESTRA FIT. Posso
-          editar ou excluir esses dados a qualquer momento.
+          editar ou excluir esses dados a qualquer momento. Veja a{" "}
+          <Link href="/privacidade" target="_blank" className="underline hover:text-foreground">
+            política de privacidade
+          </Link>
+          .
         </span>
       </label>
 

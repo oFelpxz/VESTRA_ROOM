@@ -6,8 +6,13 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { signIn, signOut } from "@/auth";
+import { safeNextPath } from "@/lib/safe-next";
 
-export type AuthFormState = { error?: string };
+export type AuthFormState = {
+  error?: string;
+  /** E-mail digitado, para o campo não ficar vazio depois de um erro. */
+  email?: string;
+};
 
 export async function registerAction(
   _prevState: AuthFormState,
@@ -56,20 +61,21 @@ export async function loginAction(
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    return { error: "Preencha e-mail e senha." };
+    return { error: "Preencha e-mail e senha.", email };
   }
 
-  // Todos vão para /perfil. O acesso ao /admin é feito apenas pelo
-  // item "Admin" do menu, visível só para administradores logados.
+  // Volta para onde o cliente estava (`next`, ex.: /checkout); sem ele, vai
+  // para /perfil. O acesso ao /admin continua pelo item "Admin" do menu, e o
+  // proxy ainda confere o papel de quem chega lá.
   try {
     await signIn("credentials", {
       email,
       password,
-      redirectTo: "/perfil",
+      redirectTo: safeNextPath(String(formData.get("next") ?? "")),
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      return { error: "E-mail ou senha inválidos." };
+      return { error: "E-mail ou senha inválidos.", email };
     }
     // Re-lança o redirect do Next (NEXT_REDIRECT) para funcionar.
     throw error;
@@ -113,6 +119,7 @@ export async function deleteAccountAction(
     prisma.address.deleteMany({ where: { userId } }),
     prisma.savedPaymentMethod.deleteMany({ where: { userId } }),
     prisma.cart.deleteMany({ where: { userId } }),
+    prisma.savedLook.deleteMany({ where: { userId } }),
     prisma.user.update({
       where: { id: userId },
       data: {

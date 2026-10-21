@@ -10,7 +10,18 @@ export function Marquee({
       ? "border-y border-background/15 bg-foreground text-background"
       : "border-y border-border bg-background text-foreground";
 
-  const Group = () => (
+  return (
+    <div className={`overflow-hidden py-4 ${wrap}`}>
+      <div className="animate-marquee flex w-max">
+        <MarqueeGroup items={items} />
+        <MarqueeGroup items={items} />
+      </div>
+    </div>
+  );
+}
+
+function MarqueeGroup({ items }: { items: string[] }) {
+  return (
     <div className="flex shrink-0 items-center">
       {items.map((t, i) => (
         <span
@@ -21,15 +32,6 @@ export function Marquee({
           <span className="size-1 rounded-full bg-acid" />
         </span>
       ))}
-    </div>
-  );
-
-  return (
-    <div className={`overflow-hidden py-4 ${wrap}`}>
-      <div className="animate-marquee flex w-max">
-        <Group />
-        <Group />
-      </div>
     </div>
   );
 }

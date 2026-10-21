@@ -12,6 +12,12 @@ import {
   toCsv,
   type ReportRange,
 } from "@/lib/reports";
+import {
+  KIND_LABEL,
+  REASON_LABEL,
+  STATUS_LABEL as RETURN_STATUS_LABEL,
+  summarizeReturns,
+} from "@/lib/returns";
 import { PAYMENT_METHOD_LABEL } from "@/components/checkout/payment-details";
 
 export const ORDER_STATUS_LABEL: Record<string, string> = {
@@ -149,7 +155,59 @@ export async function getStockReport() {
   };
 }
 
-export const REPORT_KINDS = ["vendas", "produtos", "estoque"] as const;
+/** Pedidos de troca e devolução abertos no período (item 24). */
+export async function getReturnsReport(range: ReportRange) {
+  const requests = await prisma.returnRequest.findMany({
+    where: { createdAt: { gte: range.start, lt: range.end } },
+    select: {
+      id: true,
+      orderId: true,
+      reason: true,
+      kind: true,
+      approvedKind: true,
+      status: true,
+      quantity: true,
+      createdAt: true,
+      answeredAt: true,
+      completedAt: true,
+      refundAmount: true,
+      goodCondition: true,
+      user: { select: { name: true } },
+      orderItem: { select: { productName: true, color: true, size: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const rows = requests.map((r) => ({
+    id: r.id,
+    order: r.orderId.slice(-8).toUpperCase(),
+    day: spDayKey(r.createdAt),
+    createdAt: r.createdAt,
+    answeredAt: r.answeredAt,
+    completedAt: r.completedAt,
+    customer: r.user.name,
+    product: `${r.orderItem.productName} · ${r.orderItem.color} · ${r.orderItem.size}`,
+    productName: r.orderItem.productName,
+    quantity: r.quantity,
+    reason: r.reason,
+    kind: r.kind,
+    approvedKind: r.approvedKind,
+    status: r.status,
+    goodCondition: r.goodCondition,
+    refundAmount: r.refundAmount === null ? null : Number(r.refundAmount),
+  }));
+
+  // Peças mais devolvidas, pelo nome gravado no pedido.
+  const byProduct = new Map<string, number>();
+  for (const r of rows) byProduct.set(r.productName, (byProduct.get(r.productName) ?? 0) + r.quantity);
+  const products = [...byProduct.entries()]
+    .map(([name, units]) => ({ name, units }))
+    .sort((a, b) => b.units - a.units);
+
+  return { rows, products, summary: summarizeReturns(rows) };
+}
+
+export const REPORT_KINDS = ["vendas", "produtos", "estoque", "devolucoes"] as const;
 export type ReportKind = (typeof REPORT_KINDS)[number];
 
 /** Nome do arquivo e conteúdo do CSV de cada relatório. */
@@ -172,6 +230,45 @@ export async function buildReportCsv(kind: ReportKind, range: ReportRange) {
           r.threshold,
           r.situation,
           r.active ? "Sim" : "Não",
+        ]),
+      ),
+    };
+  }
+
+  if (kind === "devolucoes") {
+    const { rows } = await getReturnsReport(range);
+    const hours = (from: Date, to: Date | null) =>
+      to ? csvMoney((to.getTime() - from.getTime()) / 36e5) : "";
+    return {
+      filename: `vestra-devolucoes-${period}.csv`,
+      csv: toCsv(
+        [
+          "Data",
+          "Pedido",
+          "Cliente",
+          "Peça",
+          "Qtd",
+          "Motivo",
+          "Pedido do cliente",
+          "Aprovado como",
+          "Status",
+          "Horas até a resposta",
+          "Chegou em bom estado",
+          "Valor devolvido (R$)",
+        ],
+        rows.map((r) => [
+          formatDay(r.day),
+          r.order,
+          r.customer,
+          r.product,
+          r.quantity,
+          REASON_LABEL[r.reason],
+          KIND_LABEL[r.kind],
+          r.approvedKind ? KIND_LABEL[r.approvedKind] : "",
+          RETURN_STATUS_LABEL[r.status],
+          hours(r.createdAt, r.answeredAt),
+          r.goodCondition === null ? "" : r.goodCondition ? "Sim" : "Não",
+          r.refundAmount === null ? "" : csvMoney(r.refundAmount),
         ]),
       ),
     };

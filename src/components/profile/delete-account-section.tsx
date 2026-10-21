@@ -43,8 +43,9 @@ export function DeleteAccountSection({ userEmail }: { userEmail: string }) {
         className="mt-4 flex flex-col gap-3"
       >
         <div className="flex flex-col gap-2 max-w-sm">
-          <Label htmlFor="confirmEmail">
-            Digite <span className="font-semibold">{userEmail}</span> para confirmar
+          {/* E-mail longo quebra linha em vez de alargar a página no celular. */}
+          <Label htmlFor="confirmEmail" className="block leading-snug">
+            Digite <span className="font-semibold break-all">{userEmail}</span> para confirmar
           </Label>
           <Input
             id="confirmEmail"
