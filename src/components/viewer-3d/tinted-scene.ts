@@ -2,30 +2,62 @@
 
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { tintMaterial } from "@/lib/garment-color";
+import { bottomWrinkle } from "@/lib/bottom-fit";
+import { deinterleave } from "@/lib/deinterleave";
+import { addFabricEdge, clothMaterial, fabricOf, type Wrinkle } from "@/lib/fabric";
+import { isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
+
+type Piece = { geometry: THREE.BufferGeometry; source: THREE.Material; wrinkle: Wrinkle | null };
+
+// A conta da borda (barra e pesponto) é feita uma vez por arquivo; trocar a
+// cor só troca os materiais.
+const pieces = new WeakMap<THREE.Object3D, Piece[]>();
+
+function piecesOf(scene: THREE.Object3D): Piece[] {
+  let out = pieces.get(scene);
+  if (out) return out;
+  // Dobras só em peça feita sobre o corpo de referência: nas outras a altura
+  // do arquivo não diz onde fica o joelho ou a cintura.
+  const fitted = isFittedToMannequin(scene);
+  const bottom = isBottomPiece(scene);
+  scene.updateMatrixWorld(true);
+  out = [];
+  scene.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    // Em metros, nas coordenadas da cena: a trama sai do mesmo tamanho em
+    // qualquer arquivo (alguns vêm do Sketchfab com escala nos nós).
+    const geometry = mesh.geometry.clone();
+    geometry.applyMatrix4(mesh.matrixWorld);
+    geometry.morphAttributes = {};
+    deinterleave(geometry);
+    addFabricEdge(geometry);
+    const wrinkle = !fitted
+      ? null
+      : bottom
+        ? bottomWrinkle(geometry.attributes.position.array as Float32Array)
+        : "caimento";
+    const source = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    out!.push({ geometry, source, wrinkle });
+  });
+  pieces.set(scene, out);
+  return out;
+}
 
 /**
- * Cópia da cena com os materiais na cor escolhida (ver `tintMaterial`).
- * Sem cor, a peça aparece como veio do arquivo. A cópia divide a malha com
- * o arquivo; só os materiais são novos.
+ * Cópia da peça com o material de tecido (`clothMaterial`: trama, barra,
+ * pesponto e dobras) na cor escolhida. Sem cor, fica a cor do arquivo.
+ * A malha é dividida entre as cópias; só os materiais são novos.
  */
 export function useTintedScene(scene: THREE.Object3D, color?: string) {
   const { model, created } = useMemo(() => {
-    const model = scene.clone(true);
+    const model = new THREE.Group();
     const created: THREE.Material[] = [];
-    if (color) {
-      const tint = (m: THREE.Material) => {
-        const t = tintMaterial(m, color);
-        created.push(t);
-        return t;
-      };
-      model.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        mesh.material = Array.isArray(mesh.material)
-          ? mesh.material.map(tint)
-          : tint(mesh.material);
-      });
+    for (const p of piecesOf(scene)) {
+      const m = clothMaterial(p.source, color, fabricOf(scene, p.source), p.wrinkle);
+      m.side = THREE.DoubleSide; // o avesso aparece na gola e na barra
+      created.push(m);
+      model.add(new THREE.Mesh(p.geometry, m));
     }
     return { model, created };
   }, [scene, color]);
