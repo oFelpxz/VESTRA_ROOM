@@ -61,7 +61,7 @@ export const FABRIC_LOOK: Record<FabricName, FabricLook> = {
   sarja: { tile: 0.028, roughness: 0.88, specular: 0.3, sheen: 0.45, sheenRoughness: 0.7, sheenWhite: 0.3, relief: 0.7, threads: 1, mottle: 0.08, hem: 0.025, stitches: [0.009], wrinkle: 1 },
   denim: { tile: 0.05, roughness: 0.92, specular: 0.25, sheen: 0.5, sheenRoughness: 0.8, sheenWhite: 0.45, relief: 1, threads: 1.3, mottle: 0.22, streak: 6, hem: 0.02, stitches: [0.006, 0.013], thread: "#c8923e", wrinkle: 1.2 },
   trico: { tile: 0.05, roughness: 0.95, specular: 0.2, sheen: 0.9, sheenRoughness: 0.85, sheenWhite: 0.3, relief: 1, threads: 1, mottle: 0.05, hem: 0, stitches: [], wrinkle: 0 },
-  cetim: { tile: 0.06, roughness: 0.2, specular: 1, sheen: 0.6, sheenRoughness: 0.3, sheenWhite: 0.6, relief: 0.25, threads: 1, mottle: 0.03, hem: 0.005, stitches: [], wrinkle: 0.5 },
+  cetim: { tile: 0.06, roughness: 0.3, specular: 0.8, sheen: 0.6, sheenRoughness: 0.3, sheenWhite: 0.6, relief: 0.25, threads: 1, mottle: 0.03, hem: 0.005, stitches: [], wrinkle: 0.5 },
   moletom: { tile: 0.03, roughness: 0.92, specular: 0.25, sheen: 0.8, sheenRoughness: 0.85, sheenWhite: 0.35, relief: 0.4, threads: 1, mottle: 0.05, hem: 0.02, stitches: [0.009], wrinkle: 1 },
 };
 
@@ -239,6 +239,13 @@ const FRAGMENT_BODY = /* glsl */ `
   diffuseColor.rgb *= 1.0 - 0.1 * max( fabricLine( edgeD, fabricStitches.x, ${STITCH_WIDTH * 2.6} ), fabricLine( edgeD, fabricStitches.y, ${STITCH_WIDTH * 2.6} ) ) * ( 1.0 - stitch );
   diffuseColor.rgb = mix( diffuseColor.rgb, fabricThread, stitch * 0.9 );
 #endif
+
+  // Reflexo sem pisca-pisca: onde a normal vira muito dentro de um pixel
+  // (alça fina, crista de dobra, trama vista de longe), o brilho espalha.
+  vec3 nDx = dFdx( normal );
+  vec3 nDy = dFdy( normal );
+  float nVar = 0.25 * ( dot( nDx, nDx ) + dot( nDy, nDy ) );
+  roughnessFactor = sqrt( clamp( roughnessFactor * roughnessFactor + min( 2.0 * nVar, 0.18 ), 0.0, 1.0 ) );
 
   if ( ! gl_FrontFacing ) diffuseColor.rgb *= fabricInside;
 }`;
