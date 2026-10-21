@@ -443,6 +443,32 @@ perto; com raio menor (8 cm) e mais amostras eles somem. Se aparecerem de
 novo em outro computador, tirar `<StudioAO />` de `tryon-scene.tsx` e
 `viewer.tsx` volta ao que era, sem mexer no resto.
 
+## Tecido e gravidade, de vez (lista 6)
+
+> **21/10:** "Escolhe 5 e faz as 5". Escolhi os itens 1, 2, 3, 5 e 9, que
+> aparecem mais na apresentação e não dependem de mexer no ajuste ao corpo do
+> cliente. Feita em 21/10 na `feat/sprint5-tecido` (f33fd0a). Como refazer:
+> [scripts/molde/README.md](../scripts/molde/README.md#9-caimento-com-gravidade-e-espessura-depois-do-molde).
+
+| # | Item | Situação | Como ficou |
+|---|---|---|---|
+| 1 | Saia Midi Plissada com gravidade | Feito | Presa do cós ao quadril, solta dali para baixo: as pregas caem retas em vez de abrir em cone |
+| 2 | Vestido Slip | Feito | Preso no corpete; o cetim cai com dobras de verdade até a barra |
+| 3 | Wide Denim | **Cortado** | 7 tentativas: a barra encosta no tênis e no chão e amassa feito papel em todas (com e sem tênis, presa ou solta). Fica como estava |
+| 4 | Cargo Pant e Bermuda | Não escolhido | |
+| 5 | Camisetas (Boxy Tee, Relugar, Oversized) | Feito | Presas nos ombros e no peito; o resto pesa e forma dobras macias. As camadas do CLO (~1 mm) são unidas a 3 mm na simulação e a queda é a média num raio de 12 mm; com menos, a manga da oversized furava a camada de baixo |
+| 6 | Hoodie Core | Não escolhido | |
+| 7 | Gravidade por tamanho | Não escolhido | |
+| 8 | Caimento no corpo do cliente | Não escolhido | A queda vai gravada na forma da peça e o ajuste ao corpo do cliente continua o de antes; nos corpos testados (padrão e 185 cm/98 kg) a queda se mantém |
+| 9 | Espessura do tecido | Feito | Peças de baixo (folha só): barra, cós, cava e alças ganham uma faixa dobrada para dentro (sarja 2,5 mm, cetim 1,2 mm, denim 3 mm). De perto, a barra da cargo e o bolso têm "corpo". As camisetas já vêm em camadas do CLO e ficaram como estavam |
+| 10 | Fechamento do tema | Não escolhido | |
+
+**Achados no caminho:**
+- A Wide Denim também ganhou espessura, só não a queda.
+- Sobra um pontinho de 1–2 px na barra da manga da camiseta, de perto e só
+  em alguns corpos. A oversized original já tinha um igual.
+- Volta rápida: os `.glb` de antes estão no commit anterior (d070e68).
+
 ## Decisões dos itens 21, 22 e 25
 
 > **Aprovadas pelo grupo em 19/10:** todas as sugestões abaixo.

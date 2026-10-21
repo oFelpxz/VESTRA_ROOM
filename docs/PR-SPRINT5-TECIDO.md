@@ -1,16 +1,17 @@
-# PR — Sprint 5: tecido de verdade no provador (listas 3, 4 e 5)
+# PR — Sprint 5: tecido de verdade no provador (listas 3, 4, 5 e 6)
 
 Texto pronto para abrir o PR no GitHub e checklist do grupo antes da
 apresentação de 26/10. Decisões item a item:
 [SPRINT5-DECISOES.md](SPRINT5-DECISOES.md#apresentação-segura-e-acabamento-do-provador-lista-4)
-e [lista 5](SPRINT5-DECISOES.md#melhorar-o-3d-que-já-existe-lista-5).
+[lista 5](SPRINT5-DECISOES.md#melhorar-o-3d-que-já-existe-lista-5) e
+[lista 6](SPRINT5-DECISOES.md#tecido-e-gravidade-de-vez-lista-6).
 
 ## Antes de abrir
 
 - **Branch:** `feat/sprint5-tecido` (ainda só no computador: publicar pelo
   GitHub Desktop → "Publish branch").
 - **Base:** ela sai de `feat/sprint5-itens` (que está no GitHub até
-  `6a28808`). São **24 commits novos** em cima dela.
+  `6a28808`). São **26 commits novos** em cima dela.
 - Se o PR for aberto contra a `main`, o GitHub vai mostrar ~100 commits,
   porque a `main` (`f046785`) ainda não tem a sprint 5. Para revisar só o que
   é novo, abra contra `feat/sprint5-itens`; ou junte a `feat/sprint5-itens`
@@ -38,7 +39,9 @@ entram um modo leve para celular fraco, o botão "Tecido de perto", o tecido
 no 3D da página do produto, a escolha do tecido no upload do admin e um tênis
 no avatar. Por último, o 3D que já existia foi lapidado: manequim com braços,
 camisetas sem o avesso furando, barra reta, cetim sem pisca-pisca, sombra
-macia e de contato, e a touca com câmera na cabeça.
+macia e de contato, e a touca com câmera na cabeça. Por fim, saia, vestido e
+camisetas caem com gravidade (simulação no Blender) e as peças de baixo
+ganham espessura na barra e no cós.
 
 ### Tecido e avatar (lista 3)
 - f466c74 Tecido por peça (algodão, jeans, moletom, tricô, cetim, sarja) + luz de estúdio
@@ -68,6 +71,9 @@ macia e de contato, e a touca com câmera na cabeça.
 - 149308a Sombra macia, AO de contato e mais nitidez no computador
 - ac424aa Provador da touca abre na cabeça
 
+### Tecido e gravidade (lista 6)
+- f33fd0a Saia, vestido e camisetas com gravidade (`scripts/molde/cair.py`) e espessura na barra das peças de baixo (`scripts/espessura.ts`)
+
 Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.glb`.
 
 ## Como testar
@@ -86,9 +92,11 @@ Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.
 5. Página do produto (`/produto/wide-denim`): o 3D usa o mesmo tecido e a
    mesma luz; em "Manequim" o avatar aparece com braços.
 6. Provador da Knit Beanie: abre enquadrado na cabeça.
-7. Admin → upload de modelo 3D: o campo "Tecido no provador" aparece
+7. Saia Midi Plissada e Vestido Slip: as pregas e o cetim caem retos do
+   quadril; de baixo, a barra tem espessura de pano.
+8. Admin → upload de modelo 3D: o campo "Tecido no provador" aparece
    ("Automático" mantém o comportamento antigo).
-8. `npm test`, `npx tsc --noEmit -p .` e `npx eslint .` sem erro.
+9. `npm test`, `npx tsc --noEmit -p .` e `npx eslint .` sem erro.
 
 ## Limitações conhecidas
 - Modo leve medido no Mac com tela de celular simulada, não num celular de verdade.
@@ -96,6 +104,7 @@ Sem migração no banco: o tecido escolhido no admin fica gravado no próprio `.
 - Avatar sem cabelo (cabeça lisa de manequim).
 - Moletom continua sem pesponto (as emendas do arquivo não se tocam; o
   pesponto riscava o tricô e o cós).
+- Wide Denim sem queda com gravidade (a barra amassava no tênis e no chão).
 - No celular, a ponta do tênis fica atrás dos botões de vista (igual ao pé
   descalço antes).
 

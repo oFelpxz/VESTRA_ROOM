@@ -14,5 +14,6 @@ Mesma câmera, mesmo look, `npm run dev`.
 | `05-vestido-cetim.jpg` | Vestido Slip Acetinado | Brilho de cetim e dobras verticais de caimento |
 | `06-bermuda-gorro.jpg` | Boxy Tee 01 + Bermuda Utility + Knit Beanie | Pele mais quente, sarja da bermuda, tricô do gorro |
 | `07-celular.jpg` | Oversized + Wide Denim, 375 px | O mesmo acabamento no celular, sem erro no console |
+| `manequim-novo.png` | Página do produto, aba "Manequim" (lista 5) | O manequim virou o avatar do provador, com braços e tênis |
 
 O que mudou e por quê: [SPRINT5-DECISOES.md](../../SPRINT5-DECISOES.md#roupa-sem-cara-de-massinha-lista-3).
