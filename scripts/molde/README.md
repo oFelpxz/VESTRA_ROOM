@@ -174,6 +174,42 @@ mb tenis.py -- avatar_base.glb tenis.glb
 ORTHO=0.45 ALVO=0.19,-0.08,0.07 mb render.py -- tenis avatar_base.glb tenis.glb ""
 ```
 
+## 9. Caimento com gravidade e espessura (depois do molde)
+
+O molde dá a forma "de cabide". `cair.py` solta a peça com gravidade em cima
+do `avatar_base.glb` (simulação de tecido do Blender, com chão) e grava onde
+cada ponto parou num `.bin`; `scripts/aplicar-queda.ts` aplica isso no `.glb`
+sem mexer em marcas, UV ou `_BRACO`. A parte que veste o corpo fica presa
+(cós da saia, corpete do vestido, ombros da camiseta) e o resto cai.
+
+```bash
+mb cair.py -- avatar_base.glb saia_midi_plissada.glb /tmp/saia.bin saia
+npx tsx scripts/aplicar-queda.ts public/models/saia_midi_plissada.glb /tmp/saia.bin public/models/saia_midi_plissada.glb
+mb cair.py -- avatar_base.glb vestido_slip.glb /tmp/vestido.bin vestido
+mb cair.py -- avatar_base.glb boxy_tee_01.glb /tmp/tee.bin camiseta
+npx tsx scripts/aplicar-queda.ts public/models/boxy_tee_01.glb /tmp/tee.bin public/models/boxy_tee_01.glb 12
+```
+
+- Camisetas: raio 12 (mm) no `aplicar-queda.ts`. A simulação une as camadas
+  e costuras do CLO a 3 mm; com raio menor a manga da oversized furava a
+  camada de baixo. A Relugar é o mesmo arquivo da Boxy Tee (copiar).
+- Wide Denim **fica sem queda**: a barra encosta no tênis e no chão e amassa
+  (7 tentativas, 21/10).
+- `AJUSTE="mass=0.05,bending=2"` muda o tecido sem editar o script.
+
+Depois da queda, as peças de baixo (uma folha só) ganham espessura na
+barra, no cós, na cava e nas alças: uma faixa dobrada para dentro com a
+espessura do tecido (sarja 2,5 mm, cetim 1,2 mm, denim 3 mm). O script grava
+`vestra_espessura` na cena e pula a peça que já tem:
+
+```bash
+npx tsx scripts/espessura.ts public/models/saia_midi_plissada.glb
+```
+
+Ordem ao refazer uma peça: molde → `marcar-tecido.ts` → `cair.py` +
+`aplicar-queda.ts` → `espessura.ts` (por último: a simulação não conhece a
+faixa da espessura).
+
 ## Ferramentas de conferência
 
 | Script | Para quê |
@@ -192,5 +228,7 @@ ORTHO=0.45 ALVO=0.19,-0.08,0.07 mb render.py -- tenis avatar_base.glb tenis.glb 
 3. Dizer o tecido: adicionar o `.glb` em `TECIDO` no
    `scripts/marcar-tecido.ts` (algodao, sarja, denim, trico, cetim ou moletom)
    e rodar `npx tsx scripts/marcar-tecido.ts`. Sem isso, a peça sai de algodão.
-4. Conferir com `render.py` e no provador (`/produto/<id>/provador`, painel
+4. Se for saia, vestido ou camiseta: queda com gravidade e, nas peças de
+   baixo, espessura (seção 9).
+5. Conferir com `render.py` e no provador (`/produto/<id>/provador`, painel
    "Simular corpo (dev)").
