@@ -4,7 +4,7 @@ Um print por passo do [roteiro de 26/10](../ROTEIRO-APRESENTACAO-26-10.md),
 para usar se o 3D ou a internet falharem ao vivo. Tirados em 20/10/2026 no
 `npm run dev`, com a conta de admin de teste (por isso aparece "Admin" no
 topo da loja). Os do provador (02 a 05 e 13) foram refeitos em 21/10/2026,
-já com o tecido novo e o botão "Tecido de perto".
+já com o tecido novo, o botão "Tecido de perto" e o tênis no avatar.
 
 | Passo do roteiro | Arquivo | O que mostra |
 |---|---|---|

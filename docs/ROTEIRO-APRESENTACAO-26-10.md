@@ -147,6 +147,7 @@ Usar um pedido **já entregue** do cliente.
 |---|---|
 | A roupa é simulada como tecido? | O caimento não: é um encaixe geométrico em cima do corpo do cliente, que roda no navegador sem travar. A aparência sim: cada peça tem material de tecido (trama, barra, pesponto e dobras). |
 | E num celular fraco? | Entra sozinho no modo leve (sem dobras, sombras e resolução dupla). Para comparar: `?leve=1` força o leve e `?leve=0` o completo. |
+| O tênis está à venda? | Não: é parte do avatar (antes ele ficava descalço). Foi feito no Blender a partir dos próprios pés do avatar e acompanha o pé de cada corpo. |
 | De onde vêm as medidas das peças? | Da tabela de medidas de cada produto (cadastrada no banco). |
 | Por que "estimativa"? | O avatar é paramétrico (medidas digitadas, não escaneamento). |
 | E as senhas e chaves? | Ficam fora do Git, em `.env`. As chaves do Stripe são de modo teste. |
