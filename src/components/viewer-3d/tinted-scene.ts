@@ -57,7 +57,10 @@ export function useTintedScene(scene: THREE.Object3D, color?: string) {
       const m = clothMaterial(p.source, color, fabricOf(scene, p.source), p.wrinkle);
       m.side = THREE.DoubleSide; // o avesso aparece na gola e na barra
       created.push(m);
-      model.add(new THREE.Mesh(p.geometry, m));
+      const mesh = new THREE.Mesh(p.geometry, m);
+      // Sombra da própria peça (capuz no peito, manga no tronco).
+      mesh.castShadow = mesh.receiveShadow = true;
+      model.add(mesh);
     }
     return { model, created };
   }, [scene, color]);

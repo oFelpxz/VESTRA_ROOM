@@ -8,6 +8,7 @@ import {
   Center,
   Bounds,
   useBounds,
+  ContactShadows,
 } from "@react-three/drei";
 import {
   lazy,
@@ -20,6 +21,7 @@ import {
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { isFittedToMannequin } from "./mannequin-mark";
+import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { useTintedScene } from "./tinted-scene";
 
 // Carregado só quando o cliente escolhe "Manequim": quem só olha a peça não
@@ -178,18 +180,17 @@ export function Viewer3D({
       ref={wrapperRef}
       className={`relative h-full w-full ${isFullscreen ? "bg-background" : ""}`}
     >
-      <Canvas camera={{ position: [3, 2, 5], fov: 50 }}>
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        camera={{ position: [3, 2, 5], fov: 50 }}
+        gl={{ toneMapping: STUDIO_TONE_MAPPING }}
+      >
         {/* fundo de estúdio — independente do CSS, funciona em tela cheia */}
         <color attach="background" args={[bgColor]} />
 
-        {/* iluminação de estúdio — ajustada por tema claro/escuro */}
-        <hemisphereLight
-          intensity={bg === "light" ? 0.7 : 0.4}
-          groundColor={bg === "light" ? "#cfcabd" : "#1a1a1a"}
-        />
-        <ambientLight intensity={bg === "light" ? 0.45 : 0.25} />
-        <directionalLight position={[5, 6, 5]} intensity={bg === "light" ? 1.4 : 1.7} />
-        <directionalLight position={[-5, 2, -3]} intensity={0.6} />
+        {/* Mesma luz e tom do provador: o padrão (ACES) estourava a camiseta branca. */}
+        <StudioLights />
 
         <Suspense fallback={<Loader />}>
           <Bounds fit clip observe margin={1.2}>
@@ -205,6 +206,16 @@ export function Viewer3D({
               </Center>
             )}
           </Bounds>
+          {/* Fora do Bounds: o chão de 4 m afastava a câmera. */}
+          {mode === "mannequin" && (
+            <ContactShadows
+              position={[0, 0.005, 0]}
+              opacity={0.45}
+              scale={4}
+              blur={2.4}
+              far={2}
+            />
+          )}
         </Suspense>
 
         <OrbitControls
