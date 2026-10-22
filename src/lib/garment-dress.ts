@@ -31,6 +31,10 @@ export const SHOULDER = new Vector3(0.18, 1.33, 0.02);
 export const WRIST = new Vector3(0.415, 0.869, 0.088);
 // Altura da axila do corpo de referência (m): o caimento do tronco começa aqui.
 const ARMPIT_Y = 1.24;
+// Gancho: o ponto mais baixo do tronco no meio do corpo (x = 0), procurado
+// entre essas alturas do corpo de referência (m). Ombro → gancho é o tronco.
+const CROTCH_X = 0.006;
+const CROTCH_Y = [0.6, 1.0];
 // Folga do molde até o corpo de referência (m) em que a peça se apoia nele
 // por inteiro / deixa de se apoiar (ver `settle`).
 const CONTACT_NEAR = 0.012;
@@ -97,6 +101,21 @@ export type Fitted = ReturnType<typeof dress>;
 // avatar / peça.
 const referenceBodies = new WeakMap<Float32Array, Body>();
 const referenceContacts = new WeakMap<Float32Array, { gap: Float32Array; up: Float32Array }>();
+const crotches = new WeakMap<Float32Array, number>();
+
+/** Vértice do gancho no corpo de referência (-1 se não houver). */
+function crotchOf(base: Float32Array) {
+  let found = crotches.get(base);
+  if (found !== undefined) return found;
+  found = -1;
+  for (let i = 0; i < base.length / 3; i++) {
+    const y = base[i * 3 + 1];
+    if (Math.abs(base[i * 3]) > CROTCH_X || y < CROTCH_Y[0] || y > CROTCH_Y[1]) continue;
+    if (found < 0 || y < base[found * 3 + 1]) found = i;
+  }
+  crotches.set(base, found);
+  return found;
+}
 
 function contactsWithReference(body: FitBody, part: FitPart) {
   let found = referenceContacts.get(part.base);
@@ -186,6 +205,18 @@ export function dress(
   dy /= body.shoulders.length;
   dz /= body.shoulders.length;
 
+  // ... e quanto o tronco (ombro → gancho) ficou mais comprido: a peça
+  // termina no mesmo lugar do corpo, alto ou baixo
+  let torsoScale = 1;
+  const crotch = crotchOf(body.base);
+  if (crotch >= 0) {
+    let shoulderY = 0;
+    for (const i of body.shoulders) shoulderY += body.base[i * 3 + 1] / body.shoulders.length;
+    const ref = shoulderY - body.base[crotch * 3 + 1];
+    const now = shoulderY + dy - pos[crotch * 3 + 1];
+    if (ref > 0 && now > 0) torsoScale = now / ref;
+  }
+
   // ... e o eixo ombro → pulso de cada braço (referência e cliente)
   const track = (idx: number[], j: Vector3) => {
     const out = j.clone();
@@ -212,8 +243,9 @@ export function dress(
   // 3) peça no tamanho escolhido, apoiada nos ombros. Cada parte segue a sua
   // graduação (ver `sizeGrade`): o tronco alarga pelo peito até a axila,
   // pela barra embaixo e pelo ombro em cima; a gola quase não muda; o
-  // comprimento cresce até a barra. A manga cresce em volta do braço do
-  // cliente: comprimento ao longo do eixo, largura em volta dele.
+  // comprimento cresce até a barra e acompanha o tronco. A manga cresce em
+  // volta do braço do cliente: comprimento ao longo do eixo, largura em volta
+  // dele.
   let hemY = NECK.y;
   for (const p of parts)
     for (let i = 0; i < p.base.length; i += 3)
@@ -230,7 +262,7 @@ export function dress(
         : y >= ARMPIT_Y
           ? lerp(grade.chest, shoulder, (y - ARMPIT_Y) / (SHOULDER.y - ARMPIT_Y))
           : lerp(grade.chest, grade.hem, (ARMPIT_Y - y) / (ARMPIT_Y - hemY));
-  const bodyLen = 1 + grade.length / Math.max(NECK.y - hemY, 0.1);
+  const bodyLen = (1 + grade.length / Math.max(NECK.y - hemY, 0.1)) * torsoScale;
   const sleeveLen = 1 + grade.sleeve / SHOULDER.distanceTo(WRIST);
   const sleeveWidth = 1 + (grade.chest - 1) * SLEEVE_WIDTH_SHARE;
 

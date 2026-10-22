@@ -72,6 +72,19 @@ describe("shapeBody", () => {
   });
 });
 
+describe("dress", () => {
+  it("a peça acompanha o tronco: no corpo alto a barra desce junto", () => {
+    // ombros no anel de 1,42 m (o pescoço do molde) e gancho em 0,60 m
+    const body = { ...toyBody(), shoulders: [568, 569, 570] };
+    const parts = [{ base: new Float32Array([0, 1.2, 0.2, 0.1, 0.8, 0.2]), arm: null }];
+    for (const h of [1.5, 1.66, 1.88]) {
+      const k = h / 1.66;
+      const { cloth } = dress(body, parts, NO_MORPHS, h, MOLDE_GRADE);
+      assert.ok(Math.abs(cloth[4] - 0.8 * k) < 2e-3, `barra ${cloth[4]} ≠ ${0.8 * k} (${h} m)`);
+    }
+  });
+});
+
 describe("FitRunner", () => {
   const parts = [{ base: new Float32Array([0, 1.2, 0.2, 0.1, 1.0, 0.2]), arm: null }];
 
