@@ -27,6 +27,8 @@ const BULGE_RADIUS = 0.015; // pele "embaixo" do ponto do tecido (m)
 const BULGE_MAX = 0.008; // m
 const BULGE_TOP = 0.2; // m acima do entrepernas do molde (o cós fica de fora)
 const BULGE_MID = 0.01; // m do meio do corpo: daí para fora, só pele do mesmo lado
+const BULGE_CHEST_Y = 1.05; // m no molde: daqui para cima (só o corpete do vestido) volta a valer
+const BULGE_NECK_Y = 1.235; // m no molde: até 2 cm abaixo do decote (borda e alcinhas serrilhavam)
 const MAX_EASE = 0.04; // folga a mais, no máximo (m)
 // Tamanho apertado: o tecido chega no máximo a 3/4 da distância do molde
 // (no gancho e no vinco dos glúteos o tecido passa por cima de uma reentrância
@@ -261,7 +263,16 @@ export function fitBottom(
     // acima dele serrilhava a borda.
     // Sem pele embaixo (toda do outro lado), nada: -Infinity × 0 dava NaN e o
     // ponto ia para a origem, uma linha do gancho até o chão.
-    const below = Math.min(Math.max((MOLDE_CROTCH_Y + BULGE_TOP - refY[i]) / TIGHT_LEG_BLEND, 0), 1);
+    // Acima do cós das calças só chega o corpete do vestido: ali o busto maior
+    // do cliente furava o tecido no mamilo.
+    const chest = Math.min(
+      (refY[i] - BULGE_CHEST_Y) / TIGHT_LEG_BLEND,
+      (BULGE_NECK_Y - refY[i]) / TUCK_BLEND,
+    );
+    const below = Math.min(
+      Math.max((MOLDE_CROTCH_Y + BULGE_TOP - refY[i]) / TIGHT_LEG_BLEND, chest, 0),
+      1,
+    );
     if (bulge > -Infinity) g = Math.max(g, g + (Math.min(bulge + MIN_GAP, g + BULGE_MAX) - g) * below);
     out[i * 3] = sx + dir[i * 3] * g;
     out[i * 3 + 1] = sy + dir[i * 3 + 1] * g;

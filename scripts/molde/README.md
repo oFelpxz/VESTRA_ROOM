@@ -201,7 +201,8 @@ que estava embaixo dele). Duas regras de lá completam a gravidade:
   (até 2,5 vezes na barra), em vez de inflar a perna por igual.
 - O tecido nunca fica atrás da pele logo embaixo dele (até 8 mm a mais,
   fora do cós): em corpo grande com tamanho apertado a pele aparecia no
-  gancho e no glúteo.
+  gancho e no glúteo. Vale também no busto do vestido (até 2 cm abaixo do
+  decote, fora a borda e as alcinhas): busto maior furava o tecido no mamilo.
 
 - Camisetas: raio 12 (mm) no `aplicar-queda.ts`. A simulação une as camadas
   e costuras do CLO a 3 mm; com raio menor a manga da oversized furava a

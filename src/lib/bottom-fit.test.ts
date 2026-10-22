@@ -85,6 +85,31 @@ describe("fitBottom", () => {
   });
 });
 
+describe("fitBottom no corpete do vestido", () => {
+  // Pele de frente (z = 0) na altura do busto e um ponto do tecido 1 cm à frente.
+  const chest = new Float32Array([
+    -0.01, 1.19, 0,
+    0.01, 1.19, 0,
+    -0.01, 1.21, 0,
+    0.01, 1.21, 0,
+    0, 1.2, 0,
+  ]);
+  const cloth = new Float32Array([0, 1.2, 0.01]);
+
+  it("o mamilo maior no cliente não fura o tecido", () => {
+    const client = chest.map((v, i) => (i === 14 ? 0.02 : v));
+    const out = fitBottom(bindBottom(cloth, chest), client, 0);
+    assert.ok(out[2] > 0.02 + 0.002, `${out[2]}`);
+  });
+
+  it("na borda do decote e nas alcinhas, não (serrilhava)", () => {
+    const up = (a: Float32Array) => a.map((v, i) => (i % 3 === 1 ? v + 0.06 : v));
+    const client = up(chest).map((v, i) => (i === 14 ? 0.02 : v));
+    const out = fitBottom(bindBottom(up(cloth), up(chest)), client, 0);
+    assert.ok(out[2] < 0.02, `${out[2]}`);
+  });
+});
+
 describe("fitBottom na perna", () => {
   // Folga a mais cresce para baixo do entrepernas (gravidade no tamanho maior).
   const hang = (y: number) => 1 + 1.5 * Math.min((0.776 - y) / 0.7, 1);

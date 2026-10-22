@@ -17,7 +17,7 @@ from mathutils.bvhtree import BVHTree
 AVATAR, OUT = sys.argv[sys.argv.index("--") + 1:][:2]
 
 # Alturas no corpo de referência (m, eixo Z do Blender; pés em 0).
-NECK = 1.235         # decote: borda de cima do corpete (abaixo da axila)
+NECK = 1.255         # decote: 5 cm acima do mamilo (1,207), abaixo da axila
 WAIST = 0.985        # cintura: daqui para cima o raio sai de dentro do tronco
 HEM = 0.38           # barra: abaixo do joelho
 BODICE_EASE = 0.008  # folga do corpete
@@ -87,13 +87,37 @@ def skin_radius(z, a):
         return 0.0
     return (Vector((hit.x, hit.y)) - Vector((0, CY))).length
 
-def bridge(radii, width):
-    """O tecido passa reto por cima das reentrâncias (entre os seios, vinco das costas)."""
-    n = len(radii)
-    out = list(radii)
-    for j in range(n):
-        for k in range(1, width + 1):
-            out[j] = max(out[j], (radii[(j - k) % n] + radii[(j + k) % n]) / 2)
+def bridge(radii):
+    """O tecido passa reto por cima das reentrâncias (entre os seios, vinco das
+    costas): o anel vira o fecho convexo da pele, como um elástico em volta.
+    A média de raios vizinhos que havia antes empurrava para fora toda parte
+    reta do tronco (a frente plana tem raio menor no meio) e o corpete saía
+    com três calombos, do decote à cintura."""
+    pts = sorted((cos(a) * r, sin(a) * r) for a, r in zip(angles, radii) if r > 0)
+    cross = lambda o, p, q: (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0])
+    hull = []
+    for seq in (pts, pts[::-1]):
+        half = []
+        for p in seq:
+            while len(half) >= 2 and cross(half[-2], half[-1], p) <= 0:
+                half.pop()
+            half.append(p)
+        hull += half[:-1]
+    out = []
+    for a, r in zip(angles, radii):
+        d = (cos(a), sin(a))
+        best = r
+        for k in range(len(hull)):
+            p, q = hull[k], hull[(k + 1) % len(hull)]
+            e = (q[0] - p[0], q[1] - p[1])
+            den = d[0] * e[1] - d[1] * e[0]
+            if abs(den) < 1e-12:
+                continue
+            t = (p[0] * e[1] - p[1] * e[0]) / den  # distância do meio até a aresta
+            s = (p[0] * d[1] - p[1] * d[0]) / den  # posição na aresta (0..1)
+            if t > 0 and -1e-9 <= s <= 1 + 1e-9:
+                best = max(best, t)
+        out.append(best)
     return out
 
 def smooth(a, b, x):
@@ -111,19 +135,29 @@ heights.append(HEM)
 def ring_size(z):
     return sum(skin_radius(z, a) for a in angles[::6])
 HIP_Z = max((z for z in heights if crotch < z < WAIST - 0.04), key=ring_size)
-hip_r = bridge([skin_radius(HIP_Z, a) for a in angles], 10)
+hip_r = bridge([skin_radius(HIP_Z, a) for a in angles])
 
 # Perto da axila o tronco já começa a virar braço: nos lados, o corpete não
 # abre mais que a largura logo abaixo (SIDE_Z).
 SIDE_Z = 1.19
-side_cap = bridge([skin_radius(SIDE_Z, a) for a in angles], 18)
+side_cap = bridge([skin_radius(SIDE_Z, a) for a in angles])
 
 rings = []
 for z in heights:
-    skins = bridge([skin_radius(z, a) for a in angles], 18 if z > WAIST else 10)
+    raw = [skin_radius(z, a) for a in angles]
+    skins = bridge(raw)
     if z > SIDE_Z:
-        skins = [min(r, side_cap[j] + 0.004) if abs(cos(angles[j])) > 0.6 else r
-                 for j, r in enumerate(skins)]
+        # Corta o fecho onde ele pegaria o braço, mas nunca para dentro da pele
+        # do tronco (omoplata, lateral do peito): pele bem além do limite é braço.
+        out = []
+        for j, r in enumerate(skins):
+            cap = side_cap[j] + 0.004
+            capped = min(r, cap)
+            if raw[j] < cap + 0.03:
+                capped = max(capped, raw[j] + 0.003)
+            w = smooth(0.4, 0.7, abs(cos(angles[j])))
+            out.append(r + (capped - r) * w)
+        skins = out
     row = []
     for j, a in enumerate(angles):
         if z >= HIP_Z:
