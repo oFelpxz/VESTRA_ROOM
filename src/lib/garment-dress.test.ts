@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FitRunner } from "./fit-runner";
 import { MOLDE_GRADE } from "./garment-fit";
-import { dress, rideUp, shapeBody, torsoStretch, type FitBody } from "./garment-dress";
+import {
+  dress,
+  rideUp,
+  shapeBody,
+  squeezeRib,
+  torsoStretch,
+  type FitBody,
+} from "./garment-dress";
 
 const NO_MORPHS = {
   height: 0,
@@ -116,6 +123,33 @@ describe("peça apertada", () => {
     assert.ok(Math.abs(cloth[1] - 0.88) < 1e-6, "tronco: 40 cm abaixo da axila → 36");
     assert.equal(cloth[4], Math.fround(1.3), "acima da axila não mexe");
     assert.equal(cloth[7], Math.fround(0.84), "manga não mexe");
+  });
+});
+
+describe("ribana da barra", () => {
+  const ring = (r: number, y = 0.9) => {
+    const out: number[] = [];
+    for (let k = 0; k < 24; k++) {
+      const a = ((k + 0.5) / 24) * 2 * Math.PI;
+      out.push(r * Math.cos(a), y, r * Math.sin(a));
+    }
+    return out;
+  };
+  const radiusAfter = (hip: number) => {
+    const base = new Float32Array(ring(0.3));
+    const cloth = base.slice();
+    const pos = new Float32Array(ring(hip));
+    squeezeRib(cloth, [{ base, arm: null }], new Float32Array(24), 1.0, { base: pos }, pos);
+    return Math.hypot(cloth[0], cloth[2]);
+  };
+
+  it("abraça o quadril fino com folga, até o limite da ribana", () => {
+    assert.ok(Math.abs(radiusAfter(0.2) - 0.215) < 1e-4, "quadril + 1,5 cm");
+    assert.ok(Math.abs(radiusAfter(0.1) - 0.21) < 1e-4, "no máximo 30% menor");
+  });
+
+  it("quadril largo: encolhe só o mínimo (o empurrão estica depois)", () => {
+    assert.ok(Math.abs(radiusAfter(0.29) - 0.264) < 1e-4);
   });
 });
 

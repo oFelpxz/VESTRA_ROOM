@@ -54,10 +54,17 @@ const DEPTH_RATIO = 0.7;
 // largura do tronco usada nessa comparação (fora dela, os braços).
 const DEPTH_ROW = 0.02;
 const TORSO_HALF_WIDTH = 0.12;
-// Ribana da barra: encolhe até essa fração do raio quando o corpo deixa, e o
-// corpo da peça afina até ela nessa altura acima (m).
+// Ribana da barra: encolhe até abraçar o quadril com RIB_EASE de folga (m),
+// pelo menos RIB_SQUEEZE e no máximo RIB_MAX do raio, e o corpo da peça afina
+// até ela nessa altura acima (m). O quadril é medido em RIB_SECTORS setores da
+// volta, só no tronco: até HIP_HALF_WIDTH do meio no corpo de referência (fora
+// disso, as mãos).
 const RIB_SQUEEZE = 0.12;
+const RIB_MAX = 0.3;
+const RIB_EASE = 0.015;
 const RIB_BLEND = 0.08;
+const RIB_SECTORS = 24;
+const HIP_HALF_WIDTH = 0.25;
 // Peça apertada (tamanho pequeno para o corpo): a volta do tronco que o corpo
 // esticou além de TIGHT_FREE vira altura a menos abaixo da axila, TIGHT_LIFT
 // por unidade de esticão (a barra sobe), até TIGHT_MAX. O esticão é medido
@@ -317,13 +324,13 @@ export function dress(
     off += p.base.length;
   }
 
-  // 4) a ribana da barra encolhe até abraçar o quadril (se o quadril for
-  // maior, o passo 7 a estica de volta)
-  if (options.rib > 0) squeezeRib(cloth, parts, armOf, hemY + options.rib);
-
-  // 5) corpo mais raso que o de referência (sem busto, sem barriga): frente e
+  // 4) corpo mais raso que o de referência (sem busto, sem barriga): frente e
   // costas da peça recuam junto, e o tecido que sobra vai para os lados
   followBodyDepth(cloth, parts, armOf, body, pos, dz, hemY);
+
+  // 5) a ribana da barra encolhe até abraçar o quadril do cliente: na peça
+  // folgada, segura a sobra (se o quadril for maior, o passo 7 a estica)
+  if (options.rib > 0) squeezeRib(cloth, parts, armOf, hemY + options.rib, body, pos);
 
   // 6) onde o molde se apoiava no corpo de referência (ombros, costas altas,
   // mangas), a peça volta a se apoiar no corpo do cliente
@@ -370,6 +377,9 @@ export function dress(
   }
   // 8) ... e, no tronco, desce reto a partir dali em vez de voltar para dentro
   const draped = drape(cloth, before, armOf, armpit);
+  // (indo para fora, a lateral da peça larga pode entrar no braço: um último
+  // empurrão curto tira de lá)
+  if (draped) touching = pushOut(cloth, skin, 0);
 
   return {
     body: pos,
@@ -448,19 +458,23 @@ export function rideUp(cloth: Float32Array, armOf: Float32Array, armpit: number,
 
 /**
  * Ribana da barra: o tronco abaixo de `ribTop` (y do molde) encolhe em volta
- * do centro da barra até RIB_SQUEEZE do raio; logo acima, a peça afina até
- * ela aos poucos.
+ * do centro da barra até abraçar o quadril do cliente (`pos`) com RIB_EASE de
+ * folga, setor a setor, entre RIB_SQUEEZE e RIB_MAX do raio; logo acima, a
+ * peça afina até ela aos poucos. Na peça folgada, a sobra fica acima da
+ * ribana, em vez de a barra descer reta e longe do quadril.
  */
-function squeezeRib(
+export function squeezeRib(
   cloth: Float32Array,
   parts: FitPart[],
   armOf: Float32Array,
   ribTop: number,
+  body: Pick<FitBody, "base">,
+  pos: Float32Array,
 ) {
   const w = new Float32Array(armOf.length);
+  const rib: number[] = [];
   let cx = 0;
   let cz = 0;
-  let n = 0;
   let off = 0;
   for (const p of parts) {
     for (let i = 0; i < p.base.length / 3; i++) {
@@ -471,17 +485,58 @@ function squeezeRib(
       if (torso > 0 && p.base[i * 3 + 1] < ribTop) {
         cx += cloth[v * 3];
         cz += cloth[v * 3 + 2];
-        n++;
+        rib.push(v);
       }
     }
     off += p.base.length / 3;
   }
-  if (!n) return;
-  cx /= n;
-  cz /= n;
+  if (!rib.length) return;
+  cx /= rib.length;
+  cz /= rib.length;
+  const sectorOf = (x: number, z: number) =>
+    (Math.atan2(z - cz, x - cx) / (2 * Math.PI) + 0.5) * RIB_SECTORS;
+
+  // raio da ribana (camada de fora) e do quadril em cada setor, na altura dela
+  const outer = new Float32Array(RIB_SECTORS);
+  const hip = new Float32Array(RIB_SECTORS);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const v of rib) {
+    const x = cloth[v * 3];
+    const z = cloth[v * 3 + 2];
+    const s = Math.floor(sectorOf(x, z)) % RIB_SECTORS;
+    outer[s] = Math.max(outer[s], Math.hypot(x - cx, z - cz));
+    lo = Math.min(lo, cloth[v * 3 + 1]);
+    hi = Math.max(hi, cloth[v * 3 + 1]);
+  }
+  for (let j = 0; j < body.base.length / 3; j++) {
+    const y = pos[j * 3 + 1];
+    if (y < lo || y > hi || Math.abs(body.base[j * 3]) > HIP_HALF_WIDTH) continue;
+    const x = pos[j * 3];
+    const z = pos[j * 3 + 2];
+    const s = Math.floor(sectorOf(x, z)) % RIB_SECTORS;
+    hip[s] = Math.max(hip[s], Math.hypot(x - cx, z - cz));
+  }
+
+  // quanto cada setor encolhe, suavizado entre setores vizinhos
+  const keep = new Float32Array(RIB_SECTORS);
+  for (let s = 0; s < RIB_SECTORS; s++)
+    keep[s] =
+      outer[s] > 0 && hip[s] > 0
+        ? MathUtils.clamp((hip[s] + RIB_EASE) / outer[s], 1 - RIB_MAX, 1 - RIB_SQUEEZE)
+        : 1 - RIB_SQUEEZE;
+  const smooth = keep.map(
+    (k, s) =>
+      (keep[(s + RIB_SECTORS - 1) % RIB_SECTORS] + 2 * k + keep[(s + 1) % RIB_SECTORS]) / 4,
+  );
+
   for (let v = 0; v < w.length; v++) {
     if (!w[v]) continue;
-    const k = 1 - RIB_SQUEEZE * w[v];
+    const f = sectorOf(cloth[v * 3], cloth[v * 3 + 2]) - 0.5;
+    const s0 = Math.floor(f);
+    const a = smooth[(s0 + RIB_SECTORS) % RIB_SECTORS];
+    const b = smooth[(s0 + 1) % RIB_SECTORS];
+    const k = 1 - (1 - (a + (b - a) * (f - s0))) * w[v];
     cloth[v * 3] = cx + (cloth[v * 3] - cx) * k;
     cloth[v * 3 + 2] = cz + (cloth[v * 3 + 2] - cz) * k;
   }
