@@ -58,6 +58,18 @@ const TORSO_HALF_WIDTH = 0.12;
 // corpo da peça afina até ela nessa altura acima (m).
 const RIB_SQUEEZE = 0.12;
 const RIB_BLEND = 0.08;
+// Peça apertada (tamanho pequeno para o corpo): a volta do tronco que o corpo
+// esticou além de TIGHT_FREE vira altura a menos abaixo da axila, TIGHT_LIFT
+// por unidade de esticão (a barra sobe), até TIGHT_MAX. O esticão é medido
+// em TIGHT_BAND abaixo da axila (peito e cintura): no quadril, a peça abre
+// em vez de subir. Só conta a camada de fora: o maior raio em cada faixa de
+// STRETCH_ROW de altura e em cada um dos STRETCH_SECTORS setores da volta.
+const TIGHT_BAND = 0.25;
+const TIGHT_FREE = 0.02;
+const TIGHT_LIFT = 1.2;
+const TIGHT_MAX = 0.2;
+const STRETCH_ROW = 0.02;
+const STRETCH_SECTORS = 24;
 
 export const mirror = (v: Vector3, side: number) =>
   new Vector3(v.x * side, v.y, v.z);
@@ -340,10 +352,24 @@ export function dress(
   const settled = settle(cloth, skin, goal, pull);
 
   // 7) onde o corpo passa do tecido, o tecido é empurrado ...
+  const armpit = ARMPIT_Y + dy;
   const before = cloth.slice();
-  const touching = pushOut(cloth, skin);
+  let touching = pushOut(cloth, skin);
+  // ... e, se o tronco esticou (peça pequena para o corpo), o tecido encurta:
+  // a barra sobe e a peça é empurrada de novo a partir daí
+  // (a ribana da barra estica de volta de propósito: fica fora da medida)
+  const ribLine =
+    options.rib > 0 ? NECK.y + (hemY + options.rib + RIB_BLEND - NECK.y) * bodyLen + dy : -Infinity;
+  const stretch = torsoStretch(before, cloth, armOf, armpit, ribLine);
+  const lift = Math.min(TIGHT_MAX, Math.max(0, stretch - 1 - TIGHT_FREE) * TIGHT_LIFT);
+  if (lift > 0) {
+    cloth.set(before);
+    rideUp(cloth, armOf, armpit, lift);
+    before.set(cloth);
+    touching = pushOut(cloth, skin);
+  }
   // 8) ... e, no tronco, desce reto a partir dali em vez de voltar para dentro
-  const draped = drape(cloth, before, armOf, ARMPIT_Y + dy);
+  const draped = drape(cloth, before, armOf, armpit);
 
   return {
     body: pos,
@@ -352,9 +378,72 @@ export function dress(
     touching,
     settled,
     draped,
+    stretch,
+    lift,
     grade,
     ms: Math.round(performance.now() - t0),
   };
+}
+
+/** Quanto o tronco é tronco (1) ou manga (0), pelo atributo de manga. */
+const torsoOf = (arm: number) => 1 - MathUtils.clamp(Math.abs(arm) / 0.5, 0, 1);
+
+/**
+ * Quanto a volta do tronco de TIGHT_BAND abaixo da axila (e acima de
+ * `floor`) cresceu de `before` para `after` (1 = nada). Conta só a camada de
+ * fora: em cada faixa de STRETCH_ROW × setor, o maior raio (o forro e o
+ * capuz por dentro empurrados da pele não esticam a peça).
+ */
+export function torsoStretch(
+  before: Float32Array,
+  after: Float32Array,
+  armOf: Float32Array,
+  armpit: number,
+  floor = -Infinity,
+) {
+  const inBand = (y: number) => y < armpit && y > Math.max(armpit - TIGHT_BAND, floor);
+  let cz = 0;
+  let n = 0;
+  for (let v = 0; v < armOf.length; v++)
+    if (torsoOf(armOf[v]) === 1 && inBand(before[v * 3 + 1])) {
+      cz += before[v * 3 + 2];
+      n++;
+    }
+  if (!n) return 1;
+  cz /= n;
+  const r0 = new Map<number, number>();
+  const r1 = new Map<number, number>();
+  for (let v = 0; v < armOf.length; v++) {
+    const y = before[v * 3 + 1];
+    if (torsoOf(armOf[v]) !== 1 || !inBand(y)) continue;
+    const x = before[v * 3];
+    const z = before[v * 3 + 2] - cz;
+    const a = Math.atan2(z, x) / (2 * Math.PI) + 0.5;
+    const bin =
+      Math.floor((armpit - y) / STRETCH_ROW) * STRETCH_SECTORS +
+      (Math.floor(a * STRETCH_SECTORS) % STRETCH_SECTORS);
+    r0.set(bin, Math.max(r0.get(bin) ?? 0, Math.hypot(x, z)));
+    r1.set(bin, Math.max(r1.get(bin) ?? 0, Math.hypot(after[v * 3], after[v * 3 + 2] - cz)));
+  }
+  let s0 = 0;
+  let s1 = 0;
+  for (const [bin, r] of r0) {
+    s0 += r;
+    s1 += r1.get(bin)!;
+  }
+  return s0 > 0 ? s1 / s0 : 1;
+}
+
+/**
+ * Peça apertada sobe: o tronco abaixo da axila encolhe na altura em `lift`
+ * (fração), puxando a barra para cima; a manga não mexe.
+ */
+export function rideUp(cloth: Float32Array, armOf: Float32Array, armpit: number, lift: number) {
+  for (let v = 0; v < armOf.length; v++) {
+    const y = cloth[v * 3 + 1];
+    if (y >= armpit) continue;
+    cloth[v * 3 + 1] = armpit + (y - armpit) * (1 - lift * torsoOf(armOf[v]));
+  }
 }
 
 /**

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { FitRunner } from "./fit-runner";
 import { MOLDE_GRADE } from "./garment-fit";
-import { dress, shapeBody, type FitBody } from "./garment-dress";
+import { dress, rideUp, shapeBody, torsoStretch, type FitBody } from "./garment-dress";
 
 const NO_MORPHS = {
   height: 0,
@@ -82,6 +82,40 @@ describe("dress", () => {
       const { cloth } = dress(body, parts, NO_MORPHS, h, MOLDE_GRADE);
       assert.ok(Math.abs(cloth[4] - 0.8 * k) < 2e-3, `barra ${cloth[4]} ≠ ${0.8 * k} (${h} m)`);
     }
+  });
+});
+
+describe("peça apertada", () => {
+  // anel de tronco no peito (y = 1,1) e um ponto de manga
+  const ring = (r: number, y = 1.1) => {
+    const out: number[] = [];
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * 2 * Math.PI;
+      out.push(r * Math.cos(a), y, r * Math.sin(a));
+    }
+    return out;
+  };
+  const armOf = new Float32Array(16);
+
+  it("mede quanto a volta do tronco esticou no peito e na cintura", () => {
+    const before = new Float32Array([...ring(0.15), ...ring(0.15, 0.8)]);
+    // peito 10% maior; no quadril (fora da faixa) o dobro não conta
+    const after = new Float32Array([...ring(0.165), ...ring(0.3, 0.8)]);
+    assert.ok(Math.abs(torsoStretch(before, after, armOf, 1.24) - 1.1) < 1e-6);
+  });
+
+  it("o forro empurrado da pele não conta: só a camada de fora", () => {
+    const before = new Float32Array([...ring(0.15), ...ring(0.1)]);
+    const after = new Float32Array([...ring(0.15), ...ring(0.14)]);
+    assert.ok(Math.abs(torsoStretch(before, after, armOf, 1.24) - 1) < 1e-6);
+  });
+
+  it("a barra sobe e a manga fica onde está", () => {
+    const cloth = new Float32Array([0, 0.84, 0.2, 0, 1.3, 0.2, 0.4, 0.84, 0]);
+    rideUp(cloth, new Float32Array([0, 0, 1]), 1.24, 0.1);
+    assert.ok(Math.abs(cloth[1] - 0.88) < 1e-6, "tronco: 40 cm abaixo da axila → 36");
+    assert.equal(cloth[4], Math.fround(1.3), "acima da axila não mexe");
+    assert.equal(cloth[7], Math.fround(0.84), "manga não mexe");
   });
 });
 
