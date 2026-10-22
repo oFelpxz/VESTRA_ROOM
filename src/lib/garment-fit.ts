@@ -406,20 +406,26 @@ export function drape(
 ): number {
   const count = cloth.length / 3;
   const weight = new Float32Array(count);
-  let cx = 0, cz = 0, n = 0, bottom = Infinity;
+  // eixo do tronco: meio da caixa, e não a média dos vértices (uma peça
+  // com muito mais vértices na frente, como os botões da jaqueta, puxava o
+  // eixo para o peito e "para fora" passava a ser para dentro do corpo)
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  let n = 0, bottom = Infinity;
   for (let i = 0; i < count; i++) {
     const y = before[i * 3 + 1];
     const a = Math.abs(arm[i]);
     if (y >= top || a >= DRAPE_ARM) continue;
     weight[i] = (1 - a / DRAPE_ARM) * Math.min(1, (top - y) / DRAPE_FADE);
-    cx += before[i * 3];
-    cz += before[i * 3 + 2];
+    minX = Math.min(minX, before[i * 3]);
+    maxX = Math.max(maxX, before[i * 3]);
+    minZ = Math.min(minZ, before[i * 3 + 2]);
+    maxZ = Math.max(maxZ, before[i * 3 + 2]);
     bottom = Math.min(bottom, y);
     n++;
   }
   if (!n) return 0;
-  cx /= n;
-  cz /= n;
+  const cx = (minX + maxX) / 2;
+  const cz = (minZ + maxZ) / 2;
 
   // 1) por célula (coluna × linha): quanto o tecido foi empurrado e a que
   // distância do eixo ele ficou, no máximo

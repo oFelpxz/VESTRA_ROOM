@@ -20,7 +20,10 @@ COSTURA = 0.012          # bordas de painéis a menos disso são a mesma costura
 AXILA = 1.24             # altura da axila do corpo de referência (m)
 EMBOLA = 0.14            # trecho da manga antes do pulso que absorve o excesso (m)
 FOLGA_PUNHO = 0.02       # o punho termina isso depois do pulso (m)
-PUNHO_RAIO = 0.05        # raio mínimo do punho fechado (m)
+PUNHO_RAIO = 0.065       # raio do punho fechado (m): a mão tem ~10,6 cm de largura
+                         # e o punho não pode encostar nela (o empurrar abre em sino)
+FECHA = 0.12             # trecho da manga que afina até o punho (m)
+FOLGA_MAO = 0.015        # distância mínima do punho até a mão (m)
 z = np.load(NPZ)
 base = z["base"]
 pesos_corpo = {
@@ -114,7 +117,14 @@ def pesos_por_painel(me, P):
             if votos:
                 classe[k] = max(votos, key=votos.get); mudou = True
     soltas = np.where(classe == 9)[0]                  # sem costura (cordões): o mais perto
-    if len(soltas):
+    if len(soltas) and (classe != 9).sum() == 0:
+        # Objeto sem painel grande (os botões da jaqueta vêm em triângulos
+        # soltos): cada pedaço pela mediana do próprio peso copiado.
+        for k in soltas:
+            classe[k] = 0
+            for s in (1, -1):
+                if np.median(geral[s][lab == k].sum(1)) > 0.5: classe[k] = s
+    elif len(soltas):
         ok = classe[lab] != 9
         kd = kdtree(P[ok]); lab_ok = lab[ok]
         for k in soltas:
@@ -167,6 +177,46 @@ def pesos_por_painel(me, P):
     return pesos, cls
 
 
+_corpo_final = []
+def corpo_final():
+    """Corpo na pose padrão (a mesma da roupa posada), para medir a mão."""
+    if not _corpo_final: _corpo_final.append(posar(corpo, juntas, pesos_corpo))
+    return _corpo_final[0]
+
+
+def fora_da_mao(q, W, d):
+    """
+    Afasta do eixo do antebraço (pulso W, direção d) os pontos do punho que
+    ficam a menos de FOLGA_MAO da mão: por fatia de 1 cm ao longo do eixo e
+    setor de 15° em volta dele, o raio do punho fica pelo menos o maior raio
+    do corpo ali (polegar, mão dobrada) mais a folga.
+    """
+    u = np.cross(d, [0, 0, 1.0]); u /= np.linalg.norm(u); v = np.cross(d, u)
+    def polar(X):
+        rel = X - W
+        t = rel @ d
+        a, b = rel @ u, rel @ v
+        return t, np.hypot(a, b), np.arctan2(b, a)
+    tq, rq, aq = polar(q)
+    tc, rc, ac = polar(corpo_final())
+    perto = (tc > tq.min() - 0.02) & (tc < tq.max() + 0.02) & (rc < 0.12)
+    FATIA, SETORES = 0.01, 24
+    fb = lambda t: np.floor((t - tq.min()) / FATIA).astype(int) + 2
+    sb = lambda a: np.floor((a + np.pi) / (2 * np.pi) * SETORES).astype(int) % SETORES
+    env = np.zeros((fb(np.array([tq.max()]))[0] + 5, SETORES))
+    np.maximum.at(env, (fb(tc[perto]), sb(ac[perto])), rc[perto])
+    i, j = fb(tq), sb(aq)
+    precisa = np.zeros(len(q))
+    for di in (-1, 0, 1):
+        for dj in (-1, 0, 1):
+            precisa = np.maximum(precisa, env[np.clip(i + di, 0, len(env) - 1), (j + dj) % SETORES])
+    precisa = np.where(precisa > 0, precisa + FOLGA_MAO, 0)
+    eixo = W + np.outer(tq, d)
+    radial = q - eixo
+    k = np.where(rq < precisa, precisa / np.maximum(rq, 1e-9), 1)
+    return eixo + radial * k[:, None], int((k > 1).sum())
+
+
 def punho_no_pulso(Q, cls):
     """
     Punho de ribana fica preso no pulso: quando a manga passa do pulso (pessoa
@@ -176,6 +226,7 @@ def punho_no_pulso(Q, cls):
     """
     for s, (S, E, W) in juntas_posadas(juntas).items():
         m = cls == s
+        if not m.any(): continue                    # objeto sem manga (botões)
         d = (W - E) / np.linalg.norm(W - E)
         t = (Q[m] - W) @ d                          # distância além do pulso
         fim = t.max()
@@ -183,16 +234,25 @@ def punho_no_pulso(Q, cls):
         k = (EMBOLA + FOLGA_PUNHO) / (EMBOLA + fim)
         novo = np.where(t > -EMBOLA, -EMBOLA + (t + EMBOLA) * k, t)
         Q[m] += (novo - t)[:, None] * d
-        # e fecha em volta do pulso (a ribana aperta), sem passar de PUNHO_RAIO
+        # e fecha em volta do pulso (a ribana aperta) até PUNHO_RAIO, afinando
+        # aos poucos desde FECHA antes do pulso (senão a manga larga da jaqueta
+        # abre em sino na ponta)
         q = Q[m]
         eixo = W + np.outer((q - W) @ d, d)
         radial = q - eixo
         r = np.linalg.norm(radial, axis=1)
-        f = np.clip((novo + 0.06) / (FOLGA_PUNHO + 0.06), 0, 1)       # 0 → 1 perto do punho
-        alvo = np.maximum(r * 0.7, PUNHO_RAIO)
-        r2 = np.where(r > alvo, r + (alvo - r) * f, r)
-        Q[m] = eixo + radial * (r2 / np.maximum(r, 1e-9))[:, None]
+        f = np.clip((novo + FECHA) / FECHA, 0, 1)
+        f = f * f * (3 - 2 * f)                                      # 0 → 1 até o pulso
+        r2 = np.where(r > PUNHO_RAIO, PUNHO_RAIO + (r - PUNHO_RAIO) * (1 - f), r)
+        q = eixo + radial * (r2 / np.maximum(r, 1e-9))[:, None]
+        # onde o punho ainda encosta na mão (polegar, mão dobrada), afasta só
+        # esses pontos do eixo: no empurrar, poucos pontos encostando inflam o
+        # punho inteiro
+        ponta = novo > -FECHA
+        q[ponta], afastados = fora_da_mao(q[ponta], W, d)
+        Q[m] = q
         print(f"manga {'E' if s > 0 else 'D'}: passava {fim*100:.0f} cm do pulso; embolada até {FOLGA_PUNHO*100:.0f} cm")
+        print(f"  {afastados} pontos do punho afastados da mão")
     return Q
 
 

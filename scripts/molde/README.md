@@ -73,6 +73,50 @@ mb marcar.py -- mol_pe.glb hoodie_molde.glb 0.10
 
 `hoodie_molde.glb` → `public/models/hoodie-core-v3.glb`.
 
+### Jaqueta (Track Jacket) e colete (Tech Vest) — molde M
+
+Os dois arquivos vêm encaixados no corpo original do MakeHuman (`avatar_orig`,
+antes do gênero e das medidas). A jaqueta é tratada como o moletom: o corpo é
+posado nos ângulos das mangas do arquivo (53° para fora, 9° para a frente).
+O colete não tem manga e vai direto no `avatar_v3` (0.27 = altura da barra):
+
+```bash
+# jaqueta
+mb avatar_pose.py -- avatar_orig.glb avatar_jaq.glb pesos_jaq.npz 53,9
+mb alinhar_moletom.py -- avatar_jaq.glb jaq_orig.glb jaq_a.glb
+mb empurrar.py -- jaq_a.glb jaq_e.glb avatar_jaq.glb
+mb posar_roupa.py -- jaq_e.glb pesos.npz jaq_p.glb 53,9
+mb empurrar.py -- jaq_p.glb jaq_pe.glb avatar_v3.glb
+mb marcar.py -- jaq_pe.glb jaq_molde.glb
+# o painel principal tem só ~3 mil vértices: entre eles o peito do corpo
+# aparecia através do tecido. Subdivide os objetos com menos de 8000
+mb subdiv.py -- jaq_molde.glb jaq_sub.glb 8000
+
+# colete
+mb alinhar_moletom.py -- avatar_v3.glb col_orig.glb col_a.glb 0.27
+mb empurrar.py -- col_a.glb col_e.glb avatar_v3.glb
+mb marcar.py -- col_e.glb col_molde.glb
+```
+
+`jaq_sub.glb` → `public/models/track_jacket.glb` e `col_molde.glb` →
+`public/models/tech_vest.glb`; depois `npx tsx scripts/marcar-tecido.ts`.
+
+Cuidados que apareceram na jaqueta:
+
+- os botões vêm num objeto à parte, em triângulos soltos, sem painel grande:
+  o `posar_roupa.py` classifica cada pedaço pela mediana do próprio peso, e
+  pula o punho de objeto sem manga;
+- o punho fecha até `PUNHO_RAIO` (6,5 cm). Mais fechado ele encosta na mão
+  (~10,6 cm de largura), e o `empurrar.py` espalha esse empurrão pela manga
+  inteira: o punho abre em sino;
+- mesmo com 6,5 cm, o polegar e a mão dobrada ainda furam alguns pontos do
+  punho. O `fora_da_mao` monta um envelope polar da mão em volta do eixo do
+  pulso (fatias de 1 cm × 24 setores, o maior raio de cada) e afasta só os
+  pontos que ficam a menos de `FOLGA_MAO` (1,5 cm) dele;
+- o caimento do site (`drape`, em `src/lib/garment-fit.ts`) usa o meio da
+  caixa do tronco como eixo, e não a média dos vértices: os botões, densos na
+  frente, puxavam o eixo para o peito.
+
 ## 4. Manequim (`public/models/manequim.glb`, fora de uso)
 
 > Desde 21/10/2026 o modo Manequim da página do produto usa o próprio avatar
