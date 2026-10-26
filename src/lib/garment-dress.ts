@@ -10,6 +10,7 @@ import {
   type Body,
   type Grade,
 } from "@/lib/garment-fit";
+import type { TopHem } from "@/lib/bottom-fit";
 
 /**
  * Veste a peça moldada no avatar do cliente. Roda num Web Worker
@@ -65,6 +66,11 @@ const RIB_EASE = 0.015;
 const RIB_BLEND = 0.08;
 const RIB_SECTORS = 24;
 const HIP_HALF_WIDTH = 0.25;
+// Barra da peça vestida, para a peça de baixo ficar por dentro dela (ver
+// `hemProfile`): fatias em volta do corpo, e a faixa acima da barra (m) em que
+// se mede o lado de dentro da peça.
+const HEM_SECTORS = 24;
+const HEM_BAND = 0.08;
 // Peça apertada (tamanho pequeno para o corpo): a volta do tronco que o corpo
 // esticou além de TIGHT_FREE vira altura a menos abaixo da axila, TIGHT_LIFT
 // por unidade de esticão (a barra sobe), até TIGHT_MAX. O esticão é medido
@@ -380,6 +386,7 @@ export function dress(
   // (indo para fora, a lateral da peça larga pode entrar no braço: um último
   // empurrão curto tira de lá)
   if (draped) touching = pushOut(cloth, skin, 0);
+  const hem = hemProfile(cloth, armOf, armpit);
 
   return {
     body: pos,
@@ -391,6 +398,7 @@ export function dress(
     stretch,
     lift,
     grade,
+    hem,
     ms: Math.round(performance.now() - t0),
   };
 }
@@ -539,6 +547,63 @@ export function squeezeRib(
     const k = 1 - (1 - (a + (b - a) * (f - s0))) * w[v];
     cloth[v * 3] = cx + (cloth[v * 3] - cx) * k;
     cloth[v * 3 + 2] = cz + (cloth[v * 3 + 2] - cz) * k;
+  }
+}
+
+/**
+ * Barra da peça vestida (`TopHem`): o ponto mais baixo do tronco em cada uma
+ * das HEM_SECTORS fatias em volta do meio dele (abaixo da axila) e o raio
+ * mais curto do tronco até HEM_BAND acima dela. Fatia sem tronco (fenda da
+ * barra) fica com a da vizinha. Sem tronco: null.
+ */
+export function hemProfile(
+  cloth: Float32Array,
+  armOf: Float32Array,
+  armpit: number,
+): TopHem | null {
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (let v = 0; v < armOf.length; v++) {
+    if (Math.abs(armOf[v]) >= 0.5 || cloth[v * 3 + 1] > armpit) continue;
+    x0 = Math.min(x0, cloth[v * 3]);
+    x1 = Math.max(x1, cloth[v * 3]);
+    z0 = Math.min(z0, cloth[v * 3 + 2]);
+    z1 = Math.max(z1, cloth[v * 3 + 2]);
+  }
+  if (x0 > x1) return null;
+  const cx = (x0 + x1) / 2;
+  const cz = (z0 + z1) / 2;
+  const sectorOf = (v: number) => {
+    const a = Math.atan2(cloth[v * 3 + 2] - cz, cloth[v * 3] - cx) / (2 * Math.PI) + 1;
+    return Math.floor(a * HEM_SECTORS) % HEM_SECTORS;
+  };
+  const y = new Float32Array(HEM_SECTORS).fill(Infinity);
+  const r = new Float32Array(HEM_SECTORS).fill(Infinity);
+  for (let v = 0; v < armOf.length; v++) {
+    if (Math.abs(armOf[v]) >= 0.5 || cloth[v * 3 + 1] > armpit) continue;
+    const s = sectorOf(v);
+    y[s] = Math.min(y[s], cloth[v * 3 + 1]);
+  }
+  fillGaps(y);
+  for (let v = 0; v < armOf.length; v++) {
+    if (Math.abs(armOf[v]) >= 0.5) continue;
+    const s = sectorOf(v);
+    if (cloth[v * 3 + 1] > y[s] + HEM_BAND) continue;
+    r[s] = Math.min(r[s], Math.hypot(cloth[v * 3] - cx, cloth[v * 3 + 2] - cz));
+  }
+  fillGaps(r);
+  return { cx, cz, y, r };
+}
+
+/** Fatia vazia (Infinity) fica com a menor das vizinhas, em volta. */
+function fillGaps(a: Float32Array) {
+  const n = a.length;
+  for (let pass = 0; pass < n && a.includes(Infinity); pass++) {
+    const prev = a.slice();
+    for (let s = 0; s < n; s++)
+      if (prev[s] === Infinity) a[s] = Math.min(prev[(s + n - 1) % n], prev[(s + 1) % n]);
   }
 }
 

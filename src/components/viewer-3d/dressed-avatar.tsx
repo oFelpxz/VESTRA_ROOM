@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Html, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import type { TopHem } from "@/lib/bottom-fit";
 import type { Grade } from "@/lib/garment-fit";
 import { FitRunner } from "@/lib/fit-runner";
 import {
@@ -134,12 +135,15 @@ export function DressedAvatar({
   params,
   grade,
   selectedColor,
+  onHem,
 }: {
   garmentUrl: string;
   params: AvatarParams;
   /** Graduação do tamanho escolhido em relação ao molde (M). */
   grade: Grade;
   selectedColor?: string;
+  /** Barra da peça já vestida, a cada encaixe (a peça de baixo fica por dentro). */
+  onHem?: (hem: TopHem | null) => void;
 }) {
   const avatar = useGLTF(AVATAR_URL);
   const garment = useGLTF(garmentUrl);
@@ -179,6 +183,8 @@ export function DressedAvatar({
   if (error) throw error;
 
   const fitted = result?.parts === parts ? result.fitted : null;
+  const hem = fitted?.hem ?? null;
+  useEffect(() => onHem?.(hem), [onHem, hem]);
   return fitted ? (
     <FittedAvatar
       parts={parts}

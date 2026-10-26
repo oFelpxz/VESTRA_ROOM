@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { bindBottom, bottomEase, bottomLength, bottomWrinkle, fitBottom } from "./bottom-fit";
+import {
+  bindBottom,
+  bottomEase,
+  bottomLength,
+  bottomWrinkle,
+  fitBottom,
+  type TopHem,
+} from "./bottom-fit";
 
 // Tabela da calça (scripts/attach-bottom-models.ts): quadril e perna por tamanho.
 const CHART = [
@@ -82,6 +89,41 @@ describe("fitBottom", () => {
     const binding = bindBottom(CLOTH, SKIN);
     const out = fitBottom(binding, SKIN, 0, 0.9);
     close(out[1], 1.004, 1e-5);
+  });
+});
+
+describe("fitBottom debaixo da peça de cima vestida", () => {
+  // Pele de pé no lado +X (x = 0,1, em volta de y = 1); tecido 2 cm para fora.
+  const WALL = new Float32Array([
+    0.1, 0.99, -0.01,
+    0.1, 0.99, 0.01,
+    0.1, 1.01, -0.01,
+    0.1, 1.01, 0.01,
+  ]);
+  const POINT = new Float32Array([0.12, 1, 0]);
+  const hem = (y: number, r = 1, side?: number): TopHem => {
+    const ys = new Float32Array(24).fill(y);
+    if (side != null) ys[0] = ys[23] = side; // as duas fatias em volta de +X
+    return { cx: 0, cz: 0, y: ys, r: new Float32Array(24).fill(r) };
+  };
+  const fit = (tuck: TopHem) => fitBottom(bindBottom(POINT, WALL), WALL, 0, tuck)[0];
+
+  it("acima da barra vestida fica rente", () => {
+    close(fit(hem(0.9)), 0.104, 1e-5);
+  });
+
+  it("vale a barra na direção do ponto: lá ela está mais baixa ou mais alta", () => {
+    close(fit(hem(0.9, 1, 1)), 0.12, 1e-5);
+    close(fit(hem(1, 1, 0.9)), 0.104, 1e-5);
+  });
+
+  it("logo acima da barra mantém a forma, mas não passa da peça de cima", () => {
+    close(fit(hem(0.99)), 0.12, 1e-5);
+    close(fit(hem(0.99, 0.11)), 0.107, 1e-5);
+  });
+
+  it("abaixo da barra (à mostra), a peça de cima não aperta", () => {
+    close(fit(hem(1.02, 0.11)), 0.12, 1e-5);
   });
 });
 

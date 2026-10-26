@@ -50,10 +50,18 @@ const FAR_SPREAD = 0.04; // longe da pele: pele até essa distância além da ma
 const GRADE_HIP_CM = 4;
 // Debaixo da peça de cima o tecido fica rente (fica "por dentro" da camiseta),
 // a partir de TUCK_START acima da barra dela: perto da barra (e do gancho) a
-// peça de baixo mantém a forma.
+// peça de baixo mantém a forma. A barra é a da peça já vestida, em volta do
+// corpo (`TopHem`): no corpo baixo ela desce, e nas costas a camiseta larga
+// cai mais que na frente; com a do molde o quadril e o bolso da calça
+// vazavam por cima da camiseta nesse trecho.
 const TUCK_GAP = 0.004;
 const TUCK_START = 0.03; // m
 const TUCK_BLEND = 0.03; // m
+// Até lá, a peça de baixo não passa do lado de dentro da de cima (`TopHem.r`),
+// com essa folga (m); começa de leve meio centímetro abaixo da barra. No corpo
+// magro o quadril e o bolso da calça saíam pela lateral da camiseta ali.
+const UNDER_GAP = 0.003;
+const UNDER_BLEND = 0.01; // m
 // Comprimento: só abaixo do entrepernas do molde (m), até a barra.
 const MOLDE_CROTCH_Y = 0.776;
 const MAX_LONGER = 0.05; // m a mais, no máximo (a barra para no chão)
@@ -64,6 +72,22 @@ const FLOOR_Y = 0.005; // m
 // de seguir a perna. Sem isso o G parecia o P inflado por igual.
 const HANG = 1.5;
 const HANG_SPAN = 0.7; // m
+
+/**
+ * Barra da peça de cima vestida no cliente, em fatias iguais em volta de
+ * (cx, cz), a partir de +X (no sentido de atan2(z, x)): a altura mais baixa
+ * do tronco (`y`) e o raio do lado de dentro dele logo acima da barra (`r`).
+ */
+export type TopHem = { cx: number; cz: number; y: Float32Array; r: Float32Array };
+
+/** Valor de uma fatia da barra na direção de (x, z), entre as vizinhas. */
+export function hemAt(hem: TopHem, x: number, z: number, of: Float32Array = hem.y) {
+  const n = of.length;
+  const f = (Math.atan2(z - hem.cz, x - hem.cx) / (2 * Math.PI) + 1) * n - 0.5;
+  const k = Math.floor(f);
+  const a = f - k;
+  return of[((k % n) + n) % n] * (1 - a) + of[(k + 1) % n] * a;
+}
 
 export type BottomBinding = {
   /** Início dos vizinhos de cada ponto em `skin`/`weights` (n + 1 itens). */
@@ -195,8 +219,10 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
 
 /**
  * Posições da peça no corpo do cliente (`pos`, mesmos vértices de `base`).
- * `ease` = folga a mais (ou a menos) que no molde, em m. `tuckY` = barra da
- * peça de cima no molde (m): acima dela o tecido fica rente à pele.
+ * `ease` = folga a mais (ou a menos) que no molde, em m. `tuck` = barra da
+ * peça de cima: a vestida no cliente (`TopHem`) ou, enquanto ela não chega
+ * (ou sem molde), a altura dela no molde (m). Acima dela o tecido fica rente
+ * à pele.
  * `length` = quanto a peça é mais longa (ou mais curta) que a perna, em m
  * (ver `bottomLength`): a perna estica ou encolhe do entrepernas à barra.
  */
@@ -204,7 +230,7 @@ export function fitBottom(
   binding: BottomBinding,
   pos: Float32Array,
   ease: number,
-  tuckY: number | null = null,
+  tuck: TopHem | number | null = null,
   length = 0,
 ): Float32Array {
   const { start, skin, weights, dir, gap, refY, refX, hemY } = binding;
@@ -238,8 +264,10 @@ export function fitBottom(
     const hang = 1 + HANG * Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / HANG_SPAN, 0), 1);
     const e = ease < 0 ? ease * (1 - leg) : ease * hang * (1 - (1 - innerEase) * inner);
     let g = Math.max(gap[i] + e, gap[i] * TIGHT_KEEP, MIN_GAP);
-    if (tuckY != null) {
-      const t = Math.min(Math.max((refY[i] - tuckY - TUCK_START) / TUCK_BLEND, 0), 1);
+    const above =
+      tuck == null ? -Infinity : typeof tuck === "number" ? refY[i] - tuck : sy - hemAt(tuck, sx, sz);
+    if (tuck != null) {
+      const t = Math.min(Math.max((above - TUCK_START) / TUCK_BLEND, 0), 1);
       g += (Math.min(g, TUCK_GAP) - g) * t;
     }
     // A média da pele fica por dentro da curva (quadril e glúteo grandes, e o
@@ -277,6 +305,21 @@ export function fitBottom(
     out[i * 3] = sx + dir[i * 3] * g;
     out[i * 3 + 1] = sy + dir[i * 3 + 1] * g;
     out[i * 3 + 2] = sz + dir[i * 3 + 2] * g;
+    if (tuck != null && typeof tuck !== "number") {
+      const w = Math.min(Math.max((above + UNDER_BLEND / 2) / UNDER_BLEND, 0), 1);
+      const dx = out[i * 3] - tuck.cx;
+      const dz = out[i * 3 + 2] - tuck.cz;
+      const r = Math.hypot(dx, dz);
+      const limit = Math.max(
+        hemAt(tuck, out[i * 3], out[i * 3 + 2], tuck.r) - UNDER_GAP,
+        Math.hypot(sx - tuck.cx, sz - tuck.cz) + MIN_GAP,
+      );
+      if (w > 0 && r > limit) {
+        const k = 1 - (1 - limit / r) * w;
+        out[i * 3] = tuck.cx + dx * k;
+        out[i * 3 + 2] = tuck.cz + dz * k;
+      }
+    }
     if (length !== 0) {
       const t = Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / legSpan, 0), 1);
       out[i * 3 + 1] = Math.max(out[i * 3 + 1] - length * t, FLOOR_Y);

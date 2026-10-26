@@ -5,7 +5,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { AvatarParams } from "@/lib/avatar-builder";
-import { bindBottom, bottomWrinkle, fitBottom } from "@/lib/bottom-fit";
+import { bindBottom, bottomWrinkle, fitBottom, type TopHem } from "@/lib/bottom-fit";
 import { shapeBody } from "@/lib/garment-dress";
 import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
@@ -61,7 +61,7 @@ export function BottomGarment({
   params,
   ease,
   length = 0,
-  tuckY = null,
+  tuck = null,
   selectedColor,
 }: {
   url: string;
@@ -70,8 +70,11 @@ export function BottomGarment({
   ease: number;
   /** Quanto a peça é mais longa que a perna (m, ver `bottomLength`). */
   length?: number;
-  /** Barra da peça de cima no molde (m): acima dela a peça fica por dentro. */
-  tuckY?: number | null;
+  /**
+   * Barra da peça de cima, vestida (`TopHem`) ou no molde (m): acima dela a
+   * peça fica por dentro.
+   */
+  tuck?: TopHem | number | null;
   selectedColor?: string;
 }) {
   const garment = useGLTF(url);
@@ -89,13 +92,13 @@ export function BottomGarment({
         const g = p.geometry.clone();
         g.setAttribute(
           "position",
-          new THREE.BufferAttribute(fitBottom(bindings[i], pos, ease, tuckY, length), 3),
+          new THREE.BufferAttribute(fitBottom(bindings[i], pos, ease, tuck, length), 3),
         );
         // Prega, cós e lapela de bolso com quina: acima de 30° entre as faces a
         // luz não é mais alisada (sem isso a saia vira um cone ondulado).
         return toCreasedNormals(g, CREASE_ANGLE);
       }),
-    [parts, bindings, pos, ease, tuckY, length],
+    [parts, bindings, pos, ease, tuck, length],
   );
 
   const materials = useMemo(
@@ -119,10 +122,14 @@ export function BottomGarment({
       console.info(
         `[VESTRA FIT] peça de baixo · folga ${(ease * 100).toFixed(1)} cm` +
           (length !== 0 ? ` · ${(length * 100).toFixed(1)} cm ${length > 0 ? "mais longa" : "mais curta"}` : "") +
-          (tuckY != null ? ` · por dentro acima de ${tuckY.toFixed(2)} m` : ""),
+          (typeof tuck === "number"
+            ? ` · por dentro acima de ${tuck.toFixed(2)} m (molde)`
+            : tuck
+              ? ` · por dentro acima da barra vestida (${Math.min(...tuck.y).toFixed(2)}–${Math.max(...tuck.y).toFixed(2)} m)`
+              : ""),
       );
     }
-  }, [ease, length, tuckY]);
+  }, [ease, length, tuck]);
 
   return (
     <group>

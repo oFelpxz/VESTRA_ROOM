@@ -4,6 +4,7 @@ import { FitRunner } from "./fit-runner";
 import { MOLDE_GRADE } from "./garment-fit";
 import {
   dress,
+  hemProfile,
   rideUp,
   shapeBody,
   squeezeRib,
@@ -150,6 +151,36 @@ describe("ribana da barra", () => {
 
   it("quadril largo: encolhe só o mínimo (o empurrão estica depois)", () => {
     assert.ok(Math.abs(radiusAfter(0.29) - 0.264) < 1e-4);
+  });
+});
+
+describe("barra da peça vestida", () => {
+  // tubo de raio 0,2 entre a barra e 1,1 m; nas costas (-Z) a barra é 5 cm mais
+  // baixa, e as fatias de +X (em volta do ângulo 0) não têm tecido (fenda)
+  const tube: number[] = [];
+  for (let k = 0; k < 48; k++) {
+    const a = ((k + 0.5) / 48) * 2 * Math.PI;
+    if (a < Math.PI / 12 || a > 2 * Math.PI - Math.PI / 12) continue;
+    const x = 0.2 * Math.cos(a);
+    const z = 0.2 * Math.sin(a);
+    for (const y of [z < 0 ? 0.75 : 0.8, 0.9, 1.1]) tube.push(x, y, z);
+  }
+  const cloth = new Float32Array(tube);
+  const hem = hemProfile(cloth, new Float32Array(cloth.length / 3), 1.24)!;
+
+  it("altura da barra em cada fatia e o raio do lado de dentro", () => {
+    assert.ok(Math.abs(hem.cx) < 0.01 && Math.abs(hem.cz) < 0.01, "meio do tubo");
+    assert.ok(Math.abs(hem.y[6] - 0.8) < 1e-6, "frente (+Z)");
+    assert.ok(Math.abs(hem.y[18] - 0.75) < 1e-6, "costas (-Z)");
+    assert.ok(hem.r.every((r) => Math.abs(r - 0.2) < 0.01), `${hem.r}`);
+  });
+
+  it("fatia sem tecido fica com a vizinha", () => {
+    assert.ok(Math.abs(hem.y[0] - 0.8) < 1e-6 && Math.abs(hem.y[23] - 0.75) < 1e-6);
+  });
+
+  it("sem tronco: nada", () => {
+    assert.equal(hemProfile(cloth, new Float32Array(cloth.length / 3).fill(1), 1.24), null);
   });
 });
 

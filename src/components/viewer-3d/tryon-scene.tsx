@@ -11,6 +11,7 @@ import {
 } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import type { TopHem } from "@/lib/bottom-fit";
 import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
 import { tintMaterial } from "@/lib/garment-color";
 import { CLOSE_DISTANCE, closeUpY, type Box } from "@/lib/close-up";
@@ -180,6 +181,8 @@ function DressedLook({
   const topScene = useGLTF(top?.url ?? bottom.url).scene;
   const fitted = top != null && isFittedToMannequin(topScene);
   const tuckY = useMemo(() => (fitted ? hemHeight(topScene) : null), [fitted, topScene]);
+  // Barra da peça já vestida no cliente; até ela chegar, a do molde.
+  const [hem, setHem] = useState<TopHem | null>(null);
   const bare = <BareAvatar params={params} />;
 
   return (
@@ -193,6 +196,7 @@ function DressedLook({
             params={params}
             grade={top.grade ?? MOLDE_GRADE}
             selectedColor={top.color}
+            onHem={setHem}
           />
         </AvatarErrorBoundary>
       ) : (
@@ -208,7 +212,7 @@ function DressedLook({
             params={params}
             ease={bottom.ease ?? 0}
             length={bottom.length ?? 0}
-            tuckY={tuckY}
+            tuck={fitted ? (hem ?? tuckY) : null}
             selectedColor={bottom.color}
           />
         </Suspense>
