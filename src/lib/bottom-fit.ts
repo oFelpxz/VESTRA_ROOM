@@ -69,9 +69,15 @@ const MAX_SHORTER = 0.1; // m a menos, no máximo
 const FLOOR_Y = 0.005; // m
 // Gravidade no tamanho maior: a folga a mais cresce do entrepernas para baixo
 // (até HANG vezes mais a HANG_SPAN dele) e o tecido cai reto da coxa, em vez
-// de seguir a perna. Sem isso o G parecia o P inflado por igual.
-const HANG = 1.5;
+// de seguir a perna. Sem isso o G parecia o P inflado por igual. Com 1,5 o G
+// no corpo magro abria em boca de sino.
+const HANG = 0.5;
 const HANG_SPAN = 0.7; // m
+// Folga da calça para fora do meio da perna (ver `fitBottom`): de RADIAL_FROM
+// abaixo do entrepernas, inteira RADIAL_BLEND depois (no gancho o tecido
+// olha para baixo e precisa da folga nessa direção).
+const RADIAL_FROM = 0.05; // m
+const RADIAL_BLEND = 0.1; // m
 // Calça mais curta ou mais longa que a perna: o tecido sobe ou desce, mas a
 // perna não é reta (joelho e panturrilha mais grossos que a canela, e as pernas
 // fecham em direção aos pés). O tecido acompanha o centro da perna na altura
@@ -126,6 +132,8 @@ export type BottomBinding = {
    * Vazio sem os triângulos do corpo: aí o comprimento só sobe ou desce.
    */
   legEdges: Int32Array;
+  /** Calça ou bermuda (pernas separadas); saia e vestido não. */
+  pants: boolean;
 };
 
 /**
@@ -244,6 +252,7 @@ export function bindBottom(
     refX,
     hemY: refY.reduce((m, y) => Math.min(m, y), Infinity),
     legEdges: legEdges(base, index),
+    pants: bottomWrinkle(cloth) === "calca",
   };
 }
 
@@ -380,9 +389,11 @@ export function fitBottom(
   tuck: TopHem | number | null = null,
   length = 0,
 ): Float32Array {
-  const { start, skin, weights, dir, gap, refY, refX, hemY, legEdges } = binding;
+  const { start, skin, weights, dir, gap, refY, refX, hemY, legEdges, pants } = binding;
   const legSpan = Math.max(MOLDE_CROTCH_Y - hemY, 1e-6);
-  const legs = length !== 0 ? [-1, 1].map((side) => legSlices(pos, legEdges, side)) : [];
+  const legs =
+    length !== 0 || (pants && ease > 0) ? [-1, 1].map((side) => legSlices(pos, legEdges, side)) : [];
+  const easeLegs = ease > 0 ? legs : [];
   const n = gap.length;
   const out = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
@@ -453,6 +464,26 @@ export function fitBottom(
     out[i * 3] = sx + dir[i * 3] * g;
     out[i * 3 + 1] = sy + dir[i * 3 + 1] * g;
     out[i * 3 + 2] = sz + dir[i * 3 + 2] * g;
+    // Na perna da calça a folga a mais abre para fora do meio da perna, na
+    // horizontal: pela direção de cada ponto, as camadas da barra (tecido,
+    // avesso, faixa) iam para lados diferentes e a barra rasgava, e a folga
+    // descia junto. Saia e vestido passam entre as pernas: ficam como estão.
+    const radial = pants
+      ? Math.min(Math.max((MOLDE_CROTCH_Y - RADIAL_FROM - refY[i]) / RADIAL_BLEND, 0), 1)
+      : 0;
+    const legAt = radial > 0 ? easeLegs[refX[i] < 0 ? 0 : 1] : null;
+    if (legAt && g > gap[i]) {
+      const [cx, cz] = legAt.center(out[i * 3 + 1]);
+      const rx = out[i * 3] - cx;
+      const rz = out[i * 3 + 2] - cz;
+      const r = Math.hypot(rx, rz);
+      const extra = (g - gap[i]) * radial;
+      if (r > 1e-4) {
+        out[i * 3] += (rx / r - dir[i * 3]) * extra;
+        out[i * 3 + 1] -= dir[i * 3 + 1] * extra;
+        out[i * 3 + 2] += (rz / r - dir[i * 3 + 2]) * extra;
+      }
+    }
     if (tuck != null && typeof tuck !== "number") {
       const w = Math.min(Math.max((above + UNDER_BLEND / 2) / UNDER_BLEND, 0), 1);
       const dx = out[i * 3] - tuck.cx;

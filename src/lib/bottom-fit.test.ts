@@ -156,7 +156,7 @@ describe("fitBottom no corpete do vestido", () => {
 
 describe("fitBottom na perna", () => {
   // Folga a mais cresce para baixo do entrepernas (gravidade no tamanho maior).
-  const hang = (y: number) => 1 + 1.5 * Math.min((0.776 - y) / 0.7, 1);
+  const hang = (y: number) => 1 + 0.5 * Math.min((0.776 - y) / 0.7, 1);
   // Uma "perna" do lado direito (x > 0), bem abaixo do entrepernas.
   const leg = new Float32Array([
     0.1, 0.4, -0.01,
@@ -192,7 +192,7 @@ describe("fitBottom na perna", () => {
     const thigh = leg.map((v, i) => (i % 3 === 1 ? v + 0.3 : v));
     const low = fitBottom(bindBottom(new Float32Array([0.12, 0.1, 0]), knee), knee, 0.02);
     const high = fitBottom(bindBottom(new Float32Array([0.12, 0.7, 0]), thigh), thigh, 0.02);
-    assert.ok(low[0] - 0.12 > 2 * (high[0] - 0.12));
+    assert.ok(low[0] - 0.12 > 1.3 * (high[0] - 0.12));
   });
 });
 
@@ -289,6 +289,18 @@ describe("fitBottom comprimento", () => {
     const leg = cone();
     const out = fitBottom(bindBottom(new Float32Array([0.12, 0.3, 0.07]), leg.pos), leg.pos, 0, null, -0.1);
     close(out[2], 0.07, 1e-5);
+  });
+
+  it("folga a mais na calça: abre para fora do meio da perna, sem descer", () => {
+    const leg = cone();
+    // 1 cm abaixo de um anel e 1 cm fora: a pele dele fica acima e para dentro.
+    const point = new Float32Array([0.12, 0.29, 0.07]);
+    const binding = bindBottom(point, leg.pos, leg.index);
+    assert.ok(binding.dir[1] < -0.1, `${binding.dir[1]}`);
+    const out = fitBottom(binding, leg.pos, 0.02);
+    close(out[1], 0.29, 1e-4);
+    close(out[0], 0.12, 1e-4);
+    assert.ok(out[2] > 0.08, `${out[2]}`);
   });
 });
 
