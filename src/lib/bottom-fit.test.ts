@@ -6,6 +6,8 @@ import {
   bottomLength,
   bottomWrinkle,
   fitBottom,
+  meshEdges,
+  restOnShoes,
   type TopHem,
 } from "./bottom-fit";
 
@@ -278,6 +280,44 @@ describe("fitBottom comprimento", () => {
     const leg = cone();
     const out = fitBottom(bindBottom(new Float32Array([0.12, 0.3, 0.07]), leg.pos), leg.pos, 0, null, -0.1);
     close(out[2], 0.07, 1e-5);
+  });
+});
+
+describe("restOnShoes", () => {
+  // Tênis de mentira: um tampo plano a 8 cm do chão, 10 × 20 cm.
+  const shoe: number[] = [];
+  for (let x = 0; x <= 0.1; x += 0.002) for (let z = 0; z <= 0.2; z += 0.002) shoe.push(x, 0.08, z);
+  const shoes = [new Float32Array(shoe)];
+  // Tira de tecido em pé, de 2 cm a 20 cm, no meio do tênis (x = 0,05) e fora dele (x = 0,3).
+  const strip = (x: number) => {
+    const pos: number[] = [];
+    const index: number[] = [];
+    for (let k = 0; k <= 18; k++) pos.push(x, 0.02 + k * 0.01, 0.1, x + 0.005, 0.02 + k * 0.01, 0.1);
+    for (let k = 0; k < 18; k++) index.push(2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 1, 2 * k + 3, 2 * k + 2);
+    return { pos: new Float32Array(pos), edges: meshEdges(index) };
+  };
+
+  it("barra que entra no tênis pousa em cima dele, e o tecido acima sobe junto sem dobrar", () => {
+    const { pos, edges } = strip(0.05);
+    const out = restOnShoes(pos, edges, shoes);
+    close(out[1], 0.084, 1e-3);
+    for (let k = 1; k <= 18; k++) assert.ok(out[k * 6 + 1] > out[(k - 1) * 6 + 1], `ponto ${k} desceu`);
+    close(out[18 * 6 + 1], 0.2, 1e-6); // longe do tênis: não muda
+    for (let i = 0; i < pos.length; i += 3) {
+      assert.equal(out[i], pos[i]);
+      assert.equal(out[i + 2], pos[i + 2]);
+    }
+  });
+
+  it("fora do tênis nada muda", () => {
+    const { pos, edges } = strip(0.3);
+    assert.equal(restOnShoes(pos, edges, shoes), pos);
+  });
+});
+
+describe("meshEdges", () => {
+  it("arestas de dois triângulos colados, sem repetir a do meio", () => {
+    assert.equal(meshEdges([0, 1, 2, 1, 3, 2]).length / 2, 5);
   });
 });
 

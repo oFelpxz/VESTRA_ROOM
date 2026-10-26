@@ -5,7 +5,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { AvatarParams } from "@/lib/avatar-builder";
-import { bindBottom, bottomWrinkle, fitBottom, type TopHem } from "@/lib/bottom-fit";
+import { bindBottom, bottomWrinkle, fitBottom, meshEdges, restOnShoes, type TopHem } from "@/lib/bottom-fit";
 import { shapeBody } from "@/lib/garment-dress";
 import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
@@ -36,6 +36,19 @@ function useClientBody(params: AvatarParams) {
     [body, morphs, totalHeight],
   );
   return { body, pos };
+}
+
+/** Tênis vestido no corpo do cliente: as partes e a posição de cada uma. */
+function useFittedShoes(params: AvatarParams) {
+  const shoes = useGLTF(SHOES_URL);
+  const { body, pos } = useClientBody(params);
+  const parts = useMemo(() => extractGarment(shoes.scene), [shoes.scene]);
+  const bindings = useMemo(
+    () => parts.map((p) => bindBottom(p.base, body.base, body.index)),
+    [parts, body.base, body.index],
+  );
+  const positions = useMemo(() => bindings.map((b) => fitBottom(b, pos, 0)), [bindings, pos]);
+  return { parts, positions };
 }
 
 /** Avatar sem peça de cima (quando o look só tem a de baixo). */
@@ -85,20 +98,24 @@ export function BottomGarment({
     () => parts.map((p) => bindBottom(p.base, body.base, body.index)),
     [parts, body.base, body.index],
   );
+  const edges = useMemo(
+    () => parts.map((p) => meshEdges(p.geometry.index?.array ?? [])),
+    [parts],
+  );
+  // O avatar está sempre de tênis (ver `Shoes`): a barra pousa em cima dele.
+  const shoes = useFittedShoes(params).positions;
 
   const geometries = useMemo(
     () =>
       parts.map((p, i) => {
         const g = p.geometry.clone();
-        g.setAttribute(
-          "position",
-          new THREE.BufferAttribute(fitBottom(bindings[i], pos, ease, tuck, length), 3),
-        );
+        const fitted = fitBottom(bindings[i], pos, ease, tuck, length);
+        g.setAttribute("position", new THREE.BufferAttribute(restOnShoes(fitted, edges[i], shoes), 3));
         // Prega, cós e lapela de bolso com quina: acima de 30° entre as faces a
         // luz não é mais alisada (sem isso a saia vira um cone ondulado).
         return toCreasedNormals(g, CREASE_ANGLE);
       }),
-    [parts, bindings, pos, ease, tuck, length],
+    [parts, bindings, edges, shoes, pos, ease, tuck, length],
   );
 
   const materials = useMemo(
@@ -146,23 +163,17 @@ export function BottomGarment({
  * de borracha lisa.
  */
 export function Shoes({ params }: { params: AvatarParams }) {
-  const shoes = useGLTF(SHOES_URL);
-  const { body, pos } = useClientBody(params);
-  const parts = useMemo(() => extractGarment(shoes.scene), [shoes.scene]);
+  const { parts, positions } = useFittedShoes(params);
   const lite = useLite();
-  const bindings = useMemo(
-    () => parts.map((p) => bindBottom(p.base, body.base, body.index)),
-    [parts, body.base, body.index],
-  );
   const geometries = useMemo(
     () =>
       parts.map((p, i) => {
         const g = p.geometry.clone();
-        g.setAttribute("position", new THREE.BufferAttribute(fitBottom(bindings[i], pos, 0), 3));
+        g.setAttribute("position", new THREE.BufferAttribute(positions[i], 3));
         g.computeVertexNormals();
         return g;
       }),
-    [parts, bindings, pos],
+    [parts, positions],
   );
   const materials = useMemo(
     () =>

@@ -83,6 +83,12 @@ const LEG_MIN_Y = 0.1; // m no molde: do tornozelo para cima (o pé fica de fora
 const SLICE = 0.01; // m: distância entre os cortes da perna
 const SLICE_ANGLES = 24;
 const SLICE_MIN_POINTS = 12; // menos que isso no corte: não é o contorno inteiro
+// Barra por cima do tênis (ver `restOnShoes`).
+const SHOE_CELL = 0.005; // m: célula da superfície de cima do tênis
+const SHOE_GAP = 0.004; // m entre o tênis e o tecido
+const SHOE_FALLOFF = 0.6; // m de subida a menos por m de tecido longe do ponto que pousou
+const SHOE_ROUNDS = 300; // voltas, no máximo, para a subida chegar ao tecido em volta
+const SHOE_EPS = 1e-6; // m
 
 /**
  * Barra da peça de cima vestida no cliente, em fatias iguais em volta de
@@ -247,6 +253,11 @@ function legEdges(base: Float32Array, index: ArrayLike<number>): Int32Array {
     Math.abs(base[j * 3]) < LEG_MAX_X &&
     base[j * 3 + 1] > LEG_MIN_Y &&
     base[j * 3 + 1] < MOLDE_CROTCH_Y;
+  return meshEdges(index, isLeg);
+}
+
+/** Arestas dos triângulos, sem repetir (só as com as duas pontas em `keep`). */
+export function meshEdges(index: ArrayLike<number>, keep: (j: number) => boolean = () => true): Int32Array {
   const seen = new Set<number>();
   const out: number[] = [];
   for (let f = 0; f + 2 < index.length; f += 3)
@@ -254,7 +265,7 @@ function legEdges(base: Float32Array, index: ArrayLike<number>): Int32Array {
       const a = Math.min(index[f + e], index[f + ((e + 1) % 3)]);
       const b = Math.max(index[f + e], index[f + ((e + 1) % 3)]);
       const key = a * 4194304 + b;
-      if (seen.has(key) || !isLeg(a) || !isLeg(b)) continue;
+      if (seen.has(key) || !keep(a) || !keep(b)) continue;
       seen.add(key);
       out.push(a, b);
     }
@@ -548,4 +559,124 @@ export function bottomWrinkle(base: Float32Array): "caimento" | "calca" {
   for (let i = 0; i < base.length; i += 3)
     if (Math.abs(base[i]) < 0.015 && base[i + 1] > 0.42 && base[i + 1] < 0.55) return "caimento";
   return "calca";
+}
+
+/**
+ * Altura de cima do tênis vestido em cada célula de SHOE_CELL (x, z), já lisa
+ * e um pouco por fora; `at(x, z)` dá -Infinity fora do tênis.
+ */
+function shoeTop(shoes: Float32Array[]) {
+  let [x0, z0, x1, z1, top] = [Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (const s of shoes)
+    for (let i = 0; i < s.length; i += 3) {
+      x0 = Math.min(x0, s[i]);
+      x1 = Math.max(x1, s[i]);
+      z0 = Math.min(z0, s[i + 2]);
+      z1 = Math.max(z1, s[i + 2]);
+      top = Math.max(top, s[i + 1]);
+    }
+  // Uma célula de borda em volta, para o filtro poder crescer para fora.
+  x0 -= SHOE_CELL;
+  z0 -= SHOE_CELL;
+  const nx = Math.ceil((x1 - x0) / SHOE_CELL) + 2;
+  const nz = Math.ceil((z1 - z0) / SHOE_CELL) + 2;
+  const raw = new Float32Array(nx * nz).fill(-Infinity);
+  for (const s of shoes)
+    for (let i = 0; i < s.length; i += 3) {
+      const c = Math.floor((s[i] - x0) / SHOE_CELL) + nx * Math.floor((s[i + 2] - z0) / SHOE_CELL);
+      raw[c] = Math.max(raw[c], s[i + 1]);
+    }
+  // Maior das 3×3 em volta (fecha as células sem ponto e cresce uma para
+  // fora) e depois a média das 3×3 (tira o serrilhado da barra).
+  const pass = (src: Float32Array, max: boolean) => {
+    const out = new Float32Array(src.length).fill(-Infinity);
+    for (let a = 0; a < nx; a++)
+      for (let b = 0; b < nz; b++) {
+        if (!max && src[a + nx * b] === -Infinity) continue;
+        let [m, sum, k] = [-Infinity, 0, 0];
+        for (let da = -1; da <= 1; da++)
+          for (let db = -1; db <= 1; db++) {
+            if (a + da < 0 || b + db < 0 || a + da >= nx || b + db >= nz) continue;
+            const v = src[a + da + nx * (b + db)];
+            if (v === -Infinity) continue;
+            m = Math.max(m, v);
+            sum += v;
+            k++;
+          }
+        if (k) out[a + nx * b] = max ? m : sum / k;
+      }
+    return out;
+  };
+  const h = pass(pass(raw, true), false);
+  return {
+    top,
+    /** Entre as 4 células em volta; fora do tênis (mais da metade vazia), -Infinity. */
+    at(x: number, z: number) {
+      const fa = (x - x0) / SHOE_CELL - 0.5;
+      const fb = (z - z0) / SHOE_CELL - 0.5;
+      const [a, b] = [Math.floor(fa), Math.floor(fb)];
+      let [sum, wsum] = [0, 0];
+      for (let da = 0; da < 2; da++)
+        for (let db = 0; db < 2; db++) {
+          if (a + da < 0 || b + db < 0 || a + da >= nx || b + db >= nz) continue;
+          const v = h[a + da + nx * (b + db)];
+          if (v === -Infinity) continue;
+          const w = (da ? fa - a : 1 - fa + a) * (db ? fb - b : 1 - fb + b);
+          sum += v * w;
+          wsum += w;
+        }
+      return wsum > 0.5 ? sum / wsum : -Infinity;
+    },
+  };
+}
+
+/**
+ * Barra que desce até o tênis (calça mais longa que a perna, ou a wide que já
+ * vai ao chão) fica por cima dele, como a calça de verdade, em vez de
+ * atravessá-lo. Cada ponto do tecido abaixo da superfície de cima do tênis
+ * (SHOE_GAP acima dela) sobe até lá, e o tecido em volta sobe junto, menos
+ * SHOE_FALLOFF por metro de tecido até ele: a barra faz uma curva lisa por
+ * cima do peito do pé, sem degrau. Só muda y.
+ * `edges` = arestas do tecido (`meshEdges`); `shoes` = tênis já vestido no
+ * mesmo corpo (`fitBottom` com folga 0).
+ */
+export function restOnShoes(cloth: Float32Array, edges: Int32Array, shoes: Float32Array[]): Float32Array {
+  const surface = shoeTop(shoes);
+  const n = cloth.length / 3;
+  const lift = new Float32Array(n);
+  let any = false;
+  for (let i = 0; i < n; i++) {
+    const y = cloth[i * 3 + 1];
+    if (y > surface.top + SHOE_GAP) continue;
+    const h = surface.at(cloth[i * 3], cloth[i * 3 + 2]) + SHOE_GAP;
+    if (y < h) {
+      lift[i] = h - y;
+      any = true;
+    }
+  }
+  if (!any) return cloth;
+  for (let round = 0, changed = true; changed && round < SHOE_ROUNDS; round++) {
+    changed = false;
+    for (let e = 0; e < edges.length; e += 2) {
+      const [p, q] = [edges[e], edges[e + 1]];
+      if (lift[p] === 0 && lift[q] === 0) continue;
+      const cost =
+        SHOE_FALLOFF *
+        Math.hypot(
+          cloth[q * 3] - cloth[p * 3],
+          cloth[q * 3 + 1] - cloth[p * 3 + 1],
+          cloth[q * 3 + 2] - cloth[p * 3 + 2],
+        );
+      if (lift[p] - cost > lift[q] + SHOE_EPS) {
+        lift[q] = lift[p] - cost;
+        changed = true;
+      } else if (lift[q] - cost > lift[p] + SHOE_EPS) {
+        lift[p] = lift[q] - cost;
+        changed = true;
+      }
+    }
+  }
+  const out = cloth.slice();
+  for (let i = 0; i < n; i++) out[i * 3 + 1] += lift[i];
+  return out;
 }
