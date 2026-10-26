@@ -32,10 +32,17 @@ const BULGE_NECK_Y = 1.235; // m no molde: até 2 cm abaixo do decote (borda e a
 const MAX_EASE = 0.04; // folga a mais, no máximo (m)
 // Tamanho apertado: o tecido chega no máximo a 3/4 da distância do molde
 // (no gancho e no vinco dos glúteos o tecido passa por cima de uma reentrância
-// e a pele em volta fica mais perto do que o ponto médio indica). Só aperta
-// do entrepernas para cima: na perna reta o bolso cargo entraria no tecido.
+// e a pele em volta fica mais perto do que o ponto médio indica). Só do
+// entrepernas para cima: na perna o aperto é LEG_TIGHT_* (só na calça).
 const TIGHT_KEEP = 0.75;
 const TIGHT_LEG_BLEND = 0.05; // m abaixo do entrepernas até parar de apertar
+// Perna da calça apertada: a distância do molde vezes 1 + ease/SCALE, nunca
+// menos que KEEP dela nem que ela menos LOOSE × |ease|.
+const LEG_TIGHT_SCALE = 0.06; // m
+const LEG_TIGHT_KEEP = 0.4;
+const LEG_TIGHT_LOOSE = 0.5;
+const LEG_TIGHT_FROM_Y = 0.3; // m no molde: daqui para baixo, sem aperto
+const LEG_TIGHT_BLEND = 0.15; // m até o aperto todo (joelho)
 // Folga a mais no lado de dentro da perna: só essa fração (senão as duas
 // pernas se cruzam no meio num tamanho bem maior que o corpo). Perto do
 // entrepernas, nenhuma: as pernas ali quase se tocam e, encostando, fechavam
@@ -423,6 +430,19 @@ export function fitBottom(
     const hang = 1 + HANG * Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / HANG_SPAN, 0), 1);
     const e = ease < 0 ? ease * (1 - leg) : ease * hang * (1 - (1 - innerEase) * inner);
     let g = Math.max(gap[i] + e, gap[i] * TIGHT_KEEP, MIN_GAP);
+    // Calça pequena demais: a perna também aperta, proporcional à distância
+    // do molde (as camadas não se cruzam), para o tamanho errado aparecer.
+    // Onde o molde é bem folgado (boca da wide) só parte do aperto chega.
+    // Do joelho para baixo some aos poucos: a barra continua com folga.
+    if (pants && ease < 0) {
+      const tight = Math.max(
+        gap[i] * Math.max(1 + ease / LEG_TIGHT_SCALE, LEG_TIGHT_KEEP),
+        gap[i] + ease * LEG_TIGHT_LOOSE,
+        MIN_GAP,
+      );
+      const knee = Math.min(Math.max((refY[i] - LEG_TIGHT_FROM_Y) / LEG_TIGHT_BLEND, 0), 1);
+      g += (tight - g) * leg * knee;
+    }
     const above =
       tuck == null ? -Infinity : typeof tuck === "number" ? refY[i] - tuck : sy - hemAt(tuck, sx, sz);
     if (tuck != null) {

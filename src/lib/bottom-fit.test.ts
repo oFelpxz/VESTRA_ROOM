@@ -165,10 +165,22 @@ describe("fitBottom na perna", () => {
     0.1, 0.38, 0,
   ]);
 
-  it("tamanho apertado não aperta a perna (o bolso cargo entraria no tecido)", () => {
-    const cloth = new Float32Array([0.12, 0.4, 0]);
-    const out = fitBottom(bindBottom(cloth, leg), leg, -0.05);
-    close(out[0], 0.12, 1e-5);
+  it("calça apertada: a perna aperta até o joelho; perto da barra, não", () => {
+    const at = (y: number) => {
+      const skin = leg.map((v, i) => (i % 3 === 1 ? v + y - 0.4 : v));
+      return fitBottom(bindBottom(new Float32Array([0.12, y, 0]), skin), skin, -0.05)[0];
+    };
+    close(at(0.6), 0.1 + 0.02 * 0.4, 1e-5);
+    close(at(0.2), 0.12, 1e-5);
+    assert.ok(at(0.4) > at(0.6) && at(0.4) < 0.12, `${at(0.4)}`);
+  });
+
+  it("calça apertada: tamanho menor, perna mais justa", () => {
+    const skin = leg.map((v, i) => (i % 3 === 1 ? v + 0.2 : v));
+    const cloth = new Float32Array([0.12, 0.6, 0]);
+    const small = fitBottom(bindBottom(cloth, skin), skin, -0.03)[0];
+    const smaller = fitBottom(bindBottom(cloth, skin), skin, -0.02)[0];
+    assert.ok(small < smaller && smaller < 0.12, `${small} ${smaller}`);
   });
 
   it("folga a mais: o lado de dentro sobra só 1/4", () => {
