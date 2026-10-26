@@ -287,9 +287,22 @@ cp public/models/boxy_tee_01.glb public/models/relugar-t-shirt-v1.glb
 npx tsx scripts/alisar-peito.ts public/models/oversized_shirt.glb public/models/oversized_shirt.glb
 ```
 
+Depois dele, `alisar-barra.ts` cuida do que fica abaixo de 0,95 m (onde o
+`alisar-peito.ts` para e prende as bordas): a queda deixou uma dobra
+vertical de 3–4 cm no meio da frente e um sulco de ~1 cm na linha da coluna,
+e de baixo os dois pareciam a barra abrindo. Em faixas de 1 cm, leva o meio
+(|x| < 4 cm) até a reta que liga os dois lados dele; a correção vale para
+todas as camadas juntas, então a barra continua fechada:
+
+```bash
+npx tsx scripts/alisar-barra.ts public/models/boxy_tee_01.glb public/models/boxy_tee_01.glb
+cp public/models/boxy_tee_01.glb public/models/relugar-t-shirt-v1.glb
+npx tsx scripts/alisar-barra.ts public/models/oversized_shirt.glb public/models/oversized_shirt.glb
+```
+
 Ordem ao refazer uma peça: molde → `marcar-tecido.ts` → `cair.py` +
 `aplicar-queda.ts` → `espessura.ts` (por último: a simulação não conhece a
-faixa da espessura) ou, nas camisetas, `alisar-peito.ts`.
+faixa da espessura) ou, nas camisetas, `alisar-peito.ts` + `alisar-barra.ts`.
 
 ## Ferramentas de conferência
 
@@ -310,6 +323,6 @@ faixa da espessura) ou, nas camisetas, `alisar-peito.ts`.
    `scripts/marcar-tecido.ts` (algodao, sarja, denim, trico, cetim ou moletom)
    e rodar `npx tsx scripts/marcar-tecido.ts`. Sem isso, a peça sai de algodão.
 4. Se for saia, vestido ou camiseta: queda com gravidade e, nas peças de
-   baixo, espessura; nas camisetas, `alisar-peito.ts` (seção 9).
+   baixo, espessura; nas camisetas, `alisar-peito.ts` e `alisar-barra.ts` (seção 9).
 5. Conferir com `render.py` e no provador (`/produto/<id>/provador`, painel
    "Simular corpo (dev)").
