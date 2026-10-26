@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { applyTint, meanLuminance } from "./garment-color";
+import { applyTint, keepsOwnColor, meanLuminance } from "./garment-color";
 import { WEAVE_SIZE, isFabricName, makeWeave, type FabricName } from "./fabric-weave";
 import { EDGE_CAP, fabricEdgeAttribute } from "./fabric-edge";
 
@@ -265,8 +265,14 @@ export function clothMaterial(
   wrinkle: Wrinkle | null = null,
   lite = false,
 ): THREE.MeshPhysicalMaterial {
-  const look = FABRIC_LOOK[fabric];
   const m = toPhysical(source);
+  if (keepsOwnColor(source)) {
+    // botão: liso e com um pouco de brilho, sem trama nem dobra
+    m.roughness = 0.35;
+    m.metalness = 0;
+    return m;
+  }
+  const look = FABRIC_LOOK[fabric];
   if (color) m.color.set(color);
   // Tecido preto de verdade ainda devolve ~4% da luz: sem esse piso a peça
   // vira um recorte chapado e some a trama e as dobras.

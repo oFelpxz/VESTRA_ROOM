@@ -67,6 +67,12 @@ export function applyTint(shader: THREE.WebGLProgramParametersWithUniforms, mean
 }
 
 /**
+ * Aviamento (botão): fica na cor do arquivo, não na do tecido. O arquivo da
+ * peça marca pelo nome do material.
+ */
+export const keepsOwnColor = (material: THREE.Material) => /^botao/i.test(material.name);
+
+/**
  * Cópia do material na cor escolhida. Sem cor, devolve só a cópia (a peça
  * aparece como veio do arquivo). Quem chama libera a cópia com `dispose()`.
  */
@@ -76,7 +82,7 @@ export function tintMaterial(
 ): THREE.Material {
   const material = source.clone();
   const m = material as THREE.MeshStandardMaterial;
-  if (!color || !m.color) return material;
+  if (!color || !m.color || keepsOwnColor(source)) return material;
   m.color.set(color);
   const mean = m.map ? meanLuminance(m.map) : null;
   if (mean == null) return material; // sem textura: a cor lisa já basta

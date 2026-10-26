@@ -12,6 +12,7 @@ const TECIDO: Record<string, string> = {
   "boxy_tee_01.glb": "algodao",
   "relugar-t-shirt-v1.glb": "algodao",
   "oversized_shirt.glb": "algodao",
+  "camisa_studio.glb": "algodao",
   "track_jacket.glb": "algodao",
   "hoodie-core-v3.glb": "moletom",
   "cargo_pant_02.glb": "sarja",

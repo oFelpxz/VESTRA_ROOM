@@ -6,7 +6,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 // aos produtos e cria a tabela de medidas delas (medidas do corpo de quem
 // veste cada tamanho), que o provador usa para o caimento por região.
 //
-// Uso: npx tsx scripts/attach-top-models.ts
+// Uso: npx tsx scripts/attach-top-models.ts [slug]   (sem slug, liga todas)
 
 const adapter = new PrismaPg({
   connectionString: process.env.DIRECT_URL ?? process.env.DATABASE_URL,
@@ -23,12 +23,18 @@ const OVERSIZED: Row[] = [
   { size: "G", chest: [99, 106], waist: [85, 92] },
 ];
 
+// A Camisa Studio sai do mesmo molde (scripts/derivar-camisa.ts) e é vendida
+// também em GG.
+const CAMISA: Row[] = [...OVERSIZED, { size: "GG", chest: [107, 114], waist: [93, 100] }];
+
 const pieces = [
   { slug: "oversized-shirt", fileUrl: "/models/oversized_shirt.glb", chart: OVERSIZED },
+  { slug: "camisa-studio", fileUrl: "/models/camisa_studio.glb", chart: CAMISA },
 ];
 
 async function main() {
-  for (const { slug, fileUrl, chart } of pieces) {
+  const only = process.argv[2];
+  for (const { slug, fileUrl, chart } of pieces.filter((p) => !only || p.slug === only)) {
     const product = await prisma.product.findUnique({
       where: { slug },
       include: { model3D: true, sizeChart: true },

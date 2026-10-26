@@ -190,6 +190,20 @@ npx tsx scripts/attach-top-models.ts   # liga ao produto + tabela P/M/G
 O gltf-transform grava os atributos entrelaçados num buffer só; o provador
 separa eles ao ler a peça (`src/lib/deinterleave.ts`).
 
+### Camisa Studio — derivada da Oversized Shirt (sem Blender)
+
+Mesmo corpo e mesmo caimento da Oversized Shirt (já alisada), mais três
+malhas novas: gola (sai da borda da ribana, vira para fora e desce sobre os
+ombros; ponta na frente), carcela (faixa de 3,2 cm no meio da frente) e
+botões. Os botões usam o material `Botao`, que o provador não pinta com a
+cor escolhida (`keepsOwnColor` em `src/lib/garment-color.ts`). Rodar
+**depois** de refazer a Oversized (alisar-peito + alisar-barra):
+
+```bash
+npx tsx scripts/derivar-camisa.ts public/models/oversized_shirt.glb public/models/camisa_studio.glb
+npx tsx scripts/attach-top-models.ts camisa-studio   # liga ao produto + tabela P/M/G/GG
+```
+
 ## 7. Gorro (Knit Beanie) — acessório, tamanho único
 
 `gorro.py` sai da cabeça do avatar: raios de dentro para fora acham o crânio,
