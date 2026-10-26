@@ -245,6 +245,15 @@ describe("fitBottom comprimento", () => {
     close(fitBottom(binding, skin, 0, null, 0.2)[4], 0.005, 1e-5);
   });
 
+  it("mais longa que o chão: a perna toda desce só até a barra encostar", () => {
+    // Coxa, canela e barra: a canela não pode descer mais que a barra deixa.
+    const leg = new Float32Array([0.1, 0.9, 0, 0.1, 0.5, 0, 0.1, 0.1, 0]);
+    const binding = bindBottom(new Float32Array([0.1, 0.9, 0.02, 0.1, 0.5, 0.02, 0.1, 0.1, 0.02]), leg);
+    const long = fitBottom(binding, leg, 0, null, 0.2);
+    const touch = fitBottom(binding, leg, 0, null, 0.095);
+    for (let k = 0; k < long.length; k++) close(long[k], touch[k], 1e-5);
+  });
+
   // Perna em cone em volta de x = 0,12 (mais grossa em cima, como coxa e
   // joelho), com os triângulos: raio 0,03 + 0,1·y.
   const cone = () => {

@@ -468,23 +468,35 @@ export function fitBottom(
         out[i * 3 + 2] = tuck.cz + dz * k;
       }
     }
-    if (length !== 0) {
-      const t = Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / legSpan, 0), 1);
-      const from = out[i * 3 + 1];
-      const to = Math.max(from - length * t, FLOOR_Y);
-      out[i * 3 + 1] = to;
-      const leg = legs[refX[i] < 0 ? 0 : 1];
-      if (leg && to !== from) {
-        const [ax, az] = leg.center(from);
-        const [bx, bz] = leg.center(to);
-        const dx = out[i * 3] - ax;
-        const dz = out[i * 3 + 2] - az;
-        const r = Math.hypot(dx, dz);
-        const grow = Math.max(leg.radius(to, dx, dz) - leg.radius(from, dx, dz), 0);
-        const k = r > 1e-6 ? (r + grow) / r : 1;
-        out[i * 3] = bx + dx * k;
-        out[i * 3 + 2] = bz + dz * k;
-      }
+  }
+  if (length === 0) return out;
+  // Mais longa: cada perna desce no máximo até a barra encostar no chão. Com
+  // o chão segurando só os pontos que passavam dele, o resto descia por cima
+  // e a barra virava uma faixa amassada no chão (a wide nos corpos baixos).
+  const span = (i: number) => Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / legSpan, 0), 1);
+  const reach = [length, length];
+  if (length > 0)
+    for (let i = 0; i < n; i++) {
+      const t = span(i);
+      const s = refX[i] < 0 ? 0 : 1;
+      if (t > 0) reach[s] = Math.min(reach[s], Math.max((out[i * 3 + 1] - FLOOR_Y) / t, 0));
+    }
+  for (let i = 0; i < n; i++) {
+    const t = span(i);
+    const from = out[i * 3 + 1];
+    const to = Math.max(from - reach[refX[i] < 0 ? 0 : 1] * t, FLOOR_Y);
+    out[i * 3 + 1] = to;
+    const leg = legs[refX[i] < 0 ? 0 : 1];
+    if (leg && to !== from) {
+      const [ax, az] = leg.center(from);
+      const [bx, bz] = leg.center(to);
+      const dx = out[i * 3] - ax;
+      const dz = out[i * 3 + 2] - az;
+      const r = Math.hypot(dx, dz);
+      const grow = Math.max(leg.radius(to, dx, dz) - leg.radius(from, dx, dz), 0);
+      const k = r > 1e-6 ? (r + grow) / r : 1;
+      out[i * 3] = bx + dx * k;
+      out[i * 3 + 2] = bz + dz * k;
     }
   }
   return out;
