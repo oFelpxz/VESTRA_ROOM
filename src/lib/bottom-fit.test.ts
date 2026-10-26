@@ -234,9 +234,10 @@ describe("bottomLength", () => {
     close(bottomLength("40", CHART, null), 0);
   });
 
-  it("no máximo 5 cm mais longa e 10 cm mais curta", () => {
+  it("no máximo 5 cm mais longa e 20 cm mais curta", () => {
     close(bottomLength("44", CHART, 60), 0.05);
-    close(bottomLength("38", CHART, 100), -0.1);
+    close(bottomLength("38", CHART, 100), -0.2);
+    close(bottomLength("44", CHART, 94), -0.1);
   });
 });
 

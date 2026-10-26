@@ -72,7 +72,9 @@ const UNDER_BLEND = 0.01; // m
 // Comprimento: só abaixo do entrepernas do molde (m), até a barra.
 const MOLDE_CROTCH_Y = 0.776;
 const MAX_LONGER = 0.05; // m a mais, no máximo (a barra para no chão)
-const MAX_SHORTER = 0.1; // m a menos, no máximo
+// Na perna longa a calça fica curta de verdade, cada tamanho na sua altura: com
+// 10 cm todos os tamanhos paravam na mesma barra no corpo alto.
+const MAX_SHORTER = 0.2; // m a menos, no máximo
 const FLOOR_Y = 0.005; // m
 // Gravidade no tamanho maior: a folga a mais cresce do entrepernas para baixo
 // (até HANG vezes mais a HANG_SPAN dele) e o tecido cai reto da coxa, em vez
