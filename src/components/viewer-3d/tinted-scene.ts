@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { bottomWrinkle } from "@/lib/bottom-fit";
 import { deinterleave } from "@/lib/deinterleave";
 import { addFabricEdge, clothMaterial, fabricOf, type Wrinkle } from "@/lib/fabric";
+import { duplicateLayers } from "@/lib/garment-layers";
 import { isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
 type Piece = { geometry: THREE.BufferGeometry; source: THREE.Material; wrinkle: Wrinkle | null };
@@ -22,6 +23,7 @@ function piecesOf(scene: THREE.Object3D): Piece[] {
   const bottom = isBottomPiece(scene);
   scene.updateMatrixWorld(true);
   out = [];
+  const meshes: { mesh: THREE.Mesh; geometry: THREE.BufferGeometry }[] = [];
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -31,6 +33,16 @@ function piecesOf(scene: THREE.Object3D): Piece[] {
     geometry.applyMatrix4(mesh.matrixWorld);
     geometry.morphAttributes = {};
     deinterleave(geometry);
+    meshes.push({ mesh, geometry });
+  });
+  // O avesso duplicado furava a camada de fora em manchas cinza, como no
+  // provador (ver garment-layers.ts).
+  const avesso = duplicateLayers(meshes.map((x) => x.geometry.attributes.position.array));
+  meshes.forEach(({ mesh, geometry }, i) => {
+    if (avesso.has(i)) {
+      geometry.dispose();
+      return;
+    }
     addFabricEdge(geometry);
     const wrinkle = !fitted
       ? null
