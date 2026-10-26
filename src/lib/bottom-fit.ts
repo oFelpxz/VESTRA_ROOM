@@ -72,6 +72,17 @@ const FLOOR_Y = 0.005; // m
 // de seguir a perna. Sem isso o G parecia o P inflado por igual.
 const HANG = 1.5;
 const HANG_SPAN = 0.7; // m
+// Calça mais curta ou mais longa que a perna: o tecido sobe ou desce, mas a
+// perna não é reta (joelho e panturrilha mais grossos que a canela, e as pernas
+// fecham em direção aos pés). O tecido acompanha o centro da perna na altura
+// nova e, onde a pele lá é mais grossa que onde ele estava, abre o mesmo tanto.
+// Sem isso o joelho aparecia pela calça curta (corpo alto) e a panturrilha
+// furava atrás do joelho na longa (corpo baixo).
+const LEG_MAX_X = 0.3; // m do meio, no molde: perna (as mãos ficam além de 0,37)
+const LEG_MIN_Y = 0.1; // m no molde: do tornozelo para cima (o pé fica de fora)
+const SLICE = 0.01; // m: distância entre os cortes da perna
+const SLICE_ANGLES = 24;
+const SLICE_MIN_POINTS = 12; // menos que isso no corte: não é o contorno inteiro
 
 /**
  * Barra da peça de cima vestida no cliente, em fatias iguais em volta de
@@ -104,10 +115,22 @@ export type BottomBinding = {
   refX: Float32Array;
   /** Altura da barra no molde (m). */
   hemY: number;
+  /**
+   * Arestas da pele das pernas, do tornozelo ao entrepernas (pares de pontos).
+   * Vazio sem os triângulos do corpo: aí o comprimento só sobe ou desce.
+   */
+  legEdges: Int32Array;
 };
 
-/** Prende cada ponto da peça (`cloth`) à pele do corpo de referência (`base`). */
-export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBinding {
+/**
+ * Prende cada ponto da peça (`cloth`) à pele do corpo de referência (`base`,
+ * triângulos em `index`).
+ */
+export function bindBottom(
+  cloth: Float32Array,
+  base: Float32Array,
+  index: ArrayLike<number> = [],
+): BottomBinding {
   const cell = BIND_RADIUS;
   const key = (x: number, y: number, z: number) =>
     ((Math.floor(x / cell) + 512) * 1024 + (Math.floor(y / cell) + 512)) * 1024 +
@@ -214,6 +237,119 @@ export function bindBottom(cloth: Float32Array, base: Float32Array): BottomBindi
     refY,
     refX,
     hemY: refY.reduce((m, y) => Math.min(m, y), Infinity),
+    legEdges: legEdges(base, index),
+  };
+}
+
+/** Arestas dos triângulos com as duas pontas na perna (ver LEG_MAX_X). */
+function legEdges(base: Float32Array, index: ArrayLike<number>): Int32Array {
+  const isLeg = (j: number) =>
+    Math.abs(base[j * 3]) < LEG_MAX_X &&
+    base[j * 3 + 1] > LEG_MIN_Y &&
+    base[j * 3 + 1] < MOLDE_CROTCH_Y;
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (let f = 0; f + 2 < index.length; f += 3)
+    for (let e = 0; e < 3; e++) {
+      const a = Math.min(index[f + e], index[f + ((e + 1) % 3)]);
+      const b = Math.max(index[f + e], index[f + ((e + 1) % 3)]);
+      const key = a * 4194304 + b;
+      if (seen.has(key) || !isLeg(a) || !isLeg(b)) continue;
+      seen.add(key);
+      out.push(a, b);
+    }
+  return Int32Array.from(out);
+}
+
+/**
+ * Uma perna do cliente (`side` = lado de x) cortada a cada SLICE de altura
+ * pelas arestas da pele: o centro de cada corte e o raio do contorno em volta
+ * dele, em SLICE_ANGLES direções. Fora dos cortes (acima do entrepernas, no
+ * pé) vale o da ponta.
+ */
+function legSlices(pos: Float32Array, edges: Int32Array, side: number) {
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  for (const j of edges)
+    if (pos[j * 3] * side > 0) {
+      y0 = Math.min(y0, pos[j * 3 + 1]);
+      y1 = Math.max(y1, pos[j * 3 + 1]);
+    }
+  if (y1 - y0 < SLICE) return null;
+  const rows = Math.floor((y1 - y0) / SLICE) + 1;
+  // Onde cada aresta atravessa os cortes (y = y0 + k·SLICE).
+  const cuts: number[][] = Array.from({ length: rows }, () => []);
+  for (let e = 0; e < edges.length; e += 2) {
+    const [a, b] = [edges[e], edges[e + 1]];
+    const [ya, yb] = [pos[a * 3 + 1], pos[b * 3 + 1]];
+    const lo = Math.ceil((Math.min(ya, yb) - y0) / SLICE);
+    const hi = Math.floor((Math.max(ya, yb) - y0) / SLICE);
+    for (let k = Math.max(lo, 0); k <= Math.min(hi, rows - 1); k++) {
+      const t = ya === yb ? 0 : (y0 + k * SLICE - ya) / (yb - ya);
+      const x = pos[a * 3] + (pos[b * 3] - pos[a * 3]) * t;
+      if (x * side <= 0) continue;
+      cuts[k].push(x, pos[a * 3 + 2] + (pos[b * 3 + 2] - pos[a * 3 + 2]) * t);
+    }
+  }
+  // Corte sem o contorno inteiro (a ponta de cima ou de baixo) fica com o
+  // mais perto que tem.
+  const near = (k: number) => {
+    for (let d = 0; d < rows; d++)
+      for (const r of [k - d, k + d]) if ((cuts[r]?.length ?? 0) >= 2 * SLICE_MIN_POINTS) return cuts[r];
+    return [];
+  };
+  const cx = new Float32Array(rows);
+  const cz = new Float32Array(rows);
+  const radius = new Float32Array(rows * SLICE_ANGLES);
+  const angle = (dx: number, dz: number) =>
+    (Math.atan2(dz, dx) / (2 * Math.PI) + 1) * SLICE_ANGLES - 0.5;
+  for (let k = 0; k < rows; k++) {
+    const pts = near(k);
+    let [x0, x1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity];
+    for (let p = 0; p < pts.length; p += 2) {
+      x0 = Math.min(x0, pts[p]);
+      x1 = Math.max(x1, pts[p]);
+      z0 = Math.min(z0, pts[p + 1]);
+      z1 = Math.max(z1, pts[p + 1]);
+    }
+    cx[k] = (x0 + x1) / 2;
+    cz[k] = (z0 + z1) / 2;
+    const ring = new Float32Array(SLICE_ANGLES).fill(-1);
+    for (let p = 0; p < pts.length; p += 2) {
+      const dx = pts[p] - cx[k];
+      const dz = pts[p + 1] - cz[k];
+      const a = (Math.round(angle(dx, dz)) + SLICE_ANGLES) % SLICE_ANGLES;
+      ring[a] = Math.max(ring[a], Math.hypot(dx, dz));
+    }
+    // Direção sem pele fica com a vizinha mais perto.
+    for (let a = 0; a < SLICE_ANGLES; a++) {
+      let v = ring[a];
+      for (let d = 1; v < 0 && d <= SLICE_ANGLES / 2; d++)
+        v = Math.max(ring[(a + d) % SLICE_ANGLES], ring[(a - d + SLICE_ANGLES) % SLICE_ANGLES]);
+      radius[k * SLICE_ANGLES + a] = Math.max(v, 0);
+    }
+  }
+  // Entre os cortes e as direções, a média dos vizinhos (sem degrau).
+  const at = (y: number) => {
+    const f = Math.min(Math.max((y - y0) / SLICE, 0), rows - 1);
+    const r = Math.min(Math.floor(f), rows - 1);
+    return { r, r1: Math.min(r + 1, rows - 1), a: f - r };
+  };
+  return {
+    center(y: number): [number, number] {
+      const { r, r1, a } = at(y);
+      return [cx[r] * (1 - a) + cx[r1] * a, cz[r] * (1 - a) + cz[r1] * a];
+    },
+    radius(y: number, dx: number, dz: number) {
+      const { r, r1, a } = at(y);
+      const f = angle(dx, dz);
+      const k0 = ((Math.floor(f) % SLICE_ANGLES) + SLICE_ANGLES) % SLICE_ANGLES;
+      const k1 = (k0 + 1) % SLICE_ANGLES;
+      const b = f - Math.floor(f);
+      const ring = (rr: number) =>
+        radius[rr * SLICE_ANGLES + k0] * (1 - b) + radius[rr * SLICE_ANGLES + k1] * b;
+      return ring(r) * (1 - a) + ring(r1) * a;
+    },
   };
 }
 
@@ -233,8 +369,9 @@ export function fitBottom(
   tuck: TopHem | number | null = null,
   length = 0,
 ): Float32Array {
-  const { start, skin, weights, dir, gap, refY, refX, hemY } = binding;
+  const { start, skin, weights, dir, gap, refY, refX, hemY, legEdges } = binding;
   const legSpan = Math.max(MOLDE_CROTCH_Y - hemY, 1e-6);
+  const legs = length !== 0 ? [-1, 1].map((side) => legSlices(pos, legEdges, side)) : [];
   const n = gap.length;
   const out = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
@@ -322,7 +459,21 @@ export function fitBottom(
     }
     if (length !== 0) {
       const t = Math.min(Math.max((MOLDE_CROTCH_Y - refY[i]) / legSpan, 0), 1);
-      out[i * 3 + 1] = Math.max(out[i * 3 + 1] - length * t, FLOOR_Y);
+      const from = out[i * 3 + 1];
+      const to = Math.max(from - length * t, FLOOR_Y);
+      out[i * 3 + 1] = to;
+      const leg = legs[refX[i] < 0 ? 0 : 1];
+      if (leg && to !== from) {
+        const [ax, az] = leg.center(from);
+        const [bx, bz] = leg.center(to);
+        const dx = out[i * 3] - ax;
+        const dz = out[i * 3 + 2] - az;
+        const r = Math.hypot(dx, dz);
+        const grow = Math.max(leg.radius(to, dx, dz) - leg.radius(from, dx, dz), 0);
+        const k = r > 1e-6 ? (r + grow) / r : 1;
+        out[i * 3] = bx + dx * k;
+        out[i * 3 + 2] = bz + dz * k;
+      }
     }
   }
   return out;

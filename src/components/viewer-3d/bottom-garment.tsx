@@ -82,8 +82,8 @@ export function BottomGarment({
   const parts = useMemo(() => extractGarment(garment.scene), [garment.scene]);
   const lite = useLite();
   const bindings = useMemo(
-    () => parts.map((p) => bindBottom(p.base, body.base)),
-    [parts, body.base],
+    () => parts.map((p) => bindBottom(p.base, body.base, body.index)),
+    [parts, body.base, body.index],
   );
 
   const geometries = useMemo(
@@ -151,8 +151,8 @@ export function Shoes({ params }: { params: AvatarParams }) {
   const parts = useMemo(() => extractGarment(shoes.scene), [shoes.scene]);
   const lite = useLite();
   const bindings = useMemo(
-    () => parts.map((p) => bindBottom(p.base, body.base)),
-    [parts, body.base],
+    () => parts.map((p) => bindBottom(p.base, body.base, body.index)),
+    [parts, body.base, body.index],
   );
   const geometries = useMemo(
     () =>

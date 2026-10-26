@@ -242,6 +242,43 @@ describe("fitBottom comprimento", () => {
     close(fitBottom(binding, skin, 0, null, -0.05)[4], 0.15, 1e-5);
     close(fitBottom(binding, skin, 0, null, 0.2)[4], 0.005, 1e-5);
   });
+
+  // Perna em cone em volta de x = 0,12 (mais grossa em cima, como coxa e
+  // joelho), com os triângulos: raio 0,03 + 0,1·y.
+  const cone = () => {
+    const pos: number[] = [];
+    const index: number[] = [];
+    const seg = 16;
+    const ys = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
+    for (const y of ys)
+      for (let k = 0; k < seg; k++) {
+        const a = (k / seg) * 2 * Math.PI;
+        const r = 0.03 + 0.1 * y;
+        pos.push(0.12 + r * Math.cos(a), y, r * Math.sin(a));
+      }
+    for (let j = 0; j + 1 < ys.length; j++)
+      for (let k = 0; k < seg; k++) {
+        const [a, b] = [j * seg + k, j * seg + ((k + 1) % seg)];
+        index.push(a, b, a + seg, b, b + seg, a + seg);
+      }
+    return { pos: new Float32Array(pos), index };
+  };
+
+  it("mais curta: o tecido sobe e abre onde a perna é mais grossa", () => {
+    const leg = cone();
+    // 1 cm fora da pele, de frente, em y = 0,3 (raio 0,06).
+    const point = new Float32Array([0.12, 0.3, 0.07]);
+    const out = fitBottom(bindBottom(point, leg.pos, leg.index), leg.pos, 0, null, -0.1);
+    close(out[1], 0.4, 1e-5);
+    // Em y = 0,4 a pele está a 0,07 do meio: o tecido continua 1 cm fora.
+    close(Math.hypot(out[0] - 0.12, out[2]), 0.08, 2e-3);
+  });
+
+  it("sem os triângulos do corpo, só sobe", () => {
+    const leg = cone();
+    const out = fitBottom(bindBottom(new Float32Array([0.12, 0.3, 0.07]), leg.pos), leg.pos, 0, null, -0.1);
+    close(out[2], 0.07, 1e-5);
+  });
 });
 
 describe("bottomWrinkle", () => {
