@@ -27,8 +27,20 @@ const BULGE_RADIUS = 0.015; // pele "embaixo" do ponto do tecido (m)
 const BULGE_MAX = 0.008; // m
 const BULGE_TOP = 0.2; // m acima do entrepernas do molde (o cós fica de fora)
 const BULGE_MID = 0.01; // m do meio do corpo: daí para fora, só pele do mesmo lado
+const MID_KEEP = 0.5; // perto do meio, fica pelo menos a essa fração da distância do molde
 const BULGE_CHEST_Y = 1.05; // m no molde: daqui para cima (só o corpete do vestido) volta a valer
-const BULGE_NECK_Y = 1.235; // m no molde: até 2 cm abaixo do decote (borda e alcinhas serrilhavam)
+const BULGE_NECK_Y = 1.25; // m no molde: até onde começa o alisamento da borda (acima, borda e alcinhas serrilhavam)
+// Borda de cima e alças do vestido: cada ponto anda a média dos pontos do
+// tecido em volta (no molde, de qualquer camada). Seguindo cada um a sua pele,
+// no corpo magro as alças enrugavam e a borda ondulava; pelas arestas da malha
+// a faixa da borda (solta do resto) descolava.
+const SMOOTH_FROM_Y = 1.25; // m no molde
+const SMOOTH_FULL_Y = 1.28; // m no molde
+const SMOOTH_RADIUS = 0.02; // m
+const SMOOTH_ROUNDS = 10;
+// Alisando, nada chega a menos disso da pele (se já não estava): no ombro e no
+// busto a média puxava o tecido para dentro.
+const SMOOTH_CLEAR = 0.003; // m
 const MAX_EASE = 0.04; // folga a mais, no máximo (m)
 // Tamanho apertado: o tecido chega no máximo a 3/4 da distância do molde
 // (no gancho e no vinco dos glúteos o tecido passa por cima de uma reentrância
@@ -134,6 +146,10 @@ export type BottomBinding = {
   refY: Float32Array;
   /** Lado de cada ponto no molde (x, m). */
   refX: Float32Array;
+  /** Profundidade de cada ponto no molde (z, m). */
+  refZ: Float32Array;
+  /** Pontos alisados (ver SMOOTH_FROM_Y), vizinhos e pesos, e quanto alisa. */
+  smooth: { points: Int32Array; start: Int32Array; near: Int32Array; weights: Float32Array; amount: Float32Array };
   /** Altura da barra no molde (m). */
   hemY: number;
   /**
@@ -174,6 +190,7 @@ export function bindBottom(
   const gap = new Float32Array(n);
   const refY = new Float32Array(n);
   const refX = new Float32Array(n);
+  const refZ = new Float32Array(n);
   // Pele a menos de `radius` do ponto (procura nas células em volta).
   const gather = (x: number, y: number, z: number, radius: number) => {
     const near: number[] = [];
@@ -208,6 +225,7 @@ export function bindBottom(
     const z = cloth[i * 3 + 2];
     refY[i] = y;
     refX[i] = x;
+    refZ[i] = z;
     start[i] = skin.length;
     let { near, dist } = gather(x, y, z, BIND_RADIUS);
     let s2 = 2 * BIND_SIGMA * BIND_SIGMA;
@@ -259,10 +277,55 @@ export function bindBottom(
     gap,
     refY,
     refX,
+    refZ,
+    smooth: smoothNeighbors(cloth),
     hemY: refY.reduce((m, y) => Math.min(m, y), Infinity),
     legEdges: legEdges(base, index),
     pants: bottomWrinkle(cloth) === "calca",
   };
+}
+
+/** Vizinhos de cada ponto acima de SMOOTH_FROM_Y, entre eles, no molde. */
+function smoothNeighbors(cloth: Float32Array): BottomBinding["smooth"] {
+  const points: number[] = [];
+  for (let i = 0; i < cloth.length / 3; i++) if (cloth[i * 3 + 1] > SMOOTH_FROM_Y) points.push(i);
+  const cell = SMOOTH_RADIUS;
+  const key = (x: number, y: number, z: number) =>
+    ((Math.floor(x / cell) + 512) * 1024 + (Math.floor(y / cell) + 512)) * 1024 + (Math.floor(z / cell) + 512);
+  const grid = new Map<number, number[]>();
+  points.forEach((i, a) => {
+    const k = key(cloth[i * 3], cloth[i * 3 + 1], cloth[i * 3 + 2]);
+    const list = grid.get(k);
+    if (list) list.push(a);
+    else grid.set(k, [a]);
+  });
+  const start = new Int32Array(points.length + 1);
+  const near: number[] = [];
+  const weights: number[] = [];
+  const amount = new Float32Array(points.length);
+  const s2 = 2 * (SMOOTH_RADIUS / 2) ** 2;
+  points.forEach((i, a) => {
+    const [x, y, z] = [cloth[i * 3], cloth[i * 3 + 1], cloth[i * 3 + 2]];
+    amount[a] = Math.min((y - SMOOTH_FROM_Y) / (SMOOTH_FULL_Y - SMOOTH_FROM_Y), 1);
+    start[a] = near.length;
+    let total = 0;
+    const [cx, cy, cz] = [Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell)];
+    for (let u = -1; u <= 1; u++)
+      for (let v = -1; v <= 1; v++)
+        for (let t = -1; t <= 1; t++)
+          for (const b of grid.get(((cx + u + 512) * 1024 + (cy + v + 512)) * 1024 + (cz + t + 512)) ?? []) {
+            const j = points[b];
+            const d = (cloth[j * 3] - x) ** 2 + (cloth[j * 3 + 1] - y) ** 2 + (cloth[j * 3 + 2] - z) ** 2;
+            if (d > SMOOTH_RADIUS * SMOOTH_RADIUS) continue;
+            const w = Math.exp(-d / s2);
+            near.push(b);
+            weights.push(w);
+            total += w;
+          }
+    for (let k = start[a]; k < near.length; k++) weights[k] /= total;
+  });
+  start[points.length] = near.length;
+  return { points: Int32Array.from(points), start, near: Int32Array.from(near), weights: Float32Array.from(weights), amount };
 }
 
 /** Arestas dos triângulos com as duas pontas na perna (ver LEG_MAX_X). */
@@ -405,6 +468,7 @@ export function fitBottom(
   const easeLegs = ease > 0 ? legs : [];
   const n = gap.length;
   const out = new Float32Array(n * 3);
+  const anchor = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
     let sx = 0;
     let sy = 0;
@@ -483,6 +547,9 @@ export function fitBottom(
       1,
     );
     if (bulge > -Infinity) g = Math.max(g, g + (Math.min(bulge + MIN_GAP, g + BULGE_MAX) - g) * below);
+    anchor[i * 3] = sx;
+    anchor[i * 3 + 1] = sy;
+    anchor[i * 3 + 2] = sz;
     out[i * 3] = sx + dir[i * 3] * g;
     out[i * 3 + 1] = sy + dir[i * 3 + 1] * g;
     out[i * 3 + 2] = sz + dir[i * 3 + 2] * g;
@@ -521,7 +588,13 @@ export function fitBottom(
         out[i * 3 + 2] = tuck.cz + dz * k;
       }
     }
+    // Perto do meio o ponto não passa para o outro lado: no rego do glúteo a
+    // pele de que ele se afasta fica mais para fora, a direção cruza o meio e
+    // os dois lados trocavam de lugar (triângulos virados, mancha escura).
+    if (Math.abs(refX[i]) < BULGE_MID && out[i * 3] * refX[i] < MID_KEEP * refX[i] * refX[i])
+      out[i * 3] = refX[i] * MID_KEEP;
   }
+  smoothTop(binding, out, anchor);
   if (length === 0) return out;
   // Mais longa: cada perna desce no máximo até a barra encostar no chão. Com
   // o chão segurando só os pontos que passavam dele, o resto descia por cima
@@ -553,6 +626,47 @@ export function fitBottom(
     }
   }
   return out;
+}
+
+/**
+ * Alisa o deslocamento da borda de cima e das alças (ver SMOOTH_FROM_Y), sem
+ * deixar ponto nenhum a menos de SMOOTH_CLEAR da pele (ver SMOOTH_CLEAR).
+ */
+function smoothTop(
+  { smooth, refX, refY, refZ, dir }: BottomBinding,
+  out: Float32Array,
+  anchor: Float32Array,
+) {
+  const { points, start, near, weights, amount } = smooth;
+  const m = points.length;
+  if (!m) return;
+  let d = new Float32Array(m * 3);
+  points.forEach((i, a) => {
+    d[a * 3] = out[i * 3] - refX[i];
+    d[a * 3 + 1] = out[i * 3 + 1] - refY[i];
+    d[a * 3 + 2] = out[i * 3 + 2] - refZ[i];
+  });
+  for (let r = 0; r < SMOOTH_ROUNDS; r++) {
+    const next = new Float32Array(m * 3);
+    for (let a = 0; a < m; a++)
+      for (let c = 0; c < 3; c++) {
+        let avg = 0;
+        for (let k = start[a]; k < start[a + 1]; k++) avg += d[near[k] * 3 + c] * weights[k];
+        next[a * 3 + c] = d[a * 3 + c] + (avg - d[a * 3 + c]) * amount[a];
+      }
+    d = next;
+  }
+  points.forEach((i, a) => {
+    const x = refX[i] + d[a * 3];
+    const y = refY[i] + d[a * 3 + 1];
+    const z = refZ[i] + d[a * 3 + 2];
+    const gapOf = (px: number, py: number, pz: number) =>
+      (px - anchor[i * 3]) * dir[i * 3] + (py - anchor[i * 3 + 1]) * dir[i * 3 + 1] + (pz - anchor[i * 3 + 2]) * dir[i * 3 + 2];
+    const back = Math.max(Math.min(gapOf(out[i * 3], out[i * 3 + 1], out[i * 3 + 2]), SMOOTH_CLEAR) - gapOf(x, y, z), 0);
+    out[i * 3] = x + dir[i * 3] * back;
+    out[i * 3 + 1] = y + dir[i * 3 + 1] * back;
+    out[i * 3 + 2] = z + dir[i * 3 + 2] * back;
+  });
 }
 
 type BottomSizeRow = {

@@ -154,6 +154,33 @@ describe("fitBottom no corpete do vestido", () => {
   });
 });
 
+describe("fitBottom na borda de cima e nas alças do vestido", () => {
+  // Dois pontos vizinhos 1 cm à frente da pele, cada um mais perto de um lado.
+  const skin = new Float32Array([
+    -0.03, 1.29, 0,
+    -0.03, 1.31, 0,
+    0.03, 1.29, 0,
+    0.03, 1.31, 0,
+  ]);
+  const cloth = new Float32Array([-0.005, 1.3, 0.01, 0.005, 1.3, 0.01]);
+
+  it("pontos vizinhos andam juntos (no corpo magro as alças enrugavam)", () => {
+    const client = skin.map((v, i) => (i >= 6 && i % 3 === 2 ? 0.01 : v));
+    const out = fitBottom(bindBottom(cloth, skin), client, 0);
+    close(out[2], out[5], 2e-4);
+  });
+});
+
+describe("fitBottom perto do meio do corpo", () => {
+  it("o ponto não passa para o outro lado (no glúteo virava uma mancha escura)", () => {
+    // A pele de que ele se afasta fica mais para fora: a direção cruza o meio.
+    const skin = SKIN.map((v, i) => (i % 3 === 0 ? v + 0.03 : v));
+    const cloth = new Float32Array([0.005, 1, 0.03]);
+    const out = fitBottom(bindBottom(cloth, skin), skin, 0.02);
+    assert.ok(out[0] >= 0.0025 - 1e-6, `${out[0]}`);
+  });
+});
+
 describe("fitBottom na perna", () => {
   // Folga a mais cresce para baixo do entrepernas (gravidade no tamanho maior).
   const hang = (y: number) => 1 + 0.5 * Math.min((0.776 - y) / 0.7, 1);
