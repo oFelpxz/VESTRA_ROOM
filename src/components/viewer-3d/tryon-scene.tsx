@@ -16,6 +16,7 @@ import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
 import { tintMaterial } from "@/lib/garment-color";
 import type { GarmentLook } from "@/lib/garment-prints";
 import { CLOSE_DISTANCE, closeUpY, type Box } from "@/lib/close-up";
+import { frameBody, STUDIO_FOV, type Home } from "@/lib/studio-frame";
 import { liteMode, type LiteMode } from "@/lib/render-quality";
 import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
@@ -321,6 +322,76 @@ function Look({ params, pieces }: { params: AvatarParams; pieces: LookPieces }) 
   );
 }
 
+/** O que decide onde a câmera fica: altura do corpo ou, na touca, da cabeça. */
+type Framing = { head: boolean; headY: number; height: number };
+
+/** Câmera de frente, recalculada quando a altura ou o formato da tela mudam. */
+function useHome({ head, headY, height }: Framing): Home {
+  const aspect = useThree((s) => (s.size.height ? s.size.width / s.size.height : 1));
+  return useMemo(
+    () =>
+      head
+        ? { y: headY + 0.12, dist: HEAD_DISTANCE, targetY: headY + 0.04 }
+        : frameBody(height, aspect),
+    [head, headY, height, aspect],
+  );
+}
+
+/**
+ * Fundo do estúdio (lista 11, item 9): claro atrás do corpo, escurecendo de
+ * leve para as bordas e para o chão — o avatar deixa de "flutuar" num chapado.
+ * Fica preso à tela (gira junto com a câmera), como o fundo infinito de foto.
+ */
+function makeBackdrop() {
+  const size = 512;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
+  if (!g) return null;
+  const v = g.createLinearGradient(0, 0, 0, size);
+  v.addColorStop(0, "#ebe7e0");
+  v.addColorStop(0.6, "#e7e2da");
+  v.addColorStop(1, "#d8d1c5");
+  g.fillStyle = v;
+  g.fillRect(0, 0, size, size);
+  const r = g.createRadialGradient(size / 2, size * 0.42, 0, size / 2, size * 0.42, size * 0.7);
+  r.addColorStop(0, "rgba(255, 253, 249, 0.5)");
+  r.addColorStop(1, "rgba(255, 253, 249, 0)");
+  g.fillStyle = r;
+  g.fillRect(0, 0, size, size);
+  // Ruído de ±1 tom: sem ele o degradê suave aparece em faixas.
+  const img = g.getImageData(0, 0, size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = Math.random() * 2 - 1;
+    img.data[i] += n;
+    img.data[i + 1] += n;
+    img.data[i + 2] += n;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// Fora do componente: o fundo é da cena, não do estado do React.
+function setBackground(scene: THREE.Scene, bg: THREE.Texture | null) {
+  scene.background = bg;
+}
+
+function StudioBackdrop() {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    const texture = makeBackdrop();
+    if (!texture) return;
+    setBackground(scene, texture);
+    return () => {
+      setBackground(scene, null);
+      texture.dispose();
+    };
+  }, [scene]);
+  return null;
+}
+
 const VIEW_ANGLE: Record<"front" | "side" | "back", number> = {
   front: 0,
   side: Math.PI / 2,
@@ -356,15 +427,15 @@ function CameraRig({
   view,
   params,
   primary,
-  home,
-  head,
+  framing,
 }: {
   view: { name: CameraView; n: number } | null;
   params: AvatarParams;
   primary: "top" | "bottom";
-  home: { y: number; dist: number; targetY: number };
-  head: boolean;
+  framing: Framing;
 }) {
+  const { head } = framing;
+  const home = useHome(framing);
   const camera = useThree((s) => s.camera);
   const scene = useThree((s) => s.scene);
   const controls = useThree((s) => s.controls) as unknown as Controls | null;
@@ -434,6 +505,28 @@ function CameraRig({
     setMinDistance(controls, 0.3);
   }, [view, camera, controls, scene, params, primary, home, head]);
 
+  // Altura do corpo ou formato da tela mudou: reenquadra no mesmo ângulo
+  // (na primeira vez, sem deslizar). No close do tecido, fica onde está.
+  const placed = useRef(false);
+  useEffect(() => {
+    if (!controls) return;
+    const first = !placed.current;
+    placed.current = true;
+    if (close.current || goal.current?.close) return;
+    const from = goal.current?.pos ?? camera.position;
+    const a = Math.atan2(from.x - controls.target.x, from.z - controls.target.z);
+    const target = new THREE.Vector3(0, home.targetY, 0);
+    const pos = new THREE.Vector3(Math.sin(a) * home.dist, home.y, Math.cos(a) * home.dist);
+    if (first) {
+      camera.position.copy(pos);
+      controls.target.copy(target);
+      controls.update();
+      return;
+    }
+    goal.current = { target, pos, close: false };
+    setMinDistance(controls, 0.3);
+  }, [home, camera, controls]);
+
   useFrame((_, dt) => {
     const g = goal.current;
     if (!g || !controls) return;
@@ -462,12 +555,13 @@ export type LookShots = () => { front: HTMLCanvasElement; back: HTMLCanvasElemen
  * onde estava, tudo entre dois quadros (quem olha não vê a câmera pular).
  */
 function ShotTaker({
-  home,
+  framing,
   onShots,
 }: {
-  home: { y: number; dist: number; targetY: number };
+  framing: Framing;
   onShots: (take: LookShots) => void;
 }) {
+  const home = useHome(framing);
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
@@ -554,18 +648,10 @@ export function TryOnScene({
   const tone = useMemo(() => skinTone(skin), [skin]);
   const cut = mannequin || accessory ? "none" : hairStyle(hair).id;
   const headY = avatarParams.anchors.head.y;
-  const home = useMemo(
-    () =>
-      head
-        ? { y: headY + 0.12, dist: HEAD_DISTANCE, targetY: headY + 0.04 }
-        : // Câmera "afasta" se o avatar for mais alto
-          {
-            y: avatarParams.totalHeight * 0.55,
-            dist: 2.4 + avatarParams.totalHeight * 0.5,
-            targetY: avatarParams.totalHeight * 0.5,
-          },
-    [head, headY, avatarParams.totalHeight],
-  );
+  const height = avatarParams.totalHeight;
+  const framing = useMemo(() => ({ head, headY, height }), [head, headY, height]);
+  // Só o primeiro palpite: dentro do Canvas a câmera se ajusta ao formato da tela.
+  const start = head ? { y: headY + 0.12, dist: HEAD_DISTANCE } : frameBody(height, 1);
 
   // Modo leve (src/lib/render-quality.ts): pelo aparelho ou se travar.
   const device = useSyncExternalStore(noSubscribe, readDeviceMode, () => FULL);
@@ -577,11 +663,11 @@ export function TryOnScene({
       shadows={!lite}
       dpr={lite ? 1 : [1.5, 2]}
       data-lite={lite ? "1" : undefined}
-      camera={{ position: [0, home.y, home.dist], fov: 38 }}
+      camera={{ position: [0, start.y, start.dist], fov: STUDIO_FOV }}
       // Mantém a imagem para o botão "Baixar foto do look".
       gl={{ preserveDrawingBuffer: true, toneMapping: STUDIO_TONE_MAPPING }}
     >
-      <color attach="background" args={["#e7e2da"]} />
+      <StudioBackdrop />
 
       {device.auto && !lite && <PerformanceMonitor onDecline={() => setSlow(true)} />}
       <StudioLights shadows={!lite} />
@@ -593,13 +679,14 @@ export function TryOnScene({
       <Suspense fallback={<Loader />}>
         <Look params={avatarParams} pieces={{ top, bottom, accessory, primary }} />
         {!lite && (
-          <ContactShadows
-            position={[0, 0.005, 0]}
-            opacity={0.45}
-            scale={4}
-            blur={2.4}
-            far={2}
-          />
+          <>
+            {/* Contato dos pés com o chão + a sombra da luz principal, bem leve. */}
+            <ContactShadows position={[0, 0.005, 0]} opacity={0.6} scale={3} blur={2} far={1.2} />
+            <mesh rotation-x={-Math.PI / 2} position-y={0.002} receiveShadow>
+              <circleGeometry args={[3, 48]} />
+              <shadowMaterial opacity={0.16} />
+            </mesh>
+          </>
         )}
       </Suspense>
       </HairContext.Provider>
@@ -609,15 +696,15 @@ export function TryOnScene({
 
       <OrbitControls
         makeDefault
-        target={[0, home.targetY, 0]}
-        maxDistance={6}
+        target={[0, head ? headY + 0.04 : height * 0.5, 0]}
+        maxDistance={8}
         maxPolarAngle={Math.PI / 1.8}
         minPolarAngle={Math.PI / 4}
         autoRotate={autoRotate}
         autoRotateSpeed={1.6}
       />
-      <CameraRig view={view} params={avatarParams} primary={primary} home={home} head={head} />
-      {onShots && <ShotTaker home={home} onShots={onShots} />}
+      <CameraRig view={view} params={avatarParams} primary={primary} framing={framing} />
+      {onShots && <ShotTaker framing={framing} onShots={onShots} />}
       {!lite && <StudioAO />}
     </Canvas>
   );
