@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { measurementError } from "@/lib/measurement-limits";
+import { isSkinTone } from "@/lib/skin-tones";
 
 export type MeasurementFormState = {
   error?: string;
@@ -96,4 +97,18 @@ export async function deleteMeasurementsAction(
   revalidatePath("/teste-3d");
 
   return { success: true };
+}
+
+/**
+ * Tom de pele escolhido no provador (lista 11): fica no perfil de medidas e
+ * volta no próximo provador. Sem perfil não há provador, então só atualiza.
+ */
+export async function saveSkinToneAction(tone: string): Promise<{ ok: boolean }> {
+  const session = await auth();
+  if (!session?.user?.id || !isSkinTone(tone)) return { ok: false };
+  const { count } = await prisma.measurementProfile.updateMany({
+    where: { userId: session.user.id },
+    data: { skinTone: tone },
+  });
+  return { ok: count > 0 };
 }

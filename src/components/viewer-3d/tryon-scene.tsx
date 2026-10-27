@@ -21,7 +21,8 @@ import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
 import { BareAvatar, BottomGarment, Shoes, hemHeight } from "./bottom-garment";
 import { LiteContext } from "./lite-context";
-import { MannequinFinish } from "./skin-material";
+import { MannequinFinish, SkinToneContext } from "./skin-material";
+import { skinTone } from "@/lib/skin-tones";
 import { StudioAO } from "./studio-ao";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
@@ -486,6 +487,7 @@ export function TryOnScene({
   autoRotate = false,
   focus = "body",
   mannequin = false,
+  skin = null,
   onShots,
 }: {
   avatarParams: AvatarParams;
@@ -502,10 +504,13 @@ export function TryOnScene({
   focus?: "body" | "head";
   /** Acabamento de manequim de loja no lugar da pele (looks da marca). */
   mannequin?: boolean;
+  /** Tom de pele de quem prova (id de `SKIN_TONES`); null = o padrão. */
+  skin?: string | null;
   /** Recebe a função que tira as fotos de frente e de costas. */
   onShots?: (take: LookShots) => void;
 }) {
   const head = focus === "head";
+  const tone = useMemo(() => skinTone(skin), [skin]);
   const headY = avatarParams.anchors.head.y;
   const home = useMemo(
     () =>
@@ -541,6 +546,7 @@ export function TryOnScene({
 
       <LiteContext.Provider value={lite}>
       <MannequinFinish.Provider value={mannequin}>
+      <SkinToneContext.Provider value={tone}>
       <Suspense fallback={<Loader />}>
         {top || bottom ? (
           <Outfit params={avatarParams} top={top} bottom={bottom} primary={primary} />
@@ -565,6 +571,7 @@ export function TryOnScene({
           />
         )}
       </Suspense>
+      </SkinToneContext.Provider>
       </MannequinFinish.Provider>
       </LiteContext.Provider>
 

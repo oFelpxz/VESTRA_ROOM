@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useCallback, useMemo, useRef, useState } from "react";
+import { useActionState, useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { addToCartAction, type CartActionState } from "@/lib/cart-actions";
 import {
   overallFit,
@@ -17,6 +17,8 @@ import {
   type AvatarBody,
 } from "@/lib/avatar-builder";
 import { colorToHex } from "@/lib/color-names";
+import { SKIN_TONES, skinTone } from "@/lib/skin-tones";
+import { saveSkinToneAction } from "@/lib/measurement-actions";
 import { lookOf } from "@/lib/garment-prints";
 import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
 import { bottomEase, bottomLength } from "@/lib/bottom-fit";
@@ -62,6 +64,8 @@ type UserProfile = {
   armLengthCm: number | null;
   legLengthCm: number | null;
   fitPreference: FitPreference;
+  /** Tom de pele salvo (id de `SKIN_TONES`); null = o padrão. */
+  skinTone: string | null;
 };
 
 // Só em desenvolvimento: simular outros corpos sem mexer no perfil salvo.
@@ -169,6 +173,15 @@ export function TryOnExperience({
   // Corpo do avatar: começa no unissex; não é salvo no perfil
   const [bodyType, setBodyType] = useState<AvatarBody>("neutral");
   const [sim, setSim] = useState<Partial<Record<SimKey, number>>>({});
+  // Tom de pele: muda na hora e fica salvo no perfil para o próximo provador.
+  const [skin, setSkin] = useState(() => skinTone(profile.skinTone).id);
+  const [savingSkin, startSavingSkin] = useTransition();
+  function chooseSkin(id: string) {
+    setSkin(id);
+    startSavingSkin(async () => {
+      await saveSkinToneAction(id);
+    });
+  }
   const body = useMemo(() => ({ ...profile, ...sim }), [profile, sim]);
 
   // Parâmetros do avatar — medidas do usuário (ou as simuladas, em dev)
@@ -399,6 +412,7 @@ export function TryOnExperience({
               view={view}
               autoRotate={autoRotate}
               focus={isAccessory ? "head" : "body"}
+              skin={skin}
               onShots={i === 0 ? onShots : undefined}
             />
             {compareSize && (
@@ -595,6 +609,38 @@ export function TryOnExperience({
             {bodyType === "neutral"
               ? "Corpo unissex"
               : "Não salva no perfil — só nesta tentativa"}
+          </p>
+        </div>
+
+        {/* Tom de pele (lista 11) */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Tom de pele
+          </p>
+          <div className="mt-3 flex gap-2" role="radiogroup" aria-label="Tom de pele">
+            {SKIN_TONES.map((t) => {
+              const active = skin === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={t.name}
+                  title={t.name}
+                  onClick={() => chooseSkin(t.id)}
+                  style={{ backgroundColor: t.color }}
+                  className={`h-8 flex-1 rounded-sm border transition-shadow ${
+                    active
+                      ? "border-foreground ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                      : "border-border hover:border-foreground"
+                  }`}
+                />
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground" aria-live="polite">
+            {savingSkin ? "Salvando…" : "Fica salvo no seu perfil"}
           </p>
         </div>
 

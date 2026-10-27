@@ -95,6 +95,7 @@ export default async function ProvadorPage({
         armLengthCm: profile.armLengthCm,
         legLengthCm: profile.legLengthCm,
         fitPreference: profile.fitPreference,
+        skinTone: profile.skinTone,
       }}
       sizeChart={sizeRows}
       kind={kind}

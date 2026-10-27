@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { skinTone, type SkinTone } from "@/lib/skin-tones";
 
 /**
  * Pele do avatar (provador e prévia).
@@ -8,10 +9,12 @@ import { createContext, useContext } from "react";
  * Antes era um "manequim de gesso" (fosco e cinza). Agora: tom mais quente,
  * um pouco de brilho (pele tem oleosidade, aspereza ~0,5) e um sheen
  * avermelhado nas bordas contra a luz — imita a luz que entra na pele e volta
- * avermelhada (subsurface) sem o custo de um shader de verdade.
+ * avermelhada (subsurface) sem o custo de um shader de verdade. A cor e o
+ * brilho vêm do tom de pele escolhido (`SkinToneContext`).
  */
 
-export const SKIN_COLOR = "#d9bba4";
+/** Tom de pele de quem prova (lista 11); fora do provador, o padrão. */
+export const SkinToneContext = createContext<SkinTone>(skinTone(null));
 
 /**
  * Manequim da página do produto: o mesmo corpo, com acabamento de manequim de
@@ -20,8 +23,9 @@ export const SKIN_COLOR = "#d9bba4";
  */
 export const MannequinFinish = createContext(false);
 
-export function SkinMaterial({ color = SKIN_COLOR }: { color?: string }) {
+export function SkinMaterial({ color }: { color?: string }) {
   const mannequin = useContext(MannequinFinish);
+  const tone = useContext(SkinToneContext);
   if (mannequin) {
     return (
       <meshPhysicalMaterial
@@ -34,12 +38,12 @@ export function SkinMaterial({ color = SKIN_COLOR }: { color?: string }) {
   }
   return (
     <meshPhysicalMaterial
-      color={color}
+      color={color ?? tone.color}
       roughness={0.5}
       specularIntensity={0.35}
       sheen={0.45}
       sheenRoughness={0.55}
-      sheenColor="#e58f73"
+      sheenColor={tone.sheen}
     />
   );
 }
