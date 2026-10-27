@@ -10,6 +10,16 @@ describe("colorToHex", () => {
     assert.equal(colorToHex("LILÁS"), colorToHex("lilas"));
   });
 
+  it("cores da lista 9 e as versões Street / Sport caem na cor base", () => {
+    for (const name of ["Lima", "Índigo", "Azul Céu", "Vinho", "Verde Militar", "Cinza Mescla"])
+      assert.notEqual(colorToHex(name), UNKNOWN_COLOR, name);
+    assert.notEqual(colorToHex("Azul Céu"), colorToHex("Azul"));
+    assert.equal(colorToHex("Preto Street"), colorToHex("Preto"));
+    assert.equal(colorToHex("Cinza Mescla Street"), colorToHex("Cinza Mescla"));
+    assert.equal(colorToHex("Off-white / Lima"), colorToHex("Off-white"));
+    assert.equal(colorToHex("Preto / Lima"), colorToHex("Preto"));
+  });
+
   it("aceita o código da cor", () => {
     assert.equal(colorToHex("#6B1F2A"), "#6b1f2a");
     assert.equal(colorToHex("6b1f2a"), "#6b1f2a");

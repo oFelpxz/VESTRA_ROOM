@@ -42,6 +42,8 @@ const COLOR_HEX: Record<string, string> = {
   "azul bebe": "#a9c8e8",
   "azul royal": "#2849a8",
   "azul petroleo": "#1f4f5a",
+  "azul ceu": "#9cc6e4",
+  indigo: "#2b3560",
   jeans: "#4a6485",
   // verdes
   verde: "#2a7a3a",
@@ -52,6 +54,9 @@ const COLOR_HEX: Record<string, string> = {
   "verde agua": "#8fd1c1",
   "verde bandeira": "#1f8a3a",
   "verde escuro": "#1f4a2a",
+  // lima de tecido: o lima da marca (#C6FF00) num pano fica neon demais
+  lima: "#b8dc2c",
+  "verde lima": "#b8dc2c",
   // vermelhos, rosas, roxos
   vermelho: "#a02a2a",
   vinho: "#5e1a26",
