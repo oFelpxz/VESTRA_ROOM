@@ -13,8 +13,10 @@ test("look com as peças à venda e em estoque entra todo", () => {
   assert.equal(checkLookCart(["a", "b", "c"], [v("a"), v("b"), v("c")], none), null);
 });
 
-test("uma peça só não é look", () => {
+test("uma peça só não é look, salvo o vestido salvo", () => {
   assert.match(checkLookCart(["a"], [v("a")], none)!, /todas as peças/);
+  assert.equal(checkLookCart(["a"], [v("a")], none, 1), null);
+  assert.match(checkLookCart([], [], none, 1)!, /todas as peças/);
 });
 
 test("peça desativada ou que sumiu barra o look inteiro", () => {

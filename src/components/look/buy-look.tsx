@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { addLookToCartAction, type CartActionState } from "@/lib/cart-actions";
+import { addLookPiecesToCartAction, type LookFormState } from "@/lib/look-actions";
 import { brandLookTotal } from "@/lib/brand-looks";
 import { formatBRL } from "@/lib/format";
 
-const initialState: CartActionState = {};
+const initialState: LookFormState = {};
 
 /** Peça do look para a sacola: a variação escolhida (null = falta cor ou tamanho). */
 export type BuyLookPiece = {
@@ -24,7 +24,7 @@ export type BuyLookPiece = {
  * servidor confere de novo o estoque e só põe se todas couberem.
  */
 export function BuyLook({ pieces }: { pieces: BuyLookPiece[] }) {
-  const [state, formAction, pending] = useActionState(addLookToCartAction, initialState);
+  const [state, formAction, pending] = useActionState(addLookPiecesToCartAction, initialState);
   const missing = pieces.find((p) => !p.variantId);
   const soldOut = pieces.find((p) => p.variantId && p.stockQuantity < 1);
   const blocked = missing

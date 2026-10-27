@@ -25,14 +25,16 @@ export function lookCartIds(raw: unknown[]): string[] {
 
 /**
  * Confere o look antes de pôr na sacola. Devolve a mensagem do primeiro
- * problema, ou null quando todas as peças podem entrar.
+ * problema, ou null quando todas as peças podem entrar. `minPieces` é 1 só
+ * para o vestido salvo sem acessório (o vestido é o look inteiro).
  */
 export function checkLookCart(
   ids: string[],
   variants: LookCartVariant[],
   inCart: ReadonlyMap<string, number>,
+  minPieces = 2,
 ): string | null {
-  if (ids.length < 2) return "Escolha cor e tamanho de todas as peças do look.";
+  if (ids.length < minPieces || ids.length === 0) return "Escolha cor e tamanho de todas as peças do look.";
   for (const id of ids) {
     const v = variants.find((x) => x.id === id);
     if (!v || !v.active) return v ? `${v.label} está indisponível.` : "Uma peça do look está indisponível.";

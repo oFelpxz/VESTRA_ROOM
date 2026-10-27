@@ -5,6 +5,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { garmentKind } from "@/lib/fit-regions";
 import { ACCESSORY_CATEGORY, lookRoles, MAX_LOOKS, parseLookName, parseLookPhoto } from "@/lib/looks";
+import { lookCartIds } from "@/lib/look-cart";
+import { putLookInCart } from "@/lib/look-cart-db";
 
 export type LookFormState = {
   error?: string;
@@ -126,64 +128,39 @@ export async function addLookToCartAction(
   const id = String(formData.get("id") ?? "");
   const look = await prisma.savedLook.findFirst({
     where: { id, userId },
-    include: {
-      topVariant: { include: { product: true } },
-      bottomVariant: { include: { product: true } },
-      accessoryVariant: { include: { product: true } },
-    },
+    select: { topVariantId: true, bottomVariantId: true, accessoryVariantId: true },
   });
   if (!look) return { error: "Look não encontrado." };
-
-  // Vestido: a mesma peça nos dois lugares entra uma vez só.
-  const pieces =
-    look.topVariantId === look.bottomVariantId
-      ? [look.topVariant]
-      : [look.topVariant, look.bottomVariant];
-  if (pieces.some((v) => v == null)) {
+  // Peça que saiu da loja deixa o lugar vazio no look salvo.
+  if (!look.topVariantId || !look.bottomVariantId) {
     return { error: "Uma das peças do look saiu da loja. Monte o look de novo no provador." };
   }
-  if (look.accessoryVariant) pieces.push(look.accessoryVariant);
-
-  const cart =
-    (await prisma.cart.findFirst({ where: { userId, status: "ACTIVE" } })) ??
-    (await prisma.cart.create({ data: { userId } }));
-
-  try {
-    await prisma.$transaction(async (tx) => {
-      for (const v of pieces) {
-        const variant = v!;
-        const label = `${variant.product.name} (${variant.color}, ${variant.size})`;
-        if (variant.status !== "ACTIVE" || variant.product.status !== "ACTIVE") {
-          throw new LookCartError(`${label} não está mais à venda.`);
-        }
-        const existing = await tx.cartItem.findUnique({
-          where: { cartId_productVariantId: { cartId: cart.id, productVariantId: variant.id } },
-        });
-        const quantity = (existing?.quantity ?? 0) + 1;
-        if (quantity > variant.stockQuantity) {
-          throw new LookCartError(
-            variant.stockQuantity === 0
-              ? `${label} está sem estoque.`
-              : `${label}: a sacola já tem o máximo do estoque.`,
-          );
-        }
-        // Mesmo preço da página do produto (ver addToCartAction).
-        const unitPrice =
-          variant.product.promotionalPrice ?? variant.price ?? variant.product.basePrice;
-        await tx.cartItem.upsert({
-          where: { cartId_productVariantId: { cartId: cart.id, productVariantId: variant.id } },
-          update: { quantity, unitPrice },
-          create: { cartId: cart.id, productVariantId: variant.id, quantity, unitPrice },
-        });
-      }
-    });
-  } catch (e) {
-    if (e instanceof LookCartError) return { error: e.message };
-    throw e;
-  }
+  // Vestido: a mesma peça nos dois lugares entra uma vez só (lookCartIds).
+  const ids = lookCartIds([look.topVariantId, look.bottomVariantId, look.accessoryVariantId]);
+  // O vestido sem acessório é uma peça só, e é o look inteiro.
+  const error = await putLookInCart(userId, ids, 1);
+  if (error) return { error };
 
   revalidatePath("/", "layout");
   return { success: true };
 }
 
-class LookCartError extends Error {}
+/**
+ * "Comprar o look todo" no provador (lista 10, item 8): as peças vestidas no
+ * avatar, com a cor e o tamanho escolhidos, todas ou nenhuma.
+ *
+ * formData: productVariantId (repetido, uma por peça).
+ */
+export async function addLookPiecesToCartAction(
+  _prev: LookFormState,
+  formData: FormData,
+): Promise<LookFormState> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Faça login para adicionar à sacola." };
+
+  const error = await putLookInCart(session.user.id, lookCartIds(formData.getAll("productVariantId")));
+  if (error) return { error };
+
+  revalidatePath("/", "layout");
+  return { success: true };
+}

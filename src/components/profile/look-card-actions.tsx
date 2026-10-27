@@ -42,7 +42,7 @@ export function LookCardActions({
             disabled={adding || !canAdd}
             className="inline-flex h-10 items-center justify-center rounded-sm bg-foreground px-4 text-[11px] font-semibold uppercase tracking-[0.15em] text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {adding ? "Adicionando..." : "Adicionar o look à sacola"}
+            {adding ? "Adicionando..." : "Comprar o look todo"}
           </button>
         </form>
         <form
@@ -65,7 +65,7 @@ export function LookCardActions({
       )}
       {state.success && (
         <p className="rounded-sm bg-acid/20 px-3 py-2 text-sm">
-          As duas peças foram para a sacola.{" "}
+          O look foi para a sacola.{" "}
           <Link href="/carrinho" className="font-semibold underline">
             Ver sacola
           </Link>

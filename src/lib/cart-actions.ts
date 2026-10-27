@@ -5,7 +5,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { parseShippingMethod } from "@/lib/shipping";
 import { evaluateCoupon, normalizeCouponCode, toCouponLike } from "@/lib/coupons";
-import { checkLookCart, lookCartIds } from "@/lib/look-cart";
 
 export type CartActionState = {
   error?: string;
@@ -94,62 +93,6 @@ export async function addToCartAction(
       unitPrice,
     },
   });
-
-  revalidatePath("/", "layout");
-  return { success: true };
-}
-
-/**
- * "Comprar o look todo" (lista 10): uma unidade de cada peça do look, todas
- * juntas ou nenhuma. Cada peça pelo próprio preço (sem desconto de look).
- *
- * formData: productVariantId (repetido, uma por peça).
- */
-export async function addLookToCartAction(
-  _prev: CartActionState,
-  formData: FormData,
-): Promise<CartActionState> {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return { error: "Faça login para adicionar à sacola." };
-  }
-  const userId = session.user.id;
-
-  const ids = lookCartIds(formData.getAll("productVariantId"));
-  const variants = await prisma.productVariant.findMany({
-    where: { id: { in: ids } },
-    include: { product: true },
-  });
-  const cart = await getOrCreateActiveCart(userId);
-  const items = await prisma.cartItem.findMany({
-    where: { cartId: cart.id, productVariantId: { in: ids } },
-  });
-  const inCart = new Map(items.map((i) => [i.productVariantId, i.quantity]));
-
-  const error = checkLookCart(
-    ids,
-    variants.map((v) => ({
-      id: v.id,
-      active: v.status === "ACTIVE" && v.product.status === "ACTIVE",
-      stockQuantity: v.stockQuantity,
-      label: `${v.product.name} (${v.color}, ${v.size})`,
-    })),
-    inCart,
-  );
-  if (error) return { error };
-
-  // Mesmo preço do "Adicionar à sacola": promocional, senão o da variação ou o cheio.
-  await prisma.$transaction(
-    variants.map((v) => {
-      const quantity = (inCart.get(v.id) ?? 0) + 1;
-      const unitPrice = v.product.promotionalPrice ?? v.price ?? v.product.basePrice;
-      return prisma.cartItem.upsert({
-        where: { cartId_productVariantId: { cartId: cart.id, productVariantId: v.id } },
-        update: { quantity, unitPrice },
-        create: { cartId: cart.id, productVariantId: v.id, quantity, unitPrice },
-      });
-    }),
-  );
 
   revalidatePath("/", "layout");
   return { success: true };
