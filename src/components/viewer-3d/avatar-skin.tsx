@@ -5,12 +5,13 @@ import * as THREE from "three";
 import { findEyeSockets, placeEyes, type EyeSocket } from "@/lib/eye-sockets";
 import { hairHeight, hairMask, hairShell } from "@/lib/hair";
 import { surfaceCavity } from "@/lib/skin-cavity";
+import { weldedNormals } from "@/lib/welded-normals";
 import { HairMaterial, SkinMaterial } from "./skin-material";
 
 /**
  * Pele do cliente no provador: o corpo com as medidas (sombra nas dobras,
  * lista 11 item 3), os globos dos olhos, da cor da pele (item 4), e o cabelo
- * (item 5).
+ * (item 5). Normais lisas nas costuras do corpo base (item 6).
  */
 
 /** Corte de quem prova (id de `HAIR_STYLES`); "none" com touca e no manequim. */
@@ -44,7 +45,7 @@ export function AvatarSkin({
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     g.setIndex(index);
-    g.computeVertexNormals();
+    g.setAttribute("normal", new THREE.BufferAttribute(weldedNormals(positions, index), 3));
     const cavity = surfaceCavity(positions, index, g.getAttribute("normal").array);
     g.setAttribute("skinCavity", new THREE.BufferAttribute(cavity, 1));
     if (above) g.setAttribute("hairMask", new THREE.BufferAttribute(hairMask(above), 1));

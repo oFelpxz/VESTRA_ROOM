@@ -222,7 +222,11 @@ Antes o avatar ficava descalço. `tenis.py` faz o tênis a partir dos próprios
 pés do `avatar_base.glb`: casco convexo de cada pé até o tornozelo (com
 volume extra na biqueira), remesh, folga de 6 mm da pele, boca num plano
 inclinado (mais baixa no calcanhar) e sola de 2,4 cm um pouco mais larga.
-Duas malhas: "Cabedal" (lona, com pesponto) e "Sola" (borracha lisa).
+Atrás da biqueira o cabedal desce até o peito do pé e a folga cai para
+2,5 mm na gola (o casco puro ficava um tamanco); a gola tem a borda virada
+para dentro e, na frente, a língua sobe 1,4 cm acima da boca. Três malhas:
+"Cabedal" (lona, com pesponto nas bordas), "Sola" (sola e biqueira de
+borracha) e "Cadarco" (cinco passadas sobre o peito do pé, sem pesponto).
 Marcas `vestra_fit = "avatar_base"` e `vestra_peca = "calcado"`: no site o
 tênis segue a pele dos pés do corpo do cliente (`Shoes` em
 `bottom-garment.tsx`) e entra em todo look do provador.

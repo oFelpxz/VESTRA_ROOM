@@ -148,8 +148,8 @@ export function BottomGarment({
 
 /**
  * Tênis do avatar: preso à pele dos pés como as peças de baixo (sem folga de
- * tamanho). Cabedal de lona (tecido, com pesponto na boca e na sola) e sola
- * de borracha lisa.
+ * tamanho). Cabedal de lona (tecido, com pesponto nas bordas), sola e
+ * biqueira de borracha lisa e cadarço (sem pesponto).
  */
 export function Shoes({ params }: { params: AvatarParams }) {
   const { parts, positions } = useFittedShoes(params);
@@ -167,10 +167,10 @@ export function Shoes({ params }: { params: AvatarParams }) {
   const materials = useMemo(
     () =>
       parts.map((p): THREE.Material =>
-        p.material.name === "Sola"
+        p.material.name === "Sola" || p.material.name === "Cadarco"
           ? new THREE.MeshStandardMaterial({
               color: (p.material as THREE.MeshStandardMaterial).color,
-              roughness: 0.65,
+              roughness: p.material.name === "Sola" ? 0.65 : 0.85,
             })
           : clothMaterial(p.material, undefined, p.fabric, null, lite),
       ),
