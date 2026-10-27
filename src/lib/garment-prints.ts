@@ -1,7 +1,8 @@
 /**
  * Onde vai o logo A1 em cada peça (lista 9). A versão vem do nome da cor
  * cadastrada: "Preto Street" = linha Street (logo grande nas costas e pequeno
- * no peito); "Preto / Lima" = linha Sport (faixa lima). Os outros nomes
+ * no peito); "Preto / Lima" = linha Sport (logo no peito e faixa lima nas
+ * mangas). Os outros nomes
  * ("Preto", "Verde Militar") são a peça lisa.
  *
  * Medidas em metros, no corpo de referência (avatar_base, de frente para +z):
@@ -50,15 +51,36 @@ const SPOTS: Record<string, Partial<Record<GarmentLook, PrintSpot[]>>> = {
       { kind: "costas", center: [0, 1.335], width: 0.18, side: "costas" },
     ],
   },
-  // Linha Sport: só o logo do peito aqui; a faixa das mangas é outra coisa.
+  // Linha Sport: só o logo do peito; a faixa das mangas está em STRIPES.
   track_jacket: {
     sport: [{ kind: "peito", center: [0.1, 1.3], width: 0.09, side: "frente" }],
   },
 };
 
+/** Faixa de manga: linha de fora da manga do lado +x, do ombro ao punho. */
+export type StripeSpot = {
+  from: [number, number, number];
+  to: [number, number, number];
+  width: number;
+};
+
+const STRIPES: Record<string, Partial<Record<GarmentLook, StripeSpot>>> = {
+  // Medida no arquivo: o ponto mais de fora da manga em cada altura.
+  track_jacket: { sport: { from: [0.2, 1.42, 0.005], to: [0.465, 0.94, 0.08], width: 0.024 } },
+};
+
+function modelFile(modelUrl: string) {
+  return modelUrl.match(/([^/?#]+)\.glb(?:[?#]|$)/i)?.[1];
+}
+
 /** Estampas da peça `modelUrl` na versão `look` (vazio = peça lisa). */
 export function printSpots(modelUrl: string, look: GarmentLook | null): PrintSpot[] {
-  if (!look) return [];
-  const file = modelUrl.match(/([^/?#]+)\.glb(?:[?#]|$)/i)?.[1];
-  return (file && SPOTS[file]?.[look]) || [];
+  const file = modelFile(modelUrl);
+  return (look && file && SPOTS[file]?.[look]) || [];
+}
+
+/** Faixa das mangas da peça na versão `look`, se tiver. */
+export function stripeSpot(modelUrl: string, look: GarmentLook | null): StripeSpot | null {
+  const file = modelFile(modelUrl);
+  return (look && file && STRIPES[file]?.[look]) || null;
 }

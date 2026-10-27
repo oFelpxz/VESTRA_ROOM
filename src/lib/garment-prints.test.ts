@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { lookOf, printSpots } from "./garment-prints";
+import { lookOf, printSpots, stripeSpot } from "./garment-prints";
 
 describe("estampas por versão da peça", () => {
   it("a versão sai do nome da cor", () => {
@@ -29,6 +29,16 @@ describe("estampas por versão da peça", () => {
     const spots = printSpots("/models/track_jacket.glb", "sport");
     assert.deepEqual(spots.map((s) => s.kind), ["peito"]);
     assert.deepEqual(printSpots("/models/track_jacket.glb", "street"), []);
+  });
+
+  it("faixa lima só nas mangas da track jacket Sport", () => {
+    const stripe = stripeSpot("/models/track_jacket.glb", "sport");
+    assert.ok(stripe && stripe.from[1] > stripe.to[1], "desce do ombro ao punho");
+    assert.ok(stripe.from[0] > 0 && stripe.to[0] > stripe.from[0], "lado +x, abrindo para fora");
+    assert.equal(stripeSpot("/models/track_jacket.glb", "street"), null);
+    assert.equal(stripeSpot("/models/track_jacket.glb", null), null);
+    assert.equal(stripeSpot("/models/hoodie-core-v3.glb", "street"), null);
+    assert.equal(stripeSpot("/models/cargo_pant_02.glb", "sport"), null);
   });
 
   it("acha o arquivo também numa URL completa", () => {

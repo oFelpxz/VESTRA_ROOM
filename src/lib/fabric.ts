@@ -18,8 +18,9 @@ import { EDGE_CAP, fabricEdgeAttribute } from "./fabric-edge";
  *   dobrada e pesponto tracejado — dourado no jeans.
  * - Dobras de caimento (`Wrinkle`): só na luz (a malha não muda) — em pé na
  *   camiseta, saia e vestido; deitadas na calça, juntando na barra.
- * - Estampas (`PrintDecal`): imagem presa na posição original do pano
- *   (`addFabricRest`), então acompanha a peça em qualquer corpo.
+ * - Estampas (`PrintDecal`): imagem ou faixa de manga presa na posição
+ *   original do pano (`addFabricRest`), então acompanha a peça em qualquer
+ *   corpo.
  *
  * A cor escolhida entra como no `tintMaterial` (`garment-color.ts`).
  */
@@ -137,7 +138,7 @@ const STITCH_LENGTH = 0.0045;
  * referência (avatar_base, em metros; frente = +z). Vista de frente, o lado
  * direito da tela é +x; nas costas a imagem é espelhada para ler certo.
  */
-export type PrintDecal = {
+export type ImageDecal = {
   image: THREE.Texture;
   /** Centro da estampa (x, y), em metros. */
   center: [number, number];
@@ -145,6 +146,25 @@ export type PrintDecal = {
   size: [number, number];
   side: "frente" | "costas";
 };
+
+/**
+ * Faixa reta pelo lado de fora das duas mangas (track jacket). `from`→`to` é
+ * a linha de fora da manga do lado +x, do ombro ao punho, no corpo de
+ * referência; a outra manga é o espelho.
+ */
+export type SleeveStripe = {
+  color: string;
+  from: [number, number, number];
+  to: [number, number, number];
+  /** Largura da faixa (m). */
+  width: number;
+};
+
+export type PrintDecal = ImageDecal | SleeveStripe;
+
+// Lado de fora da manga: o lado de dentro e o corpo ficam a mais que isso
+// para dentro da linha da faixa (m).
+const STRIPE_DEPTH = 0.04;
 
 /** Quantas estampas cabem numa parte da peça (frente + costas). */
 const PRINT_SLOTS = 2;
@@ -204,6 +224,28 @@ vec4 fabricPrint( sampler2D map, vec4 rect, float side, vec3 fn ) {
   vec4 ink = texture2D( map, uv );
   ink.a *= smoothstep( 0.15, 0.45, side * fn.z );
   return ink;
+}
+#endif
+
+#ifdef FABRIC_STRIPE
+uniform vec3 stripeFrom;
+uniform vec3 stripeAlong;
+uniform vec3 stripeAcross;
+uniform vec3 stripeOut;
+uniform vec3 stripeColor;
+uniform float stripeHalf;
+
+// Cobertura da faixa da manga: fatia fina em volta da linha de fora da
+// manga, só perto dela (o lado de dentro e o corpo ficam mais para dentro).
+float fabricStripe() {
+  vec3 v = vec3( abs( vFabricRest.x ), vFabricRest.yz ) - stripeFrom;
+  float t = dot( v, stripeAlong );
+  float across = abs( dot( v, stripeAcross ) );
+  float aa = fwidth( across ) + 1e-5;
+  float band = 1.0 - smoothstep( stripeHalf - aa, stripeHalf + aa, across );
+  float outer = smoothstep( -${STRIPE_DEPTH.toFixed(3)}, -${(STRIPE_DEPTH * 0.6).toFixed(3)}, dot( v, stripeOut ) );
+  float along = smoothstep( 0.0, 0.02, t ) * ( 1.0 - smoothstep( 0.98, 1.0, t ) );
+  return band * outer * along;
 }
 #endif
 
@@ -281,6 +323,9 @@ const FRAGMENT_BODY = /* glsl */ `
     vec4 ink1 = fabricPrint( printMap1, printRect1, printSide1, fn );
     diffuseColor.rgb = mix( diffuseColor.rgb, ink0.rgb, ink0.a * 0.95 );
     diffuseColor.rgb = mix( diffuseColor.rgb, ink1.rgb, ink1.a * 0.95 );
+#ifdef FABRIC_STRIPE
+    diffuseColor.rgb = mix( diffuseColor.rgb, stripeColor, fabricStripe() * 0.95 );
+#endif
   }
 #endif
 
@@ -322,7 +367,8 @@ const FRAGMENT_BODY = /* glsl */ `
  * Material de tecido na cor escolhida, a partir do material do arquivo.
  * Quem chama libera com `dispose()` (a textura da trama é dividida e fica).
  * `lite` (modo leve, `render-quality.ts`): sem dobras, barra e pesponto.
- * `prints`: até 2 estampas; a malha precisa do `addFabricRest`.
+ * `prints`: até 2 imagens e uma faixa de manga; a malha precisa do
+ * `addFabricRest`.
  */
 export function clothMaterial(
   source: THREE.Material,
@@ -340,6 +386,8 @@ export function clothMaterial(
     return m;
   }
   const look = FABRIC_LOOK[fabric];
+  const images = prints.filter((p): p is ImageDecal => "image" in p);
+  const stripe = prints.find((p): p is SleeveStripe => !("image" in p));
   if (color) m.color.set(color);
   // Tecido preto de verdade ainda devolve ~4% da luz: sem esse piso a peça
   // vira um recorte chapado e some a trama e as dobras.
@@ -377,7 +425,7 @@ export function clothMaterial(
       },
     });
     for (let i = 0; i < PRINT_SLOTS; i++) {
-      const p = prints[i];
+      const p = images[i];
       Object.assign(shader.uniforms, {
         [`printMap${i}`]: { value: p?.image ?? blankPrintTexture() },
         [`printRect${i}`]: {
@@ -388,6 +436,7 @@ export function clothMaterial(
         [`printSide${i}`]: { value: p?.side === "costas" ? -1 : 1 },
       });
     }
+    if (stripe) Object.assign(shader.uniforms, stripeUniforms(stripe));
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>${VERTEX_DECL}`)
       .replace(
@@ -399,13 +448,35 @@ export function clothMaterial(
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>${FRAGMENT_BODY}`);
   };
   // O código do shader muda só com o ajuste da cor, o modo leve e ter ou não
-  // estampa; o resto são uniforms.
+  // estampa e faixa; o resto são uniforms.
   if (lite) m.defines = { ...m.defines, FABRIC_LITE: "" };
   const printed = prints.length > 0;
   if (printed) m.defines = { ...m.defines, FABRIC_PRINT: "" };
+  if (stripe) m.defines = { ...m.defines, FABRIC_STRIPE: "" };
   m.customProgramCacheKey = () =>
-    `vestra-fabric-${mean != null ? 1 : 0}${lite ? "-lite" : ""}${printed ? "-print" : ""}`;
+    `vestra-fabric-${mean != null ? 1 : 0}${lite ? "-lite" : ""}${printed ? "-print" : ""}${stripe ? "-stripe" : ""}`;
   return m;
+}
+
+/**
+ * Eixos da faixa: `stripeAlong` dá 0 no ombro e 1 no punho; `stripeOut`
+ * aponta para fora da manga (perpendicular a ela, do lado do ombro);
+ * `stripeAcross` mede a largura.
+ */
+function stripeUniforms(s: SleeveStripe) {
+  const from = new THREE.Vector3(...s.from);
+  const d = new THREE.Vector3(...s.to).sub(from);
+  const out = new THREE.Vector3(-d.y, d.x, 0);
+  if (out.x < 0) out.negate();
+  out.addScaledVector(d, -out.dot(d) / d.lengthSq()).normalize();
+  return {
+    stripeFrom: { value: from },
+    stripeAlong: { value: d.clone().divideScalar(d.lengthSq()) },
+    stripeAcross: { value: new THREE.Vector3().crossVectors(d, out).normalize() },
+    stripeOut: { value: out },
+    stripeColor: { value: new THREE.Color(s.color) },
+    stripeHalf: { value: s.width / 2 },
+  };
 }
 
 /**
