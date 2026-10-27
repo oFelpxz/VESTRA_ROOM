@@ -192,6 +192,8 @@ model MeasurementProfile {
   fitPreference FitPreference @default(REGULAR)
   /// Tom de pele do avatar (id de `SKIN_TONES`, ex. "t3"); null = o padrão.
   skinTone      String?
+  /// Corte de cabelo do avatar (id de `HAIR_STYLES`: none, raspado, curto); null = o padrão.
+  hairStyle     String?
   acceptedTerms Boolean       @default(false)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

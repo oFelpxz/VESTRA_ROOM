@@ -32,6 +32,7 @@ export async function GET() {
           legLengthCm: true,
           fitPreference: true,
           skinTone: true,
+          hairStyle: true,
           acceptedTerms: true,
           updatedAt: true,
         },

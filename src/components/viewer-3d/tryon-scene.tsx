@@ -23,6 +23,8 @@ import { BareAvatar, BottomGarment, Shoes, hemHeight } from "./bottom-garment";
 import { LiteContext } from "./lite-context";
 import { MannequinFinish, SkinToneContext } from "./skin-material";
 import { skinTone } from "@/lib/skin-tones";
+import { hairStyle } from "@/lib/hair";
+import { HairContext } from "./avatar-skin";
 import { StudioAO } from "./studio-ao";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
@@ -266,10 +268,10 @@ export function Outfit({
   // Provador do próprio acessório: o corpo sem roupa com ele na cabeça.
   if (isAccessoryPiece(pieceScene)) {
     return (
-      <>
+      <HairContext.Provider value="none">
         <BareAvatar params={params} />
         <Accessory params={params} piece={piece} />
-      </>
+      </HairContext.Provider>
     );
   }
   return (
@@ -488,6 +490,7 @@ export function TryOnScene({
   focus = "body",
   mannequin = false,
   skin = null,
+  hair = null,
   onShots,
 }: {
   avatarParams: AvatarParams;
@@ -506,11 +509,14 @@ export function TryOnScene({
   mannequin?: boolean;
   /** Tom de pele de quem prova (id de `SKIN_TONES`); null = o padrão. */
   skin?: string | null;
+  /** Corte de cabelo (id de `HAIR_STYLES`); null = o padrão. Some com touca e no manequim. */
+  hair?: string | null;
   /** Recebe a função que tira as fotos de frente e de costas. */
   onShots?: (take: LookShots) => void;
 }) {
   const head = focus === "head";
   const tone = useMemo(() => skinTone(skin), [skin]);
+  const cut = mannequin || accessory ? "none" : hairStyle(hair).id;
   const headY = avatarParams.anchors.head.y;
   const home = useMemo(
     () =>
@@ -547,6 +553,7 @@ export function TryOnScene({
       <LiteContext.Provider value={lite}>
       <MannequinFinish.Provider value={mannequin}>
       <SkinToneContext.Provider value={tone}>
+      <HairContext.Provider value={cut}>
       <Suspense fallback={<Loader />}>
         {top || bottom ? (
           <Outfit params={avatarParams} top={top} bottom={bottom} primary={primary} />
@@ -571,6 +578,7 @@ export function TryOnScene({
           />
         )}
       </Suspense>
+      </HairContext.Provider>
       </SkinToneContext.Provider>
       </MannequinFinish.Provider>
       </LiteContext.Provider>

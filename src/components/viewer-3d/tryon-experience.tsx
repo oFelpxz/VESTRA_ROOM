@@ -18,7 +18,8 @@ import {
 } from "@/lib/avatar-builder";
 import { colorToHex } from "@/lib/color-names";
 import { SKIN_TONES, skinTone } from "@/lib/skin-tones";
-import { saveSkinToneAction } from "@/lib/measurement-actions";
+import { HAIR_STYLES, hairStyle } from "@/lib/hair";
+import { saveHairStyleAction, saveSkinToneAction } from "@/lib/measurement-actions";
 import { lookOf } from "@/lib/garment-prints";
 import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
 import { bottomEase, bottomLength } from "@/lib/bottom-fit";
@@ -66,6 +67,8 @@ type UserProfile = {
   fitPreference: FitPreference;
   /** Tom de pele salvo (id de `SKIN_TONES`); null = o padrão. */
   skinTone: string | null;
+  /** Corte de cabelo salvo (id de `HAIR_STYLES`); null = o padrão. */
+  hairStyle: string | null;
 };
 
 // Só em desenvolvimento: simular outros corpos sem mexer no perfil salvo.
@@ -180,6 +183,15 @@ export function TryOnExperience({
     setSkin(id);
     startSavingSkin(async () => {
       await saveSkinToneAction(id);
+    });
+  }
+  // Cabelo: igual ao tom de pele.
+  const [hair, setHair] = useState(() => hairStyle(profile.hairStyle).id);
+  const [savingHair, startSavingHair] = useTransition();
+  function chooseHair(id: string) {
+    setHair(id);
+    startSavingHair(async () => {
+      await saveHairStyleAction(id);
     });
   }
   const body = useMemo(() => ({ ...profile, ...sim }), [profile, sim]);
@@ -413,6 +425,7 @@ export function TryOnExperience({
               autoRotate={autoRotate}
               focus={isAccessory ? "head" : "body"}
               skin={skin}
+              hair={hair}
               onShots={i === 0 ? onShots : undefined}
             />
             {compareSize && (
@@ -641,6 +654,37 @@ export function TryOnExperience({
           </div>
           <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground" aria-live="polite">
             {savingSkin ? "Salvando…" : "Fica salvo no seu perfil"}
+          </p>
+        </div>
+
+        {/* Cabelo (lista 11) */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Cabelo
+          </p>
+          <div className="mt-3 flex gap-2" role="radiogroup" aria-label="Cabelo">
+            {HAIR_STYLES.map((h) => {
+              const active = hair === h.id;
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => chooseHair(h.id)}
+                  className={`h-8 flex-1 rounded-sm border text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+                    active
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border hover:border-foreground"
+                  }`}
+                >
+                  {h.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground" aria-live="polite">
+            {savingHair ? "Salvando…" : accessoryPiece ? "Fica escondido pela touca" : "Fica salvo no seu perfil"}
           </p>
         </div>
 
