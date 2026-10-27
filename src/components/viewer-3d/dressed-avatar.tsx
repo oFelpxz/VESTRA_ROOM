@@ -21,6 +21,7 @@ import { dropInnerPieces, duplicateLayers, type Skin } from "@/lib/garment-layer
 import { addFabricEdge, addFabricRest, clothMaterial, fabricOf, type PrintDecal } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import type { GarmentLook } from "@/lib/garment-prints";
+import { surfaceCavity } from "@/lib/skin-cavity";
 import { readMorphBody } from "./avatar";
 import { useGarmentPrints } from "./brand-logo-canvas";
 import { AVATAR_URL } from "./avatar-url";
@@ -236,6 +237,8 @@ function FittedAvatar({
     g.setAttribute("position", new THREE.BufferAttribute(fitted.body, 3));
     g.setIndex(index);
     g.computeVertexNormals();
+    const cavity = surfaceCavity(fitted.body, index, g.getAttribute("normal").array);
+    g.setAttribute("skinCavity", new THREE.BufferAttribute(cavity, 1));
     return g;
   }, [fitted, index]);
 
@@ -286,7 +289,7 @@ function FittedAvatar({
   return (
     <group>
       <mesh geometry={bodyGeometry} castShadow receiveShadow>
-        <SkinMaterial />
+        <SkinMaterial folds />
       </mesh>
       {clothGeometries.map((g, i) => (
         <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
