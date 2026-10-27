@@ -11,7 +11,7 @@ import { printSpots, stripeSpot, type GarmentLook } from "@/lib/garment-prints";
 const marker = Permanent_Marker({ weight: "400", subsets: ["latin"], display: "block" });
 const jost = Jost({ weight: "400", subsets: ["latin"], display: "block" });
 
-const FONTS = { script: marker.style.fontFamily, label: jost.style.fontFamily };
+export const FONTS = { script: marker.style.fontFamily, label: jost.style.fontFamily };
 
 let ready: Promise<unknown> | null = null;
 

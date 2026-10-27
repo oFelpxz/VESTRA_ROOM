@@ -22,7 +22,8 @@ import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
 import { bottomEase, bottomLength } from "@/lib/bottom-fit";
 import type { LookProduct, OpenLook } from "@/lib/look-data";
 import { ColorLabel, LookLegend } from "@/components/product/color-swatch";
-import { TryOnScene, type CameraView, type ScenePiece } from "./tryon-scene";
+import { TryOnScene, type CameraView, type LookShots, type ScenePiece } from "./tryon-scene";
+import { composeLookPhoto } from "@/components/look/look-photo-canvas";
 import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
 import { LookBuilder, type LookSelection } from "./look-builder";
 import type { BrandLookStart } from "@/lib/brand-looks";
@@ -256,11 +257,17 @@ export function TryOnExperience({
   const [view, setView] = useState<{ name: CameraView; n: number } | null>(null);
   const [autoRotate, setAutoRotate] = useState(false);
   const sceneRef = useRef<HTMLDivElement>(null);
-  function downloadPhoto() {
+  // Item 9 (lista 10): frente + costas, logo A1 e a lista de peças numa foto.
+  const shotsRef = useRef<LookShots | null>(null);
+  const onShots = useCallback((take: LookShots) => {
+    shotsRef.current = take;
+  }, []);
+  async function downloadPhoto() {
     const canvas = sceneRef.current?.querySelector("canvas");
     if (!canvas) return;
+    const shots = shotsRef.current?.();
     const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
+    a.href = shots ? await composeLookPhoto(shots, lookPieces) : canvas.toDataURL("image/png");
     const name = [productName, companionSel?.product.name, accessorySel?.product.name]
       .filter(Boolean)
       .join(" + ");
@@ -326,30 +333,28 @@ export function TryOnExperience({
   );
 
   // Item 8 (lista 10): o look vestido no avatar vai inteiro para a sacola.
-  const lookPieces = useMemo((): BuyLookPiece[] => {
-    const piece = (sel: LookSelection | null): BuyLookPiece[] => {
-      if (!sel) return [];
-      const v = sel.product.variants.find((x) => x.color === sel.color && x.size === sel.size);
-      return [
-        {
-          variantId: v?.id ?? null,
-          label: `${sel.product.name} (${[sel.color, sel.size].filter(Boolean).join(", ")})`,
-          price: sel.product.priceValue,
-          stockQuantity: v?.stockQuantity ?? 0,
-        },
-      ];
-    };
+  const lookPiece = (sel: LookSelection | null): BuyLookPiece[] => {
+    if (!sel) return [];
+    const v = sel.product.variants.find((x) => x.color === sel.color && x.size === sel.size);
     return [
       {
-        variantId: lookOwnVariant?.id ?? null,
-        label: `${productName} (${[selectedColor, selectedSize].filter(Boolean).join(", ")})`,
-        price: priceValue,
-        stockQuantity: lookOwnVariant?.stockQuantity ?? 0,
+        variantId: v?.id ?? null,
+        label: `${sel.product.name} (${[sel.color, sel.size].filter(Boolean).join(", ")})`,
+        price: sel.product.priceValue,
+        stockQuantity: v?.stockQuantity ?? 0,
       },
-      ...piece(companionSel),
-      ...piece(accessorySel),
     ];
-  }, [lookOwnVariant, productName, selectedColor, selectedSize, priceValue, companionSel, accessorySel]);
+  };
+  const lookPieces: BuyLookPiece[] = [
+    {
+      variantId: lookOwnVariant?.id ?? null,
+      label: `${productName} (${[selectedColor, selectedSize].filter(Boolean).join(", ")})`,
+      price: priceValue,
+      stockQuantity: lookOwnVariant?.stockQuantity ?? 0,
+    },
+    ...lookPiece(companionSel),
+    ...lookPiece(accessorySel),
+  ];
 
   const colorAvailable = (color: string) =>
     variants.some((v) => v.color === color && v.stockQuantity > 0);
@@ -394,6 +399,7 @@ export function TryOnExperience({
               view={view}
               autoRotate={autoRotate}
               focus={isAccessory ? "head" : "body"}
+              onShots={i === 0 ? onShots : undefined}
             />
             {compareSize && (
               <div className={`pointer-events-none absolute left-1/2 flex ${i === 0 ? "top-12" : "top-3 md:top-12"} -translate-x-1/2 items-center gap-2 rounded-sm bg-background/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.15em]`}>

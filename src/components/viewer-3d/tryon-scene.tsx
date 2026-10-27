@@ -414,6 +414,54 @@ function CameraRig({
   return null;
 }
 
+/** Fotos do avatar de frente e de costas, na distância do começo. */
+export type LookShots = () => { front: HTMLCanvasElement; back: HTMLCanvasElement } | null;
+
+/**
+ * Entrega `take` para a foto do look (lista 10): leva a câmera para a frente
+ * e para as costas, desenha cada uma e copia a imagem, e devolve a câmera
+ * onde estava, tudo entre dois quadros (quem olha não vê a câmera pular).
+ */
+function ShotTaker({
+  home,
+  onShots,
+}: {
+  home: { y: number; dist: number; targetY: number };
+  onShots: (take: LookShots) => void;
+}) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  const controls = useThree((s) => s.controls) as unknown as Controls | null;
+  useEffect(() => {
+    onShots(() => {
+      const canvas = gl.domElement;
+      if (!canvas.width) return null;
+      const pos = camera.position.clone();
+      const target = controls?.target.clone() ?? new THREE.Vector3(0, home.targetY, 0);
+      const shot = (angle: number) => {
+        camera.position.set(Math.sin(angle) * home.dist, home.y, Math.cos(angle) * home.dist);
+        camera.lookAt(0, home.targetY, 0);
+        camera.updateMatrixWorld();
+        gl.render(scene, camera);
+        const copy = document.createElement("canvas");
+        copy.width = canvas.width;
+        copy.height = canvas.height;
+        copy.getContext("2d")?.drawImage(canvas, 0, 0);
+        return copy;
+      };
+      const front = shot(VIEW_ANGLE.front);
+      const back = shot(VIEW_ANGLE.back);
+      camera.position.copy(pos);
+      camera.lookAt(target);
+      controls?.update();
+      gl.render(scene, camera);
+      return { front, back };
+    });
+  }, [gl, scene, camera, controls, home, onShots]);
+  return null;
+}
+
 // Lido uma vez por página (o aparelho não muda); no servidor, completo.
 let deviceMode: LiteMode | null = null;
 const FULL: LiteMode = { lite: false, auto: false };
@@ -438,6 +486,7 @@ export function TryOnScene({
   autoRotate = false,
   focus = "body",
   mannequin = false,
+  onShots,
 }: {
   avatarParams: AvatarParams;
   top: ScenePiece | null;
@@ -453,6 +502,8 @@ export function TryOnScene({
   focus?: "body" | "head";
   /** Acabamento de manequim de loja no lugar da pele (looks da marca). */
   mannequin?: boolean;
+  /** Recebe a função que tira as fotos de frente e de costas. */
+  onShots?: (take: LookShots) => void;
 }) {
   const head = focus === "head";
   const headY = avatarParams.anchors.head.y;
@@ -527,6 +578,7 @@ export function TryOnScene({
         autoRotateSpeed={1.6}
       />
       <CameraRig view={view} params={avatarParams} primary={primary} home={home} head={head} />
+      {onShots && <ShotTaker home={home} onShots={onShots} />}
       {!lite && <StudioAO />}
     </Canvas>
   );
