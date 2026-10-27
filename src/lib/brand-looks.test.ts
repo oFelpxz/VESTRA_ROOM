@@ -5,6 +5,7 @@ import {
   brandLookBySlug,
   brandLookOutfit,
   brandLookPieces,
+  brandLookStart,
   brandLookTotal,
   brandLookTryOnHref,
   brandLooksWith,
@@ -66,4 +67,31 @@ test("preço do look é a soma das peças, sem desconto", () => {
 
 test("experimentar o look abre o provador da peça de cima", () => {
   assert.equal(brandLookTryOnHref(brandLookBySlug("sport-verao")!), "/produto/track-jacket/provador?marca=sport-verao");
+});
+
+test("provador aberto no look: cor da peça, a outra peça e a touca", () => {
+  const offered = [
+    { id: "c1", slug: "cargo-pant-02", colors: ["Preto", "Verde Militar"] },
+    { id: "b1", slug: "knit-beanie", colors: ["Preto", "Lima"] },
+  ];
+  const start = brandLookStart(brandLookBySlug("sport-pista")!, "track-jacket", offered)!;
+  assert.equal(start.ownColor, "Preto / Lima");
+  assert.deepEqual(start.companion, { productId: "c1", color: "Preto" });
+  assert.deepEqual(start.accessory, { productId: "b1", color: "Lima" });
+});
+
+test("provador da peça de baixo: a outra é a de cima", () => {
+  const offered = [{ id: "h1", slug: "hoodie-core", colors: ["Preto Street"] }];
+  const start = brandLookStart(brandLookBySlug("street-noite")!, "cargo-pant-02", offered)!;
+  assert.equal(start.ownColor, "Verde Militar");
+  assert.deepEqual(start.companion, { productId: "h1", color: "Preto Street" });
+  assert.equal(start.accessory, null);
+});
+
+test("provador fora do look, ou peça sem a cor à venda, não entra", () => {
+  assert.equal(brandLookStart(brandLookBySlug("street-dia")!, "track-jacket", []), null);
+  const start = brandLookStart(brandLookBySlug("street-dia")!, "boxy-tee-01", [
+    { id: "w1", slug: "wide-denim", colors: ["Preto"] },
+  ])!;
+  assert.equal(start.companion, null);
 });

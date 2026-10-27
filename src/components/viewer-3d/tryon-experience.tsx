@@ -25,6 +25,7 @@ import { ColorLabel, LookLegend } from "@/components/product/color-swatch";
 import { TryOnScene, type CameraView, type ScenePiece } from "./tryon-scene";
 import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
 import { LookBuilder, type LookSelection } from "./look-builder";
+import type { BrandLookStart } from "@/lib/brand-looks";
 
 const initialState: CartActionState = {};
 
@@ -111,6 +112,7 @@ export function TryOnExperience({
   accessories,
   isAccessory,
   openLook,
+  brandLook = null,
 }: {
   productName: string;
   productId: string;
@@ -132,10 +134,13 @@ export function TryOnExperience({
   isAccessory: boolean;
   /** Look aberto pelo `?look=`. */
   openLook: OpenLook | null;
+  /** Look da marca aberto pelo `?marca=` (cores do look, tamanhos pela medida). */
+  brandLook?: BrandLookStart | null;
 }) {
   const lookVariant = variants.find((v) => v.id === openLook?.ownVariantId);
+  const brandColor = brandLook && colors.includes(brandLook.ownColor) ? brandLook.ownColor : null;
   const [selectedColor, setSelectedColor] = useState<string | null>(
-    lookVariant?.color ?? colors[0] ?? null,
+    lookVariant?.color ?? brandColor ?? colors[0] ?? null,
   );
   // Começa no look aberto, senão no tamanho sugerido, senão no molde (M) ou
   // no do meio.
@@ -756,6 +761,7 @@ export function TryOnExperience({
             preference={preference}
             toleranceCm={toleranceCm}
             openLook={openLook}
+            brandLook={brandLook}
             onChange={onCompanionChange}
             onAccessoryChange={onAccessoryChange}
             takePhoto={takeLookPhoto}

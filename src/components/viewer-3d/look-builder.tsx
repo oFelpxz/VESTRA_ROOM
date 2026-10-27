@@ -12,6 +12,7 @@ import {
 } from "@/lib/fit-regions";
 import { LOOK_NAME_LIMIT } from "@/lib/looks";
 import type { LookProduct, OpenLook } from "@/lib/look-data";
+import type { BrandLookStart } from "@/lib/brand-looks";
 import { ColorLabel } from "@/components/product/color-swatch";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
 import { FitPill } from "./fit-indicator";
@@ -47,6 +48,7 @@ export function LookBuilder({
   preference,
   toleranceCm,
   openLook,
+  brandLook = null,
   onChange,
   onAccessoryChange,
   takePhoto,
@@ -62,6 +64,8 @@ export function LookBuilder({
   preference: FitPreference;
   toleranceCm: number;
   openLook: OpenLook | null;
+  /** Look da marca (`?marca=`): a outra peça e a touca começam nele. */
+  brandLook?: BrandLookStart | null;
   /** Chamado a cada troca de peça, cor ou tamanho (null = nenhuma no avatar). */
   onChange?: (selection: LookSelection | null) => void;
   /** Igual a `onChange`, para o acessório. */
@@ -76,7 +80,7 @@ export function LookBuilder({
     .find((v) => v.id === openLook?.companionVariantId);
 
   const [productId, setProductId] = useState<string>(
-    startVariant?.productId ?? companions[0]?.id ?? "",
+    startVariant?.productId ?? brandLook?.companion?.productId ?? companions[0]?.id ?? "",
   );
   const product = companions.find((p) => p.id === productId) ?? null;
   const companionKind = role === "top" ? "bottom" : "top";
@@ -89,7 +93,9 @@ export function LookBuilder({
     [product, body, companionKind, preference, toleranceCm],
   );
 
-  const [color, setColor] = useState<string | null>(startVariant?.color ?? null);
+  const [color, setColor] = useState<string | null>(
+    startVariant?.color ?? brandLook?.companion?.color ?? null,
+  );
   const [size, setSize] = useState<string | null>(startVariant?.size ?? null);
   // Ao trocar de peça, a cor e o tamanho voltam para a primeira cor e o sugerido.
   const effectiveColor = product?.colors.includes(color ?? "") ? color : (product?.colors[0] ?? null);
@@ -115,8 +121,12 @@ export function LookBuilder({
   const startAccessory = accessories
     .flatMap((p) => p.variants.map((v) => ({ productId: p.id, ...v })))
     .find((v) => v.id === openLook?.accessoryVariantId);
-  const [accessoryId, setAccessoryId] = useState(startAccessory?.productId ?? "");
-  const [accessoryColor, setAccessoryColor] = useState<string | null>(startAccessory?.color ?? null);
+  const [accessoryId, setAccessoryId] = useState(
+    startAccessory?.productId ?? brandLook?.accessory?.productId ?? "",
+  );
+  const [accessoryColor, setAccessoryColor] = useState<string | null>(
+    startAccessory?.color ?? brandLook?.accessory?.color ?? null,
+  );
   const accessory = accessories.find((p) => p.id === accessoryId) ?? null;
   const effectiveAccessoryColor = accessory?.colors.includes(accessoryColor ?? "")
     ? accessoryColor
@@ -192,7 +202,7 @@ export function LookBuilder({
         name="name"
         required
         maxLength={LOOK_NAME_LIMIT}
-        defaultValue={openLook?.name ?? ""}
+        defaultValue={openLook?.name ?? brandLook?.name ?? ""}
         placeholder="Nome do look (ex.: Fim de semana)"
         aria-label="Nome do look"
         className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
@@ -260,10 +270,12 @@ export function LookBuilder({
       className="flex flex-col gap-4 rounded-sm border border-border p-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-          {openLook ? "Editar look" : "Montar look"}
+          {openLook ? "Editar look" : brandLook ? `Look ${brandLook.name}` : "Montar look"}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {ownLabel} + uma peça {role === "top" ? "de baixo" : "de cima"}.
+          {brandLook
+            ? "Look da marca, com as cores dele. Os tamanhos saíram das suas medidas; troque o que quiser."
+            : `${ownLabel} + uma peça ${role === "top" ? "de baixo" : "de cima"}.`}
         </p>
       </div>
 

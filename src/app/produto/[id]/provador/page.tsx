@@ -7,6 +7,7 @@ import { getStoreSettings } from "@/lib/store-settings-db";
 import { garmentKind } from "@/lib/fit-regions";
 import { ACCESSORY_CATEGORY, companionKind } from "@/lib/looks";
 import { getLookAccessories, getLookCompanions, getOpenLook } from "@/lib/look-data";
+import { brandLookBySlug, brandLookStart } from "@/lib/brand-looks";
 import { TryOnExperience } from "@/components/viewer-3d/tryon-experience";
 
 export const metadata = { title: "Provador virtual | VESTRA FIT" };
@@ -16,14 +17,15 @@ export default async function ProvadorPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ look?: string | string[] }>;
+  searchParams: Promise<{ look?: string | string[]; marca?: string | string[] }>;
 }) {
   const { id } = await params;
-  const { look } = await searchParams;
+  const { look, marca } = await searchParams;
   const session = await auth();
 
   if (!session?.user?.id) {
-    const back = `/produto/${id}/provador${typeof look === "string" ? `?look=${look}` : ""}`;
+    const query = typeof look === "string" ? `?look=${look}` : typeof marca === "string" ? `?marca=${marca}` : "";
+    const back = `/produto/${id}/provador${query}`;
     redirect(`/login?next=${encodeURIComponent(back)}`);
   }
 
@@ -69,6 +71,10 @@ export default async function ProvadorPage({
     inLook ? getLookAccessories() : [],
     typeof look === "string" ? getOpenLook(look, userId, product.id) : null,
   ]);
+  // Look da marca (lista 10): o provador já abre vestido com ele. Um look
+  // salvo (`?look=`) tem a preferência.
+  const brand = typeof marca === "string" && !openLook ? brandLookBySlug(marca) : null;
+  const brandStart = brand ? brandLookStart(brand, product.slug, [...companions, ...accessories]) : null;
 
   return (
     <TryOnExperience
@@ -96,6 +102,7 @@ export default async function ProvadorPage({
       accessories={accessories}
       isAccessory={product.categorySlug === ACCESSORY_CATEGORY}
       openLook={openLook}
+      brandLook={brandStart}
     />
   );
 }

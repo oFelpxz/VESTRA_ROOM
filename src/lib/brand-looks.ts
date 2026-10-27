@@ -106,3 +106,41 @@ export function brandLookOutfit(
 export function brandLookTotal(prices: number[]): number {
   return prices.reduce((sum, p) => sum + Math.round(p * 100), 0) / 100;
 }
+
+/** Look da marca aberto no provador (`?marca=`): de onde cada escolha começa. */
+export type BrandLookStart = {
+  slug: string;
+  name: string;
+  /** Cor da peça deste provador. */
+  ownColor: string;
+  /** A outra peça (de baixo para quem prova a de cima, e vice-versa). */
+  companion: { productId: string; color: string } | null;
+  accessory: { productId: string; color: string } | null;
+};
+
+/**
+ * Onde o provador de `productSlug` começa para vestir o look: a cor da peça
+ * dele, a outra peça e a touca, com a cor do look. Só entra a peça que está à
+ * venda com aquela cor (na lista que o provador oferece); o tamanho fica para
+ * a medida de quem prova. Null se o produto não faz parte do look.
+ */
+export function brandLookStart(
+  look: BrandLook,
+  productSlug: string,
+  offered: { id: string; slug: string; colors: string[] }[],
+): BrandLookStart | null {
+  const own = [look.top, look.bottom].find((p) => p.product === productSlug);
+  if (!own) return null;
+  const other = own === look.top ? look.bottom : look.top;
+  const find = (piece: BrandLookPiece | null) => {
+    const p = piece && offered.find((o) => o.slug === piece.product && o.colors.includes(piece.color));
+    return p ? { productId: p.id, color: piece!.color } : null;
+  };
+  return {
+    slug: look.slug,
+    name: look.name,
+    ownColor: own.color,
+    companion: find(other),
+    accessory: find(look.accessory),
+  };
+}
