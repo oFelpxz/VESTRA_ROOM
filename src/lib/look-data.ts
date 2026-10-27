@@ -4,10 +4,13 @@ import { resolveModelUrl } from "@/lib/storage";
 import { sortSizes } from "@/lib/sizes";
 import { categoriesOfKind, type ChartRow } from "@/lib/fit-regions";
 import { ACCESSORY_CATEGORY } from "@/lib/looks";
+import { BRAND_LOOKS, type BrandLook } from "@/lib/brand-looks";
+import type { Prisma } from "@/generated/prisma/client";
 
 /** Peça que pode completar um look no provador (item 15). */
 export type LookProduct = {
   id: string;
+  slug: string;
   name: string;
   price: string;
   imageUrl: string | null;
@@ -21,19 +24,43 @@ export type LookProduct = {
 
 /** Peças à venda de um tipo (as de baixo para quem prova uma de cima, e vice-versa). */
 export function getLookCompanions(kind: "top" | "bottom"): Promise<LookProduct[]> {
-  return lookProducts(categoriesOfKind(kind));
+  return lookProducts({ category: { slug: { in: categoriesOfKind(kind) } } });
 }
 
 /** Acessórios à venda (touca), a terceira peça opcional do look. */
 export function getLookAccessories(): Promise<LookProduct[]> {
-  return lookProducts([ACCESSORY_CATEGORY]);
+  return lookProducts({ category: { slug: ACCESSORY_CATEGORY } });
 }
 
-async function lookProducts(categories: string[]): Promise<LookProduct[]> {
+/** Peça de um look pronto, já com o produto do banco. */
+export type BrandLookItem = { role: "top" | "bottom" | "accessory"; product: LookProduct; color: string };
+export type ResolvedBrandLook = BrandLook & { items: BrandLookItem[] };
+
+/**
+ * Looks prontos da marca com as peças à venda. Um look sai da lista se faltar
+ * alguma peça ou cor (produto pausado, cor apagada).
+ */
+export async function getBrandLooks(): Promise<ResolvedBrandLook[]> {
+  const slugs = [...new Set(BRAND_LOOKS.flatMap((l) => [l.top, l.bottom, l.accessory]))]
+    .flatMap((p) => (p ? [p.product] : []));
+  const products = await lookProducts({ slug: { in: slugs } });
+  return BRAND_LOOKS.flatMap((look) => {
+    const items: BrandLookItem[] = [];
+    for (const [role, piece] of [["top", look.top], ["bottom", look.bottom], ["accessory", look.accessory]] as const) {
+      if (!piece) continue;
+      const product = products.find((p) => p.slug === piece.product);
+      if (!product?.colors.includes(piece.color)) return [];
+      items.push({ role, product, color: piece.color });
+    }
+    return [{ ...look, items }];
+  });
+}
+
+async function lookProducts(where: Prisma.ProductWhereInput): Promise<LookProduct[]> {
   const products = await prisma.product.findMany({
     where: {
       status: "ACTIVE",
-      category: { slug: { in: categories } },
+      ...where,
       variants: { some: { status: "ACTIVE" } },
     },
     include: {
@@ -48,6 +75,7 @@ async function lookProducts(categories: string[]): Promise<LookProduct[]> {
 
   return Promise.all(products.map(async (p) => ({
     id: p.id,
+    slug: p.slug,
     name: p.name,
     price: formatBRL(Number(p.promotionalPrice ?? p.basePrice)),
     imageUrl: p.images[0]?.url ?? null,
