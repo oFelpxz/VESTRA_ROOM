@@ -26,6 +26,7 @@ import { TryOnScene, type CameraView, type ScenePiece } from "./tryon-scene";
 import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
 import { LookBuilder, type LookSelection } from "./look-builder";
 import type { BrandLookStart } from "@/lib/brand-looks";
+import { BuyLook, type BuyLookPiece } from "@/components/look/buy-look";
 
 const initialState: CartActionState = {};
 
@@ -100,6 +101,7 @@ function sizeFit(
 export function TryOnExperience({
   productName,
   productId: _productId,
+  priceValue,
   variants,
   colors,
   sizes,
@@ -116,6 +118,8 @@ export function TryOnExperience({
 }: {
   productName: string;
   productId: string;
+  /** Preço cobrado (promocional, se houver), para somar o look. */
+  priceValue: number;
   variants: Variant[];
   colors: string[];
   sizes: string[];
@@ -320,6 +324,32 @@ export function TryOnExperience({
       v.size === selectedSize &&
       v.stockQuantity > 0,
   );
+
+  // Item 8 (lista 10): o look vestido no avatar vai inteiro para a sacola.
+  const lookPieces = useMemo((): BuyLookPiece[] => {
+    const piece = (sel: LookSelection | null): BuyLookPiece[] => {
+      if (!sel) return [];
+      const v = sel.product.variants.find((x) => x.color === sel.color && x.size === sel.size);
+      return [
+        {
+          variantId: v?.id ?? null,
+          label: `${sel.product.name} (${[sel.color, sel.size].filter(Boolean).join(", ")})`,
+          price: sel.product.priceValue,
+          stockQuantity: v?.stockQuantity ?? 0,
+        },
+      ];
+    };
+    return [
+      {
+        variantId: lookOwnVariant?.id ?? null,
+        label: `${productName} (${[selectedColor, selectedSize].filter(Boolean).join(", ")})`,
+        price: priceValue,
+        stockQuantity: lookOwnVariant?.stockQuantity ?? 0,
+      },
+      ...piece(companionSel),
+      ...piece(accessorySel),
+    ];
+  }, [lookOwnVariant, productName, selectedColor, selectedSize, priceValue, companionSel, accessorySel]);
 
   const colorAvailable = (color: string) =>
     variants.some((v) => v.color === color && v.stockQuantity > 0);
@@ -767,6 +797,7 @@ export function TryOnExperience({
             takePhoto={takeLookPhoto}
           />
         )}
+        {!isAccessory && lookPieces.length > 1 && <BuyLook pieces={lookPieces} />}
         {isAccessory && (
           <p className="rounded-sm border border-dashed border-border p-4 text-xs text-muted-foreground">
             Para montar um look com esta peça, abra o provador de uma peça de cima, de baixo ou de

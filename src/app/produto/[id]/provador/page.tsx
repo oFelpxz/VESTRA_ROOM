@@ -80,6 +80,7 @@ export default async function ProvadorPage({
     <TryOnExperience
       productId={product.id}
       productName={product.name}
+      priceValue={product.promotionalPriceNumber ?? product.priceNumber}
       variants={product.variants}
       colors={product.colors}
       sizes={product.sizes}
