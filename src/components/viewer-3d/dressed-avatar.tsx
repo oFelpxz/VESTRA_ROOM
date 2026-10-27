@@ -21,12 +21,12 @@ import { dropInnerPieces, duplicateLayers, type Skin } from "@/lib/garment-layer
 import { addFabricEdge, addFabricRest, clothMaterial, fabricOf, type PrintDecal } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import type { GarmentLook } from "@/lib/garment-prints";
-import { surfaceCavity } from "@/lib/skin-cavity";
+import type { EyeSocket } from "@/lib/eye-sockets";
 import { readMorphBody } from "./avatar";
+import { AvatarSkin, useEyeSockets } from "./avatar-skin";
 import { useGarmentPrints } from "./brand-logo-canvas";
 import { AVATAR_URL } from "./avatar-url";
 import { useLite } from "./lite-context";
-import { SkinMaterial } from "./skin-material";
 
 /**
  * Avatar do cliente vestindo uma peça ajustada ao corpo de referência
@@ -167,6 +167,7 @@ export function DressedAvatar({
   );
   const options = useMemo(() => readFitOptions(garment.scene), [garment.scene]);
   const prints = useGarmentPrints(garmentUrl, look, selectedColor);
+  const sockets = useEyeSockets(body.base);
   const { morphs, totalHeight } = params;
 
   // Resultado do worker, marcado com as peças para as quais foi calculado.
@@ -205,6 +206,7 @@ export function DressedAvatar({
     <FittedAvatar
       parts={parts}
       index={body.index}
+      sockets={sockets}
       fitted={fitted}
       selectedColor={selectedColor}
       prints={prints}
@@ -221,27 +223,19 @@ export function DressedAvatar({
 function FittedAvatar({
   parts,
   index,
+  sockets,
   fitted,
   selectedColor,
   prints,
 }: {
   parts: Part[];
   index: number[];
+  sockets: EyeSocket[];
   fitted: Fitted;
   selectedColor?: string;
   prints: PrintDecal[];
 }) {
   const lite = useLite();
-  const bodyGeometry = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(fitted.body, 3));
-    g.setIndex(index);
-    g.computeVertexNormals();
-    const cavity = surfaceCavity(fitted.body, index, g.getAttribute("normal").array);
-    g.setAttribute("skinCavity", new THREE.BufferAttribute(cavity, 1));
-    return g;
-  }, [fitted, index]);
-
   const clothGeometries = useMemo(
     () =>
       parts.map((p, i) => {
@@ -269,7 +263,6 @@ function FittedAvatar({
   );
 
   // Libera da GPU as geometrias/materiais substituídos a cada troca.
-  useEffect(() => () => bodyGeometry.dispose(), [bodyGeometry]);
   useEffect(
     () => () => clothGeometries.forEach((g) => g.dispose()),
     [clothGeometries],
@@ -288,9 +281,7 @@ function FittedAvatar({
 
   return (
     <group>
-      <mesh geometry={bodyGeometry} castShadow receiveShadow>
-        <SkinMaterial folds />
-      </mesh>
+      <AvatarSkin positions={fitted.body} index={index} sockets={sockets} />
       {clothGeometries.map((g, i) => (
         <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
       ))}

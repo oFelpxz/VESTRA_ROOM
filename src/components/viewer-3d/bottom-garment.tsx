@@ -9,10 +9,10 @@ import { bindBottom, bottomWrinkle, fitBottom, meshEdges, restOnShoes, type TopH
 import { shapeBody } from "@/lib/garment-dress";
 import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
+import { AvatarSkin, useEyeSockets } from "./avatar-skin";
 import { SHOES_URL } from "./avatar-url";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
 import { useLite } from "./lite-context";
-import { SkinMaterial } from "./skin-material";
 
 const CREASE_ANGLE = (30 * Math.PI) / 180;
 
@@ -54,19 +54,8 @@ function useFittedShoes(params: AvatarParams) {
 /** Avatar sem peça de cima (quando o look só tem a de baixo). */
 export function BareAvatar({ params }: { params: AvatarParams }) {
   const { body, pos } = useClientBody(params);
-  const geometry = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    g.setIndex(body.index);
-    g.computeVertexNormals();
-    return g;
-  }, [pos, body.index]);
-  useEffect(() => () => geometry.dispose(), [geometry]);
-  return (
-    <mesh geometry={geometry} castShadow receiveShadow>
-      <SkinMaterial />
-    </mesh>
-  );
+  const sockets = useEyeSockets(body.base);
+  return <AvatarSkin positions={pos} index={body.index} sockets={sockets} />;
 }
 
 export function BottomGarment({
