@@ -18,9 +18,11 @@ import {
 } from "@/lib/garment-dress";
 import { deinterleave } from "@/lib/deinterleave";
 import { duplicateLayers } from "@/lib/garment-layers";
-import { addFabricEdge, addFabricRest, clothMaterial, fabricOf } from "@/lib/fabric";
+import { addFabricEdge, addFabricRest, clothMaterial, fabricOf, type PrintDecal } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
+import type { GarmentLook } from "@/lib/garment-prints";
 import { readMorphBody } from "./avatar";
+import { useGarmentPrints } from "./brand-logo-canvas";
 import { AVATAR_URL } from "./avatar-url";
 import { useLite } from "./lite-context";
 import { SkinMaterial } from "./skin-material";
@@ -136,6 +138,7 @@ export function DressedAvatar({
   params,
   grade,
   selectedColor,
+  look,
   onHem,
 }: {
   garmentUrl: string;
@@ -143,6 +146,8 @@ export function DressedAvatar({
   /** Graduação do tamanho escolhido em relação ao molde (M). */
   grade: Grade;
   selectedColor?: string;
+  /** Versão com estampa (Street/Sport), lida do nome da cor. */
+  look?: GarmentLook | null;
   /** Barra da peça já vestida, a cada encaixe (a peça de baixo fica por dentro). */
   onHem?: (hem: TopHem | null) => void;
 }) {
@@ -152,6 +157,7 @@ export function DressedAvatar({
   const body = useMemo(() => extractBody(avatar.scene), [avatar.scene]);
   const parts = useMemo(() => extractGarment(garment.scene), [garment.scene]);
   const options = useMemo(() => readFitOptions(garment.scene), [garment.scene]);
+  const prints = useGarmentPrints(garmentUrl, look, selectedColor);
   const { morphs, totalHeight } = params;
 
   // Resultado do worker, marcado com as peças para as quais foi calculado.
@@ -192,6 +198,7 @@ export function DressedAvatar({
       index={body.index}
       fitted={fitted}
       selectedColor={selectedColor}
+      prints={prints}
     />
   ) : (
     <Html center>
@@ -207,11 +214,13 @@ function FittedAvatar({
   index,
   fitted,
   selectedColor,
+  prints,
 }: {
   parts: Part[];
   index: number[];
   fitted: Fitted;
   selectedColor?: string;
+  prints: PrintDecal[];
 }) {
   const lite = useLite();
   const bodyGeometry = useMemo(() => {
@@ -241,8 +250,11 @@ function FittedAvatar({
   );
 
   const materials = useMemo(
-    () => parts.map((p) => clothMaterial(p.material, selectedColor, p.fabric, "caimento", lite)),
-    [parts, selectedColor, lite],
+    () =>
+      parts.map((p) =>
+        clothMaterial(p.material, selectedColor, p.fabric, "caimento", lite, prints),
+      ),
+    [parts, selectedColor, lite, prints],
   );
 
   // Libera da GPU as geometrias/materiais substituídos a cada troca.

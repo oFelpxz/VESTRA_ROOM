@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useBounds, useGLTF } from "@react-three/drei";
 import { buildAvatarParams } from "@/lib/avatar-builder";
+import type { GarmentLook } from "@/lib/garment-prints";
 import { AvatarErrorBoundary } from "./avatar";
 import { Shoes } from "./bottom-garment";
 import { isBottomPiece } from "./mannequin-mark";
@@ -66,13 +67,16 @@ function useRefitWhileLoading(ref: RefObject<THREE.Group | null>) {
 export default function Mannequin({
   garmentUrl,
   color,
+  look,
 }: {
   garmentUrl: string;
   /** Cor da peça (hex). */
   color?: string;
+  /** Versão com estampa (Street/Sport). */
+  look?: GarmentLook | null;
 }) {
   const { scene } = useGLTF(garmentUrl);
-  const piece: ScenePiece = { url: garmentUrl, color };
+  const piece: ScenePiece = { url: garmentUrl, color, look };
   const bottom = isBottomPiece(scene);
   const ref = useRef<THREE.Group>(null);
   useRefitWhileLoading(ref);

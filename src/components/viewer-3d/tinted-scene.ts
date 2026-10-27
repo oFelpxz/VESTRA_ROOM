@@ -4,7 +4,14 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { bottomWrinkle } from "@/lib/bottom-fit";
 import { deinterleave } from "@/lib/deinterleave";
-import { addFabricEdge, addFabricRest, clothMaterial, fabricOf, type Wrinkle } from "@/lib/fabric";
+import {
+  addFabricEdge,
+  addFabricRest,
+  clothMaterial,
+  fabricOf,
+  type PrintDecal,
+  type Wrinkle,
+} from "@/lib/fabric";
 import { duplicateLayers } from "@/lib/garment-layers";
 import { isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
@@ -13,6 +20,9 @@ type Piece = { geometry: THREE.BufferGeometry; source: THREE.Material; wrinkle: 
 // A conta da borda (barra e pesponto) é feita uma vez por arquivo; trocar a
 // cor só troca os materiais.
 const pieces = new WeakMap<THREE.Object3D, Piece[]>();
+
+// Mesmo array sempre: um `[]` novo a cada render refaria os materiais.
+const NO_PRINTS: PrintDecal[] = [];
 
 function piecesOf(scene: THREE.Object3D): Piece[] {
   let out = pieces.get(scene);
@@ -59,15 +69,20 @@ function piecesOf(scene: THREE.Object3D): Piece[] {
 
 /**
  * Cópia da peça com o material de tecido (`clothMaterial`: trama, barra,
- * pesponto e dobras) na cor escolhida. Sem cor, fica a cor do arquivo.
- * A malha é dividida entre as cópias; só os materiais são novos.
+ * pesponto e dobras) na cor escolhida, com as estampas `prints`. Sem cor,
+ * fica a cor do arquivo. A malha é dividida entre as cópias; só os
+ * materiais são novos.
  */
-export function useTintedScene(scene: THREE.Object3D, color?: string) {
+export function useTintedScene(
+  scene: THREE.Object3D,
+  color?: string,
+  prints: PrintDecal[] = NO_PRINTS,
+) {
   const { model, created } = useMemo(() => {
     const model = new THREE.Group();
     const created: THREE.Material[] = [];
     for (const p of piecesOf(scene)) {
-      const m = clothMaterial(p.source, color, fabricOf(scene, p.source), p.wrinkle);
+      const m = clothMaterial(p.source, color, fabricOf(scene, p.source), p.wrinkle, false, prints);
       m.side = THREE.DoubleSide; // o avesso aparece na gola e na barra
       created.push(m);
       const mesh = new THREE.Mesh(p.geometry, m);
@@ -76,7 +91,7 @@ export function useTintedScene(scene: THREE.Object3D, color?: string) {
       model.add(mesh);
     }
     return { model, created };
-  }, [scene, color]);
+  }, [scene, color, prints]);
 
   useEffect(() => () => created.forEach((m) => m.dispose()), [created]);
   return model;

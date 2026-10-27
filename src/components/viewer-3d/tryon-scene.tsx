@@ -14,6 +14,7 @@ import type { AvatarParams } from "@/lib/avatar-builder";
 import type { TopHem } from "@/lib/bottom-fit";
 import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
 import { tintMaterial } from "@/lib/garment-color";
+import type { GarmentLook } from "@/lib/garment-prints";
 import { CLOSE_DISTANCE, closeUpY, type Box } from "@/lib/close-up";
 import { liteMode, type LiteMode } from "@/lib/render-quality";
 import { AvatarErrorBoundary } from "./avatar";
@@ -33,11 +34,13 @@ function TryOnGarment({
   params,
   grade,
   selectedColor,
+  look,
 }: {
   url: string;
   params: AvatarParams;
   grade: Grade;
   selectedColor?: string;
+  look?: GarmentLook | null;
 }) {
   const { scene } = useGLTF(url);
   const loose = (
@@ -52,6 +55,7 @@ function TryOnGarment({
         params={params}
         grade={grade}
         selectedColor={selectedColor}
+        look={look}
       />
     </AvatarErrorBoundary>
   );
@@ -154,6 +158,8 @@ function Loader() {
 export type ScenePiece = {
   url: string;
   color?: string;
+  /** Versão com estampa (Street/Sport), lida do nome da cor. */
+  look?: GarmentLook | null;
   /** Peça de cima: graduação do tamanho em relação ao molde (M). */
   grade?: Grade;
   /** Peça de baixo: folga do tamanho em relação ao molde (m). */
@@ -196,6 +202,7 @@ function DressedLook({
             params={params}
             grade={top.grade ?? MOLDE_GRADE}
             selectedColor={top.color}
+            look={top.look}
             onHem={setHem}
           />
         </AvatarErrorBoundary>
@@ -269,6 +276,7 @@ export function Outfit({
       params={params}
       grade={piece.grade ?? MOLDE_GRADE}
       selectedColor={piece.color}
+      look={piece.look}
     />
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import { Jost, Permanent_Marker } from "next/font/google";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import { drawLogo, logoAspect, logoInks, type LogoKind } from "@/lib/brand-logo";
+import type { PrintDecal } from "@/lib/fabric";
+import { printSpots, type GarmentLook } from "@/lib/garment-prints";
 
 // Fontes do logo A1, servidas pelo próprio site (o next/font baixa no build).
 const marker = Permanent_Marker({ weight: "400", subsets: ["latin"], display: "block" });
@@ -66,4 +68,28 @@ export function useBrandFontsReady() {
     };
   }, []);
   return ready;
+}
+
+/**
+ * Estampas da peça na versão `look` (`printSpots`), com a tinta do logo
+ * escolhida pela cor `hex`. Vazio até as fontes chegarem ou sem cor.
+ */
+export function useGarmentPrints(
+  modelUrl: string,
+  look: GarmentLook | null | undefined,
+  hex: string | undefined,
+): PrintDecal[] {
+  const fonts = useBrandFontsReady();
+  return useMemo(
+    () =>
+      !fonts || !hex
+        ? []
+        : printSpots(modelUrl, look ?? null).map((s) => ({
+            image: logoTexture(s.kind, hex),
+            center: s.center,
+            size: [s.width, s.width / logoAspect(s.kind)],
+            side: s.side,
+          })),
+    [fonts, modelUrl, look, hex],
+  );
 }

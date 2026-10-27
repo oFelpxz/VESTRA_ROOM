@@ -5,6 +5,7 @@ import { Viewer3D } from "@/components/viewer-3d/viewer";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
 import { useProductColor } from "@/components/product/product-color";
 import { colorToHex } from "@/lib/color-names";
+import { lookOf } from "@/lib/garment-prints";
 
 class ViewerErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -51,6 +52,7 @@ export function ProductViewer({
         controls={controls}
         mannequin={mannequin}
         color={selectedColor ? colorToHex(selectedColor) : undefined}
+        look={lookOf(selectedColor)}
       />
     </ViewerErrorBoundary>
   );

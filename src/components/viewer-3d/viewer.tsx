@@ -23,6 +23,8 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { isFittedToMannequin } from "./mannequin-mark";
 import { StudioAO } from "./studio-ao";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
+import type { GarmentLook } from "@/lib/garment-prints";
+import { useGarmentPrints } from "./brand-logo-canvas";
 import { useTintedScene } from "./tinted-scene";
 
 // Carregado só quando o cliente escolhe "Manequim": quem só olha a peça não
@@ -34,16 +36,20 @@ type DisplayMode = "piece" | "mannequin";
 function Model({
   url,
   color,
+  look,
   onFitted,
 }: {
   url: string;
   /** Cor escolhida pelo cliente (hex); sem ela, a do arquivo. */
   color?: string;
+  /** Versão com estampa (Street/Sport), lida do nome da cor. */
+  look?: GarmentLook | null;
   /** Avisa se a peça foi ajustada ao manequim no Blender. */
   onFitted?: (fitted: boolean) => void;
 }) {
   const { scene } = useGLTF(url);
-  const model = useTintedScene(scene, color);
+  const prints = useGarmentPrints(url, look, color);
+  const model = useTintedScene(scene, color, prints);
   useEffect(() => {
     onFitted?.(isFittedToMannequin(scene));
   }, [scene, onFitted]);
@@ -134,6 +140,8 @@ export function Viewer3D({
   mannequin = false,
   /** Cor da peça (hex), a escolhida na compra. */
   color,
+  /** Versão com estampa (Street/Sport) da cor escolhida. */
+  look,
 }: {
   modelUrl?: string;
   interactive?: boolean;
@@ -141,6 +149,7 @@ export function Viewer3D({
   controls?: boolean;
   mannequin?: boolean;
   color?: string;
+  look?: GarmentLook | null;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
@@ -200,10 +209,10 @@ export function Viewer3D({
             {mode === "mannequin" ? (
               // O avatar já fica de pé na origem; o Center o deslocaria
               // pelas partes que carregam primeiro (o tênis).
-              <Mannequin garmentUrl={modelUrl} color={color} />
+              <Mannequin garmentUrl={modelUrl} color={color} look={look} />
             ) : (
               <Center>
-                <Model url={modelUrl} color={color} onFitted={setFitted} />
+                <Model url={modelUrl} color={color} look={look} onFitted={setFitted} />
               </Center>
             )}
           </Bounds>

@@ -17,6 +17,7 @@ import {
   type AvatarBody,
 } from "@/lib/avatar-builder";
 import { colorToHex } from "@/lib/color-names";
+import { lookOf } from "@/lib/garment-prints";
 import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
 import { bottomEase, bottomLength } from "@/lib/bottom-fit";
 import type { LookProduct, OpenLook } from "@/lib/look-data";
@@ -210,6 +211,7 @@ export function TryOnExperience({
         ? {
             url: garmentUrl,
             color: selectedColor ? colorToHex(selectedColor) : undefined,
+            look: lookOf(selectedColor),
             grade,
             ease: bottomEase(size, sizeChart, body.hipCm),
             length: bottomLength(size, sizeChart, avatarLegCm),
@@ -223,6 +225,7 @@ export function TryOnExperience({
     return {
       url: p.modelUrl,
       color: companionSel.color ? colorToHex(companionSel.color) : undefined,
+      look: lookOf(companionSel.color),
       grade: sizeGrade(companionSel.size, p.sizeChart),
       ease: bottomEase(companionSel.size, p.sizeChart, body.hipCm),
       length: bottomLength(companionSel.size, p.sizeChart, avatarLegCm),
