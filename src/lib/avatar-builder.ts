@@ -82,6 +82,9 @@ export type AvatarParams = {
 
   // Altura total do avatar em unidades 3D (1 unidade = 1 metro)
   totalHeight: number;
+
+  /** Peito, cintura e quadril pedidos (cm): `shapeBody` mede a malha e acerta. */
+  girths: Record<Girth, number>;
 };
 
 const REF = {
@@ -101,17 +104,20 @@ const REF = {
  * exige atualizar estes números (ver scripts/molde/README.md).
  */
 const AVATAR_CALIBRATION = {
-  // circunferências: scripts/molde/avatar_medidas.py (fita métrica virtual,
-  // antes de abaixar os braços, sempre na mesma faixa de pele)
-  base: { chest: 90.1, waist: 69.5, hip: 85.7 },
+  // circunferências: a fita de src/lib/body-tape.ts (peito e quadril na
+  // parte mais cheia, cintura na mais fina, só o tronco), reta ajustada em
+  // 400 corpos sorteados por scripts/medir-avatar.ts. É o primeiro palpite:
+  // a fita não é linear (a cintura mais fina sobe e desce com a barriga) e
+  // `shapeBody` acerta o resto medindo a malha.
+  base: { chest: 90.1, waist: 67.0, hip: 94.2 },
   gain: {
-    height: { chest: 25.8, waist: 20.0, hip: 24.9 },
-    weight: { chest: 3.1, waist: 7.0, hip: 5.6 },
-    chest: { chest: 29.9, waist: 1.0, hip: 0 },
-    waist: { chest: 1.0, waist: 29.9, hip: 5.0 },
-    hip: { chest: 0, waist: 3.3, hip: 30.0 },
-    male: { chest: 6.7, waist: 5.5, hip: 0.5 },
-    female: { chest: -5.9, waist: -4.2, hip: 0.2 },
+    height: { chest: 24.5, waist: 20.8, hip: 26.3 },
+    weight: { chest: 3.7, waist: 5.7, hip: 5.6 },
+    chest: { chest: 32.8, waist: 4.3, hip: 0.2 },
+    waist: { chest: 2.1, waist: 23.4, hip: 1.8 },
+    hip: { chest: -0.1, waist: 4.1, hip: 24.9 },
+    male: { chest: 5.1, waist: 5.1, hip: 0.8 },
+    female: { chest: -4.7, waist: -5.3, hip: 0.7 },
   },
   // comprimentos: scripts/molde/avatar_comprimentos.py (avatar já posado)
   lengths: {
@@ -177,14 +183,33 @@ function lengthMorphs(
   return { height, legLength, armLength, shoulder };
 }
 
-type Girth = "chest" | "waist" | "hip";
-const GIRTHS: Girth[] = ["chest", "waist", "hip"];
+export type Girth = "chest" | "waist" | "hip";
+export const GIRTHS: Girth[] = ["chest", "waist", "hip"];
 
 /**
- * Pesos de peito/cintura/quadril que fazem o avatar ter exatamente essas
- * circunferências (cm), já descontando o que a altura, o peso corporal e o
- * corpo masculino/feminino acrescentam. Sistema linear 3×3, resolvido por
- * Cramer.
+ * Quanto mudar os pesos de peito, cintura e quadril para as circunferências
+ * mudarem `delta` cm (sistema linear 3×3 da calibração, por Cramer).
+ */
+export function girthStep(delta: Record<Girth, number>): Record<Girth, number> {
+  const { gain } = AVATAR_CALIBRATION;
+  // linha = medida, coluna = shape key
+  const A = GIRTHS.map((m) => GIRTHS.map((k) => gain[k][m]));
+  const rhs = GIRTHS.map((m) => delta[m]);
+  const det = (M: number[][]) =>
+    M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) -
+    M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) +
+    M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+  const d = det(A);
+  const solve = (col: number) =>
+    det(A.map((row, i) => row.map((v, j) => (j === col ? rhs[i] : v)))) / d;
+  return { chest: solve(0), waist: solve(1), hip: solve(2) };
+}
+
+/**
+ * Pesos de peito/cintura/quadril que dão ao avatar essas circunferências
+ * (cm), já descontando o que a altura, o peso corporal e o corpo
+ * masculino/feminino acrescentam. Pela calibração; `shapeBody` confere com a
+ * fita na malha e corrige.
  */
 function girthMorphs(
   target: Record<Girth, number>,
@@ -193,29 +218,27 @@ function girthMorphs(
   body: AvatarBody,
 ): Record<Girth, number> {
   const { base, gain } = AVATAR_CALIBRATION;
-  const rhs = GIRTHS.map(
-    (m) =>
+  const delta = Object.fromEntries(
+    GIRTHS.map((m) => [
+      m,
       target[m] -
-      base[m] -
-      heightMorph * gain.height[m] -
-      weightMorph * gain.weight[m] -
-      (body === "neutral" ? 0 : gain[body][m]),
-  );
-  // linha = medida, coluna = shape key
-  const A = GIRTHS.map((m) => GIRTHS.map((k) => gain[k][m]));
-  const det = (M: number[][]) =>
-    M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) -
-    M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) +
-    M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
-  const d = det(A);
-  const solve = (col: number) =>
-    det(A.map((row, i) => row.map((v, j) => (j === col ? rhs[i] : v)))) / d;
-  // As faixas funcionam nos dois sentidos; acima de 2 a forma já exagera.
+        base[m] -
+        heightMorph * gain.height[m] -
+        weightMorph * gain.weight[m] -
+        (body === "neutral" ? 0 : gain[body][m]),
+    ]),
+  ) as Record<Girth, number>;
+  const w = girthStep(delta);
   return {
-    chest: clamp(solve(0), -1, 2),
-    waist: clamp(solve(1), -1, 2),
-    hip: clamp(solve(2), -1, 2),
+    chest: clampGirth(w.chest),
+    waist: clampGirth(w.waist),
+    hip: clampGirth(w.hip),
   };
+}
+
+/** As faixas funcionam nos dois sentidos; acima de 2 a forma já exagera. */
+export function clampGirth(w: number) {
+  return clamp(w, -1, 2);
 }
 
 /**
@@ -350,6 +373,7 @@ export function buildAvatarParams(
     ratioLeg,
     morphs,
     totalHeight,
+    girths: { chest, waist, hip },
     anchors: {
       head: { y: yHead },
       shoulder: {

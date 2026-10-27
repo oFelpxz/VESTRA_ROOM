@@ -124,11 +124,15 @@ describe("3D-05 · avatar com as medidas do cliente", () => {
 
   it("acima do que o corpo alcança, a medida para no máximo (nunca passa do pedido)", () => {
     const enorme = { ...CASES.pesado, weightKg: 150, chestCm: 160, waistCm: 150, hipCm: 160 };
+    // Pela fita (body-tape) a cintura para em ~135–141 cm: a shape key chega
+    // no limite (2) antes. Peito e quadril perdem até 2 cm por tabela.
     for (const body of BODIES) {
-      const got = predictAvatarMeasurements(buildAvatarParams(enorme, body).morphs);
+      const { morphs } = buildAvatarParams(enorme, body);
+      const got = predictAvatarMeasurements(morphs);
       for (const k of ["chest", "waist", "hip"] as const) {
         const want = enorme[`${k}Cm`];
-        assert.ok(got[k] <= want + 0.5 && got[k] >= want - 5, `${body} ${k}: ${got[k].toFixed(1)}`);
+        assert.ok(got[k] <= want + 0.5, `${body} ${k}: ${got[k].toFixed(1)}`);
+        assert.ok(got[k] >= want - 2 || morphs[k] === 2, `${body} ${k}: ${got[k].toFixed(1)}`);
       }
     }
   });

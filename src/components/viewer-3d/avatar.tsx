@@ -155,25 +155,34 @@ function GltfAvatar({
   const body = useMemo(() => readMorphBody(model), [model]);
   const transform = useMemo(() => {
     if (body) {
-      const { weights, lift } = shapeBody(body, params.morphs, params.totalHeight);
-      const hk = body.keys.indexOf("height");
-      return { scale: 1, y: lift, height: hk >= 0 ? weights[hk] : 0 };
+      const { weights, lift } = shapeBody(body, params.morphs, params.totalHeight, params.girths);
+      const fitted = (k: MorphKey) => {
+        const i = body.keys.indexOf(k);
+        return i >= 0 ? weights[i] : params.morphs[k];
+      };
+      return {
+        scale: 1,
+        y: lift,
+        height: fitted("height"),
+        chest: fitted("chest"),
+        waist: fitted("waist"),
+        hip: fitted("hip"),
+      };
     }
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3();
     box.getSize(size);
     const scale = size.y > 0 ? params.totalHeight / size.y : 1;
-    return { scale, y: -box.min.y * scale, height: 0 };
-  }, [model, body, params.morphs, params.totalHeight]);
+    const { chest, waist, hip } = params.morphs;
+    return { scale, y: -box.min.y * scale, height: 0, chest, waist, hip };
+  }, [model, body, params.morphs, params.totalHeight, params.girths]);
 
   // Aplica os pesos das medidas nas influências dos morph targets.
   // Percorre a árvore renderizada (via ref) a cada mudança de medida.
-  const { height } = transform;
+  // altura, peito, cintura e quadril: os pesos que `shapeBody` acertou na malha
+  const { height, chest, waist, hip } = transform;
   const {
     weight,
-    chest,
-    waist,
-    hip,
     shoulder,
     armLength,
     legLength,

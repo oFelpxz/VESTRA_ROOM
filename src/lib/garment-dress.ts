@@ -1,5 +1,6 @@
 import { MathUtils, Vector3 } from "three";
-import type { AvatarParams } from "@/lib/avatar-builder";
+import { clampGirth, girthStep, GIRTHS, type AvatarParams } from "@/lib/avatar-builder";
+import { makeTape, tapeGirths, type BodyTape } from "@/lib/body-tape";
 import {
   applyMorphs,
   drape,
@@ -168,21 +169,33 @@ function contactsWithReference(body: FitBody, part: FitPart) {
   return found;
 }
 
+/** Até quantas vezes a fita mede e corrige peito, cintura e quadril. */
+const GIRTH_PASSES = 5;
+/** Erro aceito em cada circunferência (cm). */
+const GIRTH_TOLERANCE = 0.2;
+const tapes = new WeakMap<Float32Array, BodyTape>();
+
 /**
  * Corpo de referência com as medidas do cliente. A altura não vai direto na
  * shape key: o peso dela é resolvido para o corpo bater a altura em metros,
- * já contando o que as outras medidas mudam. Devolve as posições com os pés
- * em y = 0, os pesos usados e quanto o corpo subiu (`lift`) para isso.
+ * já contando o que as outras medidas mudam. Com `girths` (cm), a fita
+ * métrica (`body-tape.ts`) mede peito, cintura e quadril na malha e corrige
+ * os pesos até baterem — a calibração linear erra até ~10 cm nos corpos
+ * mais longe do base. Devolve as posições com os pés em y = 0, os pesos
+ * usados e quanto o corpo subiu (`lift`) para isso.
  */
 export function shapeBody(
-  body: Pick<FitBody, "base" | "deltas" | "keys">,
+  body: Pick<FitBody, "base" | "deltas" | "keys" | "index">,
   morphs: AvatarParams["morphs"],
   totalHeight: number,
+  girths?: AvatarParams["girths"],
 ) {
   const weights = body.keys.map((k) => (k && k !== "height" ? morphs[k] : 0));
-  let pos = applyMorphs(body.base, body.deltas, weights);
   const hk = body.keys.indexOf("height");
-  if (hk >= 0) {
+  const shape = () => {
+    if (hk < 0) return applyMorphs(body.base, body.deltas, weights);
+    weights[hk] = 0;
+    const pos = applyMorphs(body.base, body.deltas, weights);
     let top = 0;
     let bottom = 0;
     for (let i = 1; i < pos.length / 3; i++) {
@@ -191,9 +204,28 @@ export function shapeBody(
     }
     const h0 = pos[top * 3 + 1] - pos[bottom * 3 + 1];
     const gain = body.deltas[hk][top * 3 + 1] - body.deltas[hk][bottom * 3 + 1];
-    if (gain > 0) {
-      weights[hk] = MathUtils.clamp((totalHeight - h0) / gain, -1, 1);
-      pos = applyMorphs(body.base, body.deltas, weights);
+    if (!(gain > 0)) return pos;
+    weights[hk] = MathUtils.clamp((totalHeight - h0) / gain, -1, 1);
+    return applyMorphs(body.base, body.deltas, weights);
+  };
+  let pos = shape();
+  const gk = GIRTHS.map((g) => body.keys.indexOf(g));
+  if (girths && gk.every((k) => k >= 0)) {
+    let tape = tapes.get(body.base);
+    if (!tape) {
+      tape = makeTape(body.base, body.index);
+      tapes.set(body.base, tape);
+    }
+    for (let pass = 0; pass < GIRTH_PASSES; pass++) {
+      const got = tapeGirths(tape, pos);
+      const err = { chest: girths.chest - got.chest, waist: girths.waist - got.waist, hip: girths.hip - got.hip };
+      if (GIRTHS.every((g) => Math.abs(err[g]) < GIRTH_TOLERANCE)) break;
+      const step = girthStep(err);
+      const before = gk.map((k) => weights[k]);
+      GIRTHS.forEach((g, i) => (weights[gk[i]] = clampGirth(weights[gk[i]] + step[g])));
+      // no limite da shape key não há o que corrigir
+      if (gk.every((k, i) => weights[k] === before[i])) break;
+      pos = shape();
     }
   }
   // pés no chão
@@ -214,11 +246,12 @@ export function dress(
   totalHeight: number,
   grade: Grade,
   options: FitOptions = NO_FIT_OPTIONS,
+  girths?: AvatarParams["girths"],
 ) {
   const t0 = performance.now();
 
   // 1) corpo com as medidas, na altura do cliente e com os pés no chão
-  const { pos } = shapeBody(body, morphs, totalHeight);
+  const { pos } = shapeBody(body, morphs, totalHeight, girths);
 
   // 2) quanto os ombros subiram/desceram e foram para frente/trás
   let dy = 0;

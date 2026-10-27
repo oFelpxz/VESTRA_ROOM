@@ -34,7 +34,7 @@ ctx.onmessage = (e) => {
   }
   if (!body) return;
   const r: FitRequest = msg.request;
-  const fitted = dress(body, parts, r.morphs, r.totalHeight, r.grade, options);
+  const fitted = dress(body, parts, r.morphs, r.totalHeight, r.grade, options, r.girths);
   ctx.postMessage({ id: r.id, fitted }, [
     fitted.body.buffer,
     fitted.cloth.buffer,

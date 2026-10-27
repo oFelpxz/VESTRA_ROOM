@@ -26,7 +26,7 @@ Extensions → MPFB; feito com a 2.0.17) e roda **sem** `--factory-startup`
 # shape keys "male" e "female": corpo masculino/feminino do MakeHuman
 /Applications/Blender.app/Contents/MacOS/Blender -b -P avatar_genero.py -- avatar_orig.glb avatar_g.glb
 # peito, cintura e quadril viram "faixas" em cm, e elas e o peso são
-# suavizados pela malha; imprime CALIBRACAO
+# suavizados pela malha (a CALIBRACAO que imprime não vale mais: ver abaixo)
 mb avatar_medidas.py -- avatar_g.glb avatar_v2.glb
 # braços a 30° (pose padrão) + pesos dos braços para as roupas
 mb avatar_pose.py -- avatar_v2.glb avatar_v3.glb pesos.npz
@@ -34,8 +34,21 @@ mb avatar_pose.py -- avatar_v2.glb avatar_v3.glb pesos.npz
 mb avatar_comprimentos.py -- avatar_v3.glb
 ```
 
-`avatar_v3.glb` → `public/models/avatar_base.glb`. Se as CALIBRACAO impressas
-mudarem, atualizar `AVATAR_CALIBRATION` em `src/lib/avatar-builder.ts`.
+`avatar_v3.glb` → `public/models/avatar_base.glb`. Se as CALIBRACAO lengths
+mudarem, atualizar `AVATAR_CALIBRATION.lengths` em `src/lib/avatar-builder.ts`.
+
+Peito, cintura e quadril (lista 11, item 7) são medidos no próprio
+`avatar_base.glb` com a fita de `src/lib/body-tape.ts` (só o tronco, sem o
+braço; peito e quadril na parte mais cheia, cintura na mais fina):
+
+```bash
+npx tsx scripts/medir-avatar.ts            # tabela: pedido × corpo
+npx tsx scripts/medir-avatar.ts calibrar   # novos base/gain das circunferências
+```
+
+A calibração é só o primeiro palpite: `shapeBody` mede o corpo e corrige os
+pesos até a fita bater (< 0,2 cm). O teste `src/lib/avatar-measurements.test.ts`
+confere 8 corpos com erro < 1 cm.
 
 ## 2. Camiseta (Boxy Tee 01) — molde M
 

@@ -30,10 +30,10 @@ function useClientBody(params: AvatarParams) {
     if (!found) throw new Error("avatar sem morph targets");
     return found;
   }, [avatar.scene]);
-  const { morphs, totalHeight } = params;
+  const { morphs, totalHeight, girths } = params;
   const pos = useMemo(
-    () => shapeBody(body, morphs, totalHeight).pos,
-    [body, morphs, totalHeight],
+    () => shapeBody(body, morphs, totalHeight, girths).pos,
+    [body, morphs, totalHeight, girths],
   );
   return { body, pos };
 }

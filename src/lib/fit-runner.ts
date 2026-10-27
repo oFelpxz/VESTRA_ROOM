@@ -21,6 +21,7 @@ export type FitRequest = {
   morphs: AvatarParams["morphs"];
   totalHeight: number;
   grade: Grade;
+  girths?: AvatarParams["girths"];
 };
 
 export type FitWorkerMessage =
@@ -60,8 +61,13 @@ export class FitRunner {
     this.post({ type: "init", body, parts, options });
   }
 
-  request(morphs: FitRequest["morphs"], totalHeight: number, grade: Grade) {
-    const r = { id: ++this.lastId, morphs, totalHeight, grade };
+  request(
+    morphs: FitRequest["morphs"],
+    totalHeight: number,
+    grade: Grade,
+    girths?: FitRequest["girths"],
+  ) {
+    const r = { id: ++this.lastId, morphs, totalHeight, grade, girths };
     if (this.current) this.next = r;
     else this.start(r);
   }
@@ -88,7 +94,7 @@ export class FitRunner {
       if (this.disposed || this.current !== r) return;
       try {
         this.done(
-          dress(this.body, this.parts, r.morphs, r.totalHeight, r.grade, this.options),
+          dress(this.body, this.parts, r.morphs, r.totalHeight, r.grade, this.options, r.girths),
         );
       } catch (error) {
         this.current = null;

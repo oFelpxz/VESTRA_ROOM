@@ -168,7 +168,7 @@ export function DressedAvatar({
   const options = useMemo(() => readFitOptions(garment.scene), [garment.scene]);
   const prints = useGarmentPrints(garmentUrl, look, selectedColor);
   const sockets = useEyeSockets(body.base);
-  const { morphs, totalHeight } = params;
+  const { morphs, totalHeight, girths } = params;
 
   // Resultado do worker, marcado com as peças para as quais foi calculado.
   const [result, setResult] = useState<{ parts: Part[]; fitted: Fitted } | null>(
@@ -193,8 +193,8 @@ export function DressedAvatar({
   }, [body, parts, options]);
 
   useEffect(() => {
-    runner.current?.request(morphs, totalHeight, grade);
-  }, [body, parts, options, morphs, totalHeight, grade]);
+    runner.current?.request(morphs, totalHeight, grade, girths);
+  }, [body, parts, options, morphs, totalHeight, girths, grade]);
 
   // Deixa o AvatarErrorBoundary mostrar o encaixe antigo.
   if (error) throw error;
