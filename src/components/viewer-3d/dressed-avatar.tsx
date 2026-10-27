@@ -18,7 +18,7 @@ import {
 } from "@/lib/garment-dress";
 import { deinterleave } from "@/lib/deinterleave";
 import { duplicateLayers } from "@/lib/garment-layers";
-import { addFabricEdge, clothMaterial, fabricOf } from "@/lib/fabric";
+import { addFabricEdge, addFabricRest, clothMaterial, fabricOf } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import { readMorphBody } from "./avatar";
 import { AVATAR_URL } from "./avatar-url";
@@ -116,6 +116,7 @@ export function extractGarment(scene: THREE.Object3D): Part[] {
       return;
     }
     addFabricEdge(geometry);
+    addFabricRest(geometry);
     const source = Array.isArray(m.material) ? m.material[0] : m.material;
     const material = source.clone();
     material.side = THREE.DoubleSide; // o avesso aparece na gola e na barra

@@ -18,6 +18,8 @@ import { EDGE_CAP, fabricEdgeAttribute } from "./fabric-edge";
  *   dobrada e pesponto tracejado — dourado no jeans.
  * - Dobras de caimento (`Wrinkle`): só na luz (a malha não muda) — em pé na
  *   camiseta, saia e vestido; deitadas na calça, juntando na barra.
+ * - Estampas (`PrintDecal`): imagem presa na posição original do pano
+ *   (`addFabricRest`), então acompanha a peça em qualquer corpo.
  *
  * A cor escolhida entra como no `tintMaterial` (`garment-color.ts`).
  */
@@ -130,11 +132,43 @@ function toPhysical(source: THREE.Material): THREE.MeshPhysicalMaterial {
 const STITCH_WIDTH = 0.0011;
 const STITCH_LENGTH = 0.0045;
 
+/**
+ * Estampa na peça: imagem com fundo transparente, posicionada no corpo de
+ * referência (avatar_base, em metros; frente = +z). Vista de frente, o lado
+ * direito da tela é +x; nas costas a imagem é espelhada para ler certo.
+ */
+export type PrintDecal = {
+  image: THREE.Texture;
+  /** Centro da estampa (x, y), em metros. */
+  center: [number, number];
+  /** Largura e altura (m). */
+  size: [number, number];
+  side: "frente" | "costas";
+};
+
+/** Quantas estampas cabem numa parte da peça (frente + costas). */
+const PRINT_SLOTS = 2;
+
+let blankPrint: THREE.DataTexture | null = null;
+
+/** Imagem vazia para a vaga sem estampa (o shader sempre lê as duas). */
+function blankPrintTexture() {
+  if (!blankPrint) {
+    blankPrint = new THREE.DataTexture(new Uint8Array(4), 1, 1, THREE.RGBAFormat);
+    blankPrint.needsUpdate = true;
+  }
+  return blankPrint;
+}
+
 const VERTEX_DECL = /* glsl */ `
 attribute vec2 fabricEdge;
 varying vec3 vFabricPos;
 varying vec3 vFabricNormal;
-varying vec2 vFabricEdge;`;
+varying vec2 vFabricEdge;
+#ifdef FABRIC_PRINT
+attribute vec3 fabricRest;
+varying vec3 vFabricRest;
+#endif`;
 
 const FRAGMENT_DECL = /* glsl */ `
 uniform sampler2D fabricMap;
@@ -152,6 +186,26 @@ uniform mat3 normalMatrix;
 varying vec3 vFabricPos;
 varying vec3 vFabricNormal;
 varying vec2 vFabricEdge;
+#ifdef FABRIC_PRINT
+uniform sampler2D printMap0;
+uniform sampler2D printMap1;
+uniform vec4 printRect0;
+uniform vec4 printRect1;
+uniform float printSide0;
+uniform float printSide1;
+varying vec3 vFabricRest;
+
+// Tinta de uma estampa neste ponto (rgb linear, alpha = cobertura). O lado
+// vem da normal de agora: a frente não vaza para as costas nem para a manga.
+vec4 fabricPrint( sampler2D map, vec4 rect, float side, vec3 fn ) {
+  vec2 uv = ( vFabricRest.xy - rect.xy ) / ( 2.0 * rect.zw ) + 0.5;
+  uv.x = side > 0.0 ? uv.x : 1.0 - uv.x;
+  if ( any( lessThan( uv, vec2( 0.0 ) ) ) || any( greaterThan( uv, vec2( 1.0 ) ) ) ) return vec4( 0.0 );
+  vec4 ink = texture2D( map, uv );
+  ink.a *= smoothstep( 0.15, 0.45, side * fn.z );
+  return ink;
+}
+#endif
 
 // Linha fina a "at" da borda, sem serrilhar: de longe some aos poucos.
 float fabricLine( float d, float at, float width ) {
@@ -219,6 +273,17 @@ const FRAGMENT_BODY = /* glsl */ `
   }
 #endif
 
+#ifdef FABRIC_PRINT
+  // Estampa (silk): cobre a cor do pano, mas a trama, a mancha e a luz das
+  // dobras continuam por cima. No avesso não aparece.
+  if ( gl_FrontFacing ) {
+    vec4 ink0 = fabricPrint( printMap0, printRect0, printSide0, fn );
+    vec4 ink1 = fabricPrint( printMap1, printRect1, printSide1, fn );
+    diffuseColor.rgb = mix( diffuseColor.rgb, ink0.rgb, ink0.a * 0.95 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, ink1.rgb, ink1.a * 0.95 );
+  }
+#endif
+
   float fabricTone = tX.a * fw.x + tY.a * fw.y + tZ.a * fw.z + 0.5;
   diffuseColor.rgb *= mix( 1.0, fabricTone, fabricThreads * fabricFine );
 
@@ -257,6 +322,7 @@ const FRAGMENT_BODY = /* glsl */ `
  * Material de tecido na cor escolhida, a partir do material do arquivo.
  * Quem chama libera com `dispose()` (a textura da trama é dividida e fica).
  * `lite` (modo leve, `render-quality.ts`): sem dobras, barra e pesponto.
+ * `prints`: até 2 estampas; a malha precisa do `addFabricRest`.
  */
 export function clothMaterial(
   source: THREE.Material,
@@ -264,6 +330,7 @@ export function clothMaterial(
   fabric: FabricName,
   wrinkle: Wrinkle | null = null,
   lite = false,
+  prints: PrintDecal[] = [],
 ): THREE.MeshPhysicalMaterial {
   const m = toPhysical(source);
   if (keepsOwnColor(source)) {
@@ -309,19 +376,35 @@ export function clothMaterial(
           : m.color.clone().multiplyScalar(1.25).addScalar(0.035),
       },
     });
+    for (let i = 0; i < PRINT_SLOTS; i++) {
+      const p = prints[i];
+      Object.assign(shader.uniforms, {
+        [`printMap${i}`]: { value: p?.image ?? blankPrintTexture() },
+        [`printRect${i}`]: {
+          value: p
+            ? new THREE.Vector4(p.center[0], p.center[1], p.size[0] / 2, p.size[1] / 2)
+            : new THREE.Vector4(0, -10, 0.001, 0.001),
+        },
+        [`printSide${i}`]: { value: p?.side === "costas" ? -1 : 1 },
+      });
+    }
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>${VERTEX_DECL}`)
       .replace(
         "#include <begin_vertex>",
-        "#include <begin_vertex>\n  vFabricPos = transformed;\n  vFabricNormal = objectNormal;\n  vFabricEdge = fabricEdge;",
+        "#include <begin_vertex>\n  vFabricPos = transformed;\n  vFabricNormal = objectNormal;\n  vFabricEdge = fabricEdge;\n#ifdef FABRIC_PRINT\n  vFabricRest = fabricRest;\n#endif",
       );
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>${FRAGMENT_DECL}`)
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>${FRAGMENT_BODY}`);
   };
-  // O código do shader muda só com o ajuste da cor; o resto são uniforms.
+  // O código do shader muda só com o ajuste da cor, o modo leve e ter ou não
+  // estampa; o resto são uniforms.
   if (lite) m.defines = { ...m.defines, FABRIC_LITE: "" };
-  m.customProgramCacheKey = () => `vestra-fabric-${mean != null ? 1 : 0}${lite ? "-lite" : ""}`;
+  const printed = prints.length > 0;
+  if (printed) m.defines = { ...m.defines, FABRIC_PRINT: "" };
+  m.customProgramCacheKey = () =>
+    `vestra-fabric-${mean != null ? 1 : 0}${lite ? "-lite" : ""}${printed ? "-print" : ""}`;
   return m;
 }
 
@@ -336,5 +419,16 @@ export function clothMaterial(
 export function addFabricEdge(g: THREE.BufferGeometry) {
   const e = fabricEdgeAttribute(g.getAttribute("position").array, g.getIndex()?.array ?? null);
   g.setAttribute("fabricEdge", new THREE.BufferAttribute(e, 2));
+  return g;
+}
+
+/**
+ * Guarda a posição original do pano (antes de vestir no corpo), onde as
+ * estampas ficam presas. Chamar antes de trocar a `position` pelo caimento;
+ * as cópias da geometria (`clone`) levam junto.
+ */
+export function addFabricRest(g: THREE.BufferGeometry) {
+  const p = g.getAttribute("position");
+  g.setAttribute("fabricRest", new THREE.BufferAttribute(new Float32Array(p.array as ArrayLike<number>), 3));
   return g;
 }

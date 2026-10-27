@@ -1,6 +1,8 @@
 "use client";
 
 import { Jost, Permanent_Marker } from "next/font/google";
+import { useEffect, useState } from "react";
+import * as THREE from "three";
 import { drawLogo, logoAspect, logoInks, type LogoKind } from "@/lib/brand-logo";
 
 // Fontes do logo A1, servidas pelo próprio site (o next/font baixa no build).
@@ -30,4 +32,38 @@ export function logoCanvas(kind: LogoKind, baseHex: string, width = 1024) {
   canvas.height = Math.round(width / logoAspect(kind));
   drawLogo(canvas.getContext("2d")!, kind, width, logoInks(baseHex), FONTS);
   return canvas;
+}
+
+const textures = new Map<string, THREE.CanvasTexture>();
+
+/**
+ * Logo como textura para estampa (`PrintDecal`), uma por versão e cor de
+ * tinta, dividida entre as peças. Chamar depois de `loadBrandFonts()`.
+ */
+export function logoTexture(kind: LogoKind, baseHex: string) {
+  const inks = logoInks(baseHex);
+  const key = `${kind}-${inks.word}`;
+  let t = textures.get(key);
+  if (!t) {
+    t = new THREE.CanvasTexture(logoCanvas(kind, baseHex));
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    textures.set(key, t);
+  }
+  return t;
+}
+
+/** Fontes do logo prontas? Até lá a peça aparece sem estampa. */
+export function useBrandFontsReady() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadBrandFonts().then(() => alive && setReady(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return ready;
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { bottomWrinkle } from "@/lib/bottom-fit";
 import { deinterleave } from "@/lib/deinterleave";
-import { addFabricEdge, clothMaterial, fabricOf, type Wrinkle } from "@/lib/fabric";
+import { addFabricEdge, addFabricRest, clothMaterial, fabricOf, type Wrinkle } from "@/lib/fabric";
 import { duplicateLayers } from "@/lib/garment-layers";
 import { isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
 
@@ -44,6 +44,7 @@ function piecesOf(scene: THREE.Object3D): Piece[] {
       return;
     }
     addFabricEdge(geometry);
+    addFabricRest(geometry);
     const wrinkle = !fitted
       ? null
       : bottom
