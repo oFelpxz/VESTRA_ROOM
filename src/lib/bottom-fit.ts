@@ -30,6 +30,11 @@ const BULGE_MID = 0.01; // m do meio do corpo: daí para fora, só pele do mesmo
 const MID_KEEP = 0.5; // perto do meio, fica pelo menos a essa fração da distância do molde
 const BULGE_CHEST_Y = 1.05; // m no molde: daqui para cima (só o corpete do vestido) volta a valer
 const BULGE_NECK_Y = 1.25; // m no molde: até onde começa o alisamento da borda (acima, borda e alcinhas serrilhavam)
+// O empurrão de cada ponto vira o maior dos vizinhos a até BULGE_SPREAD (no
+// molde, do mesmo lado do meio) e depois a média deles: nunca fica menor que
+// o do ponto. Ponto a ponto, no glúteo grande cada um achava uma pele
+// diferente "embaixo" e o tecido virava um amassado de triângulos escuros.
+const BULGE_SPREAD = 0.012; // m
 // Borda de cima e alças do vestido: cada ponto anda a média dos pontos do
 // tecido em volta (no molde, de qualquer camada). Seguindo cada um a sua pele,
 // no corpo magro as alças enrugavam e a borda ondulava; pelas arestas da malha
@@ -81,6 +86,10 @@ const TUCK_BLEND = 0.03; // m
 // magro o quadril e o bolso da calça saíam pela lateral da camiseta ali.
 const UNDER_GAP = 0.003;
 const UNDER_BLEND = 0.01; // m
+// Na saia o aperto já vem inteiro na barra e some até UNDER_BLEND_SKIRT
+// abaixo dela: em 1 cm as pregas largas eram puxadas numa fileira só e
+// faziam um "V" de degraus escuros nas costas, logo abaixo da camiseta.
+const UNDER_BLEND_SKIRT = 0.04; // m
 // Comprimento: só abaixo do entrepernas do molde (m), até a barra.
 const MOLDE_CROTCH_Y = 0.776;
 const MAX_LONGER = 0.05; // m a mais, no máximo (a barra para no chão)
@@ -159,6 +168,8 @@ export type BottomBinding = {
   legEdges: Int32Array;
   /** Calça ou bermuda (pernas separadas); saia e vestido não. */
   pants: boolean;
+  /** Vizinhos de cada ponto a até BULGE_SPREAD, no molde (n + 1 inícios). */
+  spread: { start: Int32Array; near: Int32Array };
 };
 
 /**
@@ -282,7 +293,60 @@ export function bindBottom(
     hemY: refY.reduce((m, y) => Math.min(m, y), Infinity),
     legEdges: legEdges(base, index),
     pants: bottomWrinkle(cloth) === "calca",
+    spread: spreadNeighbors(cloth),
   };
+}
+
+/** Vizinhos de cada ponto a até BULGE_SPREAD, do mesmo lado do meio (ver BULGE_MID). */
+function spreadNeighbors(cloth: Float32Array): BottomBinding["spread"] {
+  const n = cloth.length / 3;
+  const cell = BULGE_SPREAD;
+  const key = (cx: number, cy: number, cz: number) => ((cx + 512) * 1024 + (cy + 512)) * 1024 + (cz + 512);
+  const grid = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const k = key(Math.floor(cloth[i * 3] / cell), Math.floor(cloth[i * 3 + 1] / cell), Math.floor(cloth[i * 3 + 2] / cell));
+    const list = grid.get(k);
+    if (list) list.push(i);
+    else grid.set(k, [i]);
+  }
+  const side = (i: number) => (Math.abs(cloth[i * 3]) > BULGE_MID ? Math.sign(cloth[i * 3]) : 0);
+  const start = new Int32Array(n + 1);
+  const near: number[] = [];
+  for (let i = 0; i < n; i++) {
+    start[i] = near.length;
+    const [x, y, z] = [cloth[i * 3], cloth[i * 3 + 1], cloth[i * 3 + 2]];
+    const [cx, cy, cz] = [Math.floor(x / cell), Math.floor(y / cell), Math.floor(z / cell)];
+    const si = side(i);
+    for (let u = -1; u <= 1; u++)
+      for (let v = -1; v <= 1; v++)
+        for (let t = -1; t <= 1; t++)
+          for (const j of grid.get(key(cx + u, cy + v, cz + t)) ?? []) {
+            const sj = side(j);
+            if (si !== 0 && sj !== 0 && si !== sj) continue;
+            const d = (cloth[j * 3] - x) ** 2 + (cloth[j * 3 + 1] - y) ** 2 + (cloth[j * 3 + 2] - z) ** 2;
+            if (d <= BULGE_SPREAD * BULGE_SPREAD) near.push(j);
+          }
+  }
+  start[n] = near.length;
+  return { start, near: Int32Array.from(near) };
+}
+
+/** Maior valor entre os vizinhos e depois a média deles (ver BULGE_SPREAD). */
+export function spreadPush({ start, near }: BottomBinding["spread"], push: Float32Array): Float32Array {
+  const n = push.length;
+  const most = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let m = push[i];
+    for (let k = start[i]; k < start[i + 1]; k++) m = Math.max(m, push[near[k]]);
+    most[i] = m;
+  }
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let sum = most[i];
+    for (let k = start[i]; k < start[i + 1]; k++) sum += most[near[k]];
+    out[i] = sum / (start[i + 1] - start[i] + 1);
+  }
+  return out;
 }
 
 /** Vizinhos de cada ponto acima de SMOOTH_FROM_Y, entre eles, no molde. */
@@ -469,6 +533,9 @@ export function fitBottom(
   const n = gap.length;
   const out = new Float32Array(n * 3);
   const anchor = new Float32Array(n * 3);
+  const gapAt = new Float32Array(n);
+  const push = new Float32Array(n);
+  const aboveAt = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     let sx = 0;
     let sy = 0;
@@ -546,10 +613,18 @@ export function fitBottom(
       Math.max((MOLDE_CROTCH_Y + BULGE_TOP - refY[i]) / TIGHT_LEG_BLEND, chest, 0),
       1,
     );
-    if (bulge > -Infinity) g = Math.max(g, g + (Math.min(bulge + MIN_GAP, g + BULGE_MAX) - g) * below);
+    if (bulge > -Infinity) push[i] = Math.max((Math.min(bulge + MIN_GAP, g + BULGE_MAX) - g) * below, 0);
     anchor[i * 3] = sx;
     anchor[i * 3 + 1] = sy;
     anchor[i * 3 + 2] = sz;
+    gapAt[i] = g;
+    aboveAt[i] = above;
+  }
+  const lift = spreadPush(binding.spread, push);
+  for (let i = 0; i < n; i++) {
+    const [sx, sy, sz] = [anchor[i * 3], anchor[i * 3 + 1], anchor[i * 3 + 2]];
+    const g = gapAt[i] + lift[i];
+    const above = aboveAt[i];
     out[i * 3] = sx + dir[i * 3] * g;
     out[i * 3 + 1] = sy + dir[i * 3 + 1] * g;
     out[i * 3 + 2] = sz + dir[i * 3 + 2] * g;
@@ -574,7 +649,9 @@ export function fitBottom(
       }
     }
     if (tuck != null && typeof tuck !== "number") {
-      const w = Math.min(Math.max((above + UNDER_BLEND / 2) / UNDER_BLEND, 0), 1);
+      const w = pants
+        ? Math.min(Math.max((above + UNDER_BLEND / 2) / UNDER_BLEND, 0), 1)
+        : Math.min(Math.max((above + UNDER_BLEND_SKIRT) / UNDER_BLEND_SKIRT, 0), 1);
       const dx = out[i * 3] - tuck.cx;
       const dz = out[i * 3 + 2] - tuck.cz;
       const r = Math.hypot(dx, dz);

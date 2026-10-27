@@ -8,6 +8,7 @@ import {
   fitBottom,
   meshEdges,
   restOnShoes,
+  spreadPush,
   type TopHem,
 } from "./bottom-fit";
 
@@ -125,7 +126,16 @@ describe("fitBottom debaixo da peça de cima vestida", () => {
   });
 
   it("abaixo da barra (à mostra), a peça de cima não aperta", () => {
-    close(fit(hem(1.02, 0.11)), 0.12, 1e-5);
+    close(fit(hem(1.05, 0.11)), 0.12, 1e-5);
+  });
+
+  it("saia: logo abaixo da barra o aperto some aos poucos", () => {
+    const skirt = (tuck: TopHem) =>
+      fitBottom({ ...bindBottom(POINT, WALL), pants: false }, WALL, 0, tuck)[0];
+    const x = skirt(hem(1.01, 0.11));
+    assert.ok(x > 0.107 + 1e-4 && x < 0.12 - 1e-4, `${x}`);
+    assert.ok(skirt(hem(1.02, 0.11)) > x);
+    close(fit(hem(1.01, 0.11)), 0.12, 1e-5); // na calça, não
   });
 });
 
@@ -408,3 +418,28 @@ describe("bottomWrinkle", () => {
     assert.equal(bottomWrinkle(new Float32Array(shorts)), "calca");
   });
 });
+
+describe("empurrão da pele espalhado entre vizinhos", () => {
+  // Fileira de 5 pontos, cada um vizinho dos do lado.
+  const spread = {
+    start: Int32Array.from([0, 1, 3, 5, 7, 8]),
+    near: Int32Array.from([1, 0, 2, 1, 3, 2, 4, 3]),
+  };
+
+  it("nunca fica menor que o empurrão do próprio ponto", () => {
+    const push = Float32Array.from([0, 0.008, 0, 0.002, 0]);
+    const out = spreadPush(spread, push);
+    push.forEach((p, i) => assert.ok(out[i] >= p - 1e-7, `${i}: ${out[i]} < ${p}`));
+  });
+
+  it("um ponto isolado não fica de bico: os vizinhos sobem junto", () => {
+    const out = spreadPush(spread, Float32Array.from([0, 0, 0.008, 0, 0]));
+    assert.ok(out[1] > 0.004 && out[3] > 0.004, `${out}`);
+    assert.ok(out[0] > 0 && out[0] < out[1], `${out}`);
+  });
+
+  it("sem empurrão, nada muda", () => {
+    assert.deepEqual([...spreadPush(spread, new Float32Array(5))], [0, 0, 0, 0, 0]);
+  });
+});
+

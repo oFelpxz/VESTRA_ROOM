@@ -395,7 +395,9 @@ export function clothMaterial(
   if (lum < BLACK_FLOOR) m.color.addScalar(BLACK_FLOOR - lum);
   const mean = color && m.map ? meanLuminance(m.map) : null;
 
-  // Com mapa de aspereza (moletom), ele manda; senão, a do tecido.
+  // Com mapa de aspereza (moletom), ele manda; senão, a do tecido. Nos outros
+  // o mapa do arquivo deixava faixas lisas brilhando (barra da track jacket).
+  if (fabric !== "moletom") m.roughnessMap = null;
   if (!m.roughnessMap) m.roughness = look.roughness;
   m.metalness = 0;
   m.specularIntensity = look.specular;

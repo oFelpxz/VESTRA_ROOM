@@ -5,7 +5,7 @@ import { Html, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
 import type { TopHem } from "@/lib/bottom-fit";
-import type { Grade } from "@/lib/garment-fit";
+import { BODY_GRID_CELL, PointGrid, type Grade } from "@/lib/garment-fit";
 import { FitRunner } from "@/lib/fit-runner";
 import {
   SHOULDER,
@@ -17,7 +17,7 @@ import {
   type Fitted,
 } from "@/lib/garment-dress";
 import { deinterleave } from "@/lib/deinterleave";
-import { duplicateLayers } from "@/lib/garment-layers";
+import { dropInnerPieces, duplicateLayers, type Skin } from "@/lib/garment-layers";
 import { addFabricEdge, addFabricRest, clothMaterial, fabricOf, type PrintDecal } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import type { GarmentLook } from "@/lib/garment-prints";
@@ -97,7 +97,11 @@ function readFitOptions(scene: THREE.Object3D): FitOptions {
   return { rib };
 }
 
-export function extractGarment(scene: THREE.Object3D): Part[] {
+/**
+ * `skin`: pele do corpo de referência, para tirar o avesso que vem como pedaço
+ * solto na mesma malha (Hoodie Core); sem ela, só o avesso em malha separada.
+ */
+export function extractGarment(scene: THREE.Object3D, skin?: Skin): Part[] {
   scene.updateMatrixWorld(true);
   const meshes: { mesh: THREE.Mesh; geometry: THREE.BufferGeometry }[] = [];
   scene.traverse((o) => {
@@ -107,6 +111,7 @@ export function extractGarment(scene: THREE.Object3D): Part[] {
     geometry.applyMatrix4(m.matrixWorld);
     geometry.morphAttributes = {};
     deinterleave(geometry);
+    if (skin) dropInnerPieces(geometry, skin);
     meshes.push({ mesh: m, geometry });
   });
   // O avesso duplicado furava a camada de fora (ver garment-layers.ts).
@@ -155,7 +160,10 @@ export function DressedAvatar({
   const garment = useGLTF(garmentUrl);
 
   const body = useMemo(() => extractBody(avatar.scene), [avatar.scene]);
-  const parts = useMemo(() => extractGarment(garment.scene), [garment.scene]);
+  const parts = useMemo(
+    () => extractGarment(garment.scene, { grid: new PointGrid(body.base, BODY_GRID_CELL), positions: body.base }),
+    [garment.scene, body],
+  );
   const options = useMemo(() => readFitOptions(garment.scene), [garment.scene]);
   const prints = useGarmentPrints(garmentUrl, look, selectedColor);
   const { morphs, totalHeight } = params;
