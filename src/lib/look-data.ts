@@ -13,6 +13,8 @@ export type LookProduct = {
   slug: string;
   name: string;
   price: string;
+  /** Preço em reais (promocional, se houver), para somar o look. */
+  priceValue: number;
   imageUrl: string | null;
   colors: string[];
   sizes: string[];
@@ -78,6 +80,7 @@ async function lookProducts(where: Prisma.ProductWhereInput): Promise<LookProduc
     slug: p.slug,
     name: p.name,
     price: formatBRL(Number(p.promotionalPrice ?? p.basePrice)),
+    priceValue: Number(p.promotionalPrice ?? p.basePrice),
     imageUrl: p.images[0]?.url ?? null,
     colors: [...new Set(p.variants.map((v) => v.color))],
     sizes: sortSizes([...new Set(p.variants.map((v) => v.size))]),

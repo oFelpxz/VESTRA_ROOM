@@ -6,6 +6,7 @@
  * soma das peças. Regras puras, sem banco.
  */
 
+import { colorToHex } from "./color-names";
 import { lookOf, type GarmentLook } from "./garment-prints";
 
 export type BrandLookPiece = { product: string; color: string };
@@ -75,4 +76,28 @@ export function brandLooksWith(productSlug: string): BrandLook[] {
 /** A linha que a cor da peça de cima diz (confere o cadastro do look). */
 export function lineOfTop(look: BrandLook): GarmentLook | null {
   return lookOf(look.top.color);
+}
+
+/** Peça do look vestida no 3D: modelo, cor (hex) e versão com estampa. */
+export type OutfitPiece = { url: string; color: string; look: GarmentLook | null };
+export type BrandLookOutfit = { top: OutfitPiece | null; bottom: OutfitPiece | null; accessory: OutfitPiece | null };
+
+/**
+ * Monta o look para o manequim. Sem o molde 3D de alguma peça, não há look
+ * para vestir (null): o manequim pela metade enganaria quem compra.
+ */
+export function brandLookOutfit(
+  items: { role: "top" | "bottom" | "accessory"; modelUrl: string | null; color: string }[],
+): BrandLookOutfit | null {
+  const outfit: BrandLookOutfit = { top: null, bottom: null, accessory: null };
+  for (const item of items) {
+    if (!item.modelUrl) return null;
+    outfit[item.role] = { url: item.modelUrl, color: colorToHex(item.color), look: lookOf(item.color) };
+  }
+  return outfit.top || outfit.bottom ? outfit : null;
+}
+
+/** Preço do look: a soma das peças, sem desconto (em centavos inteiros). */
+export function brandLookTotal(prices: number[]): number {
+  return prices.reduce((sum, p) => sum + Math.round(p * 100), 0) / 100;
 }

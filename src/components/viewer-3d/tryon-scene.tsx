@@ -21,6 +21,7 @@ import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
 import { BareAvatar, BottomGarment, Shoes, hemHeight } from "./bottom-garment";
 import { LiteContext } from "./lite-context";
+import { MannequinFinish } from "./skin-material";
 import { StudioAO } from "./studio-ao";
 import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
 import { isAccessoryPiece, isBottomPiece, isFittedToMannequin } from "./mannequin-mark";
@@ -436,6 +437,7 @@ export function TryOnScene({
   view = null,
   autoRotate = false,
   focus = "body",
+  mannequin = false,
 }: {
   avatarParams: AvatarParams;
   top: ScenePiece | null;
@@ -449,6 +451,8 @@ export function TryOnScene({
   autoRotate?: boolean;
   /** "head": provador da touca, enquadrado da cabeça ao peito. */
   focus?: "body" | "head";
+  /** Acabamento de manequim de loja no lugar da pele (looks da marca). */
+  mannequin?: boolean;
 }) {
   const head = focus === "head";
   const headY = avatarParams.anchors.head.y;
@@ -485,6 +489,7 @@ export function TryOnScene({
       <StudioLights shadows={!lite} />
 
       <LiteContext.Provider value={lite}>
+      <MannequinFinish.Provider value={mannequin}>
       <Suspense fallback={<Loader />}>
         {top || bottom ? (
           <Outfit params={avatarParams} top={top} bottom={bottom} primary={primary} />
@@ -509,6 +514,7 @@ export function TryOnScene({
           />
         )}
       </Suspense>
+      </MannequinFinish.Provider>
       </LiteContext.Provider>
 
       <OrbitControls

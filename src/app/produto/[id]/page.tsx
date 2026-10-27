@@ -14,6 +14,9 @@ import { getReviewEligibility } from "@/lib/review-actions";
 import { isProductFavorite } from "@/lib/favorites";
 import { FavoriteButton } from "@/components/product/favorite-button";
 import { formatBRL } from "@/lib/format";
+import { getBrandLooks } from "@/lib/look-data";
+import { BrandLookProvider, BrandLookStage } from "@/components/look/brand-look-stage";
+import { CompleteLook } from "@/components/look/complete-look";
 
 export async function generateMetadata({
   params,
@@ -55,12 +58,15 @@ export default async function ProdutoPage({
   }
 
   const isLoggedIn = !!session?.user;
-  const [eligibility, isFavorite] = await Promise.all([
+  const [eligibility, isFavorite, allLooks] = await Promise.all([
     getReviewEligibility(product.id),
     session?.user?.id
       ? isProductFavorite(session.user.id, product.id)
       : Promise.resolve(false),
+    getBrandLooks(),
   ]);
+  // Looks prontos da marca que levam esta peça (lista 10, item 5).
+  const brandLooks = allLooks.filter((l) => l.items.some((i) => i.product.slug === product.slug));
 
   const installments = product.maxInstallments && product.maxInstallments > 1
     ? {
@@ -75,10 +81,12 @@ export default async function ProdutoPage({
 
   return (
     <ProductColorProvider>
+      <BrandLookProvider>
       <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
         <div className="grid grid-cols-1 gap-12 md:grid-cols-2">
-          {/* Visual: 3D quando disponível, senão placeholder */}
-          <div>
+          {/* Visual: 3D quando disponível, senão placeholder; ou o look pronto no manequim */}
+          <div id="produto-visual" className="scroll-mt-24">
+            <BrandLookStage looks={brandLooks}>
             {product.has3D && product.modelUrl ? (
               <div className="relative aspect-square overflow-hidden rounded-sm border border-border bg-muted">
                 <span className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.2em] text-foreground/60">
@@ -103,6 +111,7 @@ export default async function ProdutoPage({
                 {product.model3DAvailableSizes.join(", ")}
               </p>
             )}
+            </BrandLookStage>
           </div>
 
           {/* Detalhes */}
@@ -179,6 +188,8 @@ export default async function ProdutoPage({
               </Link>
             )}
             {product.has3D && product.modelUrl && <PreloadTryOn />}
+
+            <CompleteLook looks={brandLooks} productSlug={product.slug} />
 
             {/* Tabela de medidas */}
             {product.sizeChart && product.sizeChart.rows.length > 0 && (
@@ -332,6 +343,7 @@ export default async function ProdutoPage({
           </div>
         </div>
       </section>
+      </BrandLookProvider>
     </ProductColorProvider>
   );
 }
