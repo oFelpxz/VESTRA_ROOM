@@ -73,6 +73,11 @@ export function brandLooksWith(productSlug: string): BrandLook[] {
   return BRAND_LOOKS.filter((l) => brandLookPieces(l).some((p) => p.product === productSlug));
 }
 
+/** "Experimentar este look": o provador da peça de cima, já vestido com o look. */
+export function brandLookTryOnHref(look: BrandLook): string {
+  return `/produto/${look.top.product}/provador?marca=${look.slug}`;
+}
+
 /** A linha que a cor da peça de cima diz (confere o cadastro do look). */
 export function lineOfTop(look: BrandLook): GarmentLook | null {
   return lookOf(look.top.color);

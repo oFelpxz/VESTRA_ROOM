@@ -6,6 +6,7 @@ import {
   brandLookOutfit,
   brandLookPieces,
   brandLookTotal,
+  brandLookTryOnHref,
   brandLooksWith,
   lineOfTop,
 } from "./brand-looks";
@@ -61,4 +62,8 @@ test("look no manequim: sem o 3D de uma peça não veste", () => {
 test("preço do look é a soma das peças, sem desconto", () => {
   assert.equal(brandLookTotal([199.9, 249.9, 89.9]), 539.7);
   assert.equal(brandLookTotal([]), 0);
+});
+
+test("experimentar o look abre o provador da peça de cima", () => {
+  assert.equal(brandLookTryOnHref(brandLookBySlug("sport-verao")!), "/produto/track-jacket/provador?marca=sport-verao");
 });

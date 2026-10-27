@@ -49,36 +49,9 @@ export function CompleteLook({
                 </span>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{look.caption}</p>
-              <ul className="mt-3 divide-y divide-border/60 text-sm">
-                {look.items.map((item) => (
-                  <li key={item.role} className="flex items-center justify-between gap-4 py-2">
-                    <span className="min-w-0">
-                      {item.product.slug === productSlug ? (
-                        <span className="font-medium">{item.product.name}</span>
-                      ) : (
-                        <Link
-                          href={`/produto/${item.product.slug}`}
-                          className="font-medium underline-offset-2 hover:underline"
-                        >
-                          {item.product.name}
-                        </Link>
-                      )}
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        <ColorLabel name={item.color} />
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-muted-foreground">{item.product.price}</span>
-                  </li>
-                ))}
-              </ul>
+              <LookPieceList look={look} currentSlug={productSlug} />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm">
-                  Look completo{" "}
-                  <span className="font-semibold">
-                    {formatBRL(brandLookTotal(look.items.map((i) => i.product.priceValue)))}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">Soma das peças</span>
-                </p>
+                <LookTotal look={look} />
                 {canWear && (
                   <button
                     type="button"
@@ -96,5 +69,46 @@ export function CompleteLook({
         })}
       </ul>
     </div>
+  );
+}
+
+/** Peças do look: nome (link para a peça), cor e preço. */
+export function LookPieceList({ look, currentSlug }: { look: ResolvedBrandLook; currentSlug?: string }) {
+  return (
+    <ul className="mt-3 divide-y divide-border/60 text-sm">
+      {look.items.map((item) => (
+        <li key={item.role} className="flex items-center justify-between gap-4 py-2">
+          <span className="min-w-0">
+            {item.product.slug === currentSlug ? (
+              <span className="font-medium">{item.product.name}</span>
+            ) : (
+              <Link
+                href={`/produto/${item.product.slug}`}
+                className="font-medium underline-offset-2 hover:underline"
+              >
+                {item.product.name}
+              </Link>
+            )}
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              <ColorLabel name={item.color} />
+            </span>
+          </span>
+          <span className="shrink-0 text-muted-foreground">{item.product.price}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Preço do look: a soma das peças, sem desconto. */
+export function LookTotal({ look }: { look: ResolvedBrandLook }) {
+  return (
+    <p className="text-sm">
+      Look completo{" "}
+      <span className="font-semibold">
+        {formatBRL(brandLookTotal(look.items.map((i) => i.product.priceValue)))}
+      </span>
+      <span className="block text-xs text-muted-foreground">Soma das peças</span>
+    </p>
   );
 }
