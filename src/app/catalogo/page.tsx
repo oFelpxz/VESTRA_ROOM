@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/auth-actions";
+import { ColorLabel } from "@/components/product/color-swatch";
 import { ProductCard } from "@/components/product/product-card";
 import { getFavoriteProductIds } from "@/lib/favorites";
 import { getCartItemCount } from "@/lib/cart";
@@ -233,7 +234,7 @@ export default async function CatalogoPage({
                   href={hrefWith(current, "cor", c)}
                   active={current.cor === c}
                 >
-                  {c}
+                  <ColorLabel name={c} />
                 </NavLink>
               ))}
             </Section>

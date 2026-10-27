@@ -101,7 +101,7 @@ export async function getFilterOptions() {
     select: { size: true, color: true },
   });
   const sizes = sortSizes([...new Set(variants.map((v) => v.size))]);
-  const colors = [...new Set(variants.map((v) => v.color))].sort();
+  const colors = [...new Set(variants.map((v) => v.color))].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   const products = await prisma.product.findMany({
     where: { status: "ACTIVE" },
