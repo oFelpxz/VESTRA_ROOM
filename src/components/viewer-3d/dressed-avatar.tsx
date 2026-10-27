@@ -199,18 +199,19 @@ export function DressedAvatar({
   // Deixa o AvatarErrorBoundary mostrar o encaixe antigo.
   if (error) throw error;
 
+  // Troca de peça: até o worker devolver o caimento novo, segue a anterior na tela.
   const fitted = result?.parts === parts ? result.fitted : null;
-  const hem = fitted?.hem ?? null;
+  const [shown, setShown] = useState<Shown | null>(null);
+  if (
+    fitted &&
+    (shown?.fitted !== fitted || shown.selectedColor !== selectedColor || shown.prints !== prints)
+  )
+    setShown({ parts, index: body.index, sockets, fitted, selectedColor, prints });
+  const view = fitted ? { parts, index: body.index, sockets, fitted, selectedColor, prints } : shown;
+  const hem = view?.fitted.hem ?? null;
   useEffect(() => onHem?.(hem), [onHem, hem]);
-  return fitted ? (
-    <FittedAvatar
-      parts={parts}
-      index={body.index}
-      sockets={sockets}
-      fitted={fitted}
-      selectedColor={selectedColor}
-      prints={prints}
-    />
+  return view ? (
+    <FittedAvatar {...view} />
   ) : (
     <Html center>
       <div className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/60">
@@ -220,21 +221,16 @@ export function DressedAvatar({
   );
 }
 
-function FittedAvatar({
-  parts,
-  index,
-  sockets,
-  fitted,
-  selectedColor,
-  prints,
-}: {
+type Shown = {
   parts: Part[];
   index: number[];
   sockets: EyeSocket[];
   fitted: Fitted;
   selectedColor?: string;
   prints: PrintDecal[];
-}) {
+};
+
+function FittedAvatar({ parts, index, sockets, fitted, selectedColor, prints }: Shown) {
   const lite = useLite();
   const clothGeometries = useMemo(
     () =>

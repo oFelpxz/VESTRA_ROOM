@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
@@ -285,6 +285,42 @@ export function Outfit({
   );
 }
 
+type LookPieces = {
+  top: ScenePiece | null;
+  bottom: ScenePiece | null;
+  accessory: ScenePiece | null;
+  primary: "top" | "bottom";
+};
+
+/**
+ * Peças na cena. Trocar cor, tamanho ou peça não apaga o avatar: enquanto o
+ * modelo novo carrega, continua o look anterior e a troca acontece de uma vez
+ * (useDeferredValue — dentro do Canvas, para valer na raiz do R3F).
+ */
+function Look({ params, pieces }: { params: AvatarParams; pieces: LookPieces }) {
+  // As peças chegam como objetos novos a cada render; a chave só muda com o conteúdo.
+  const key = JSON.stringify(pieces);
+  const stable = useMemo(() => JSON.parse(key) as LookPieces, [key]);
+  const { top, bottom, accessory, primary } = useDeferredValue(stable);
+  return (
+    <>
+      {top || bottom ? (
+        <Outfit params={params} top={top} bottom={bottom} primary={primary} />
+      ) : (
+        accessory && <BareAvatar params={params} />
+      )}
+      {accessory && <Accessory params={params} piece={accessory} />}
+      {(top || bottom || accessory) && (
+        <AvatarErrorBoundary fallback={null}>
+          <Suspense fallback={null}>
+            <Shoes params={params} />
+          </Suspense>
+        </AvatarErrorBoundary>
+      )}
+    </>
+  );
+}
+
 const VIEW_ANGLE: Record<"front" | "side" | "back", number> = {
   front: 0,
   side: Math.PI / 2,
@@ -555,19 +591,7 @@ export function TryOnScene({
       <SkinToneContext.Provider value={tone}>
       <HairContext.Provider value={cut}>
       <Suspense fallback={<Loader />}>
-        {top || bottom ? (
-          <Outfit params={avatarParams} top={top} bottom={bottom} primary={primary} />
-        ) : (
-          accessory && <BareAvatar params={avatarParams} />
-        )}
-        {accessory && <Accessory params={avatarParams} piece={accessory} />}
-        {(top || bottom || accessory) && (
-          <AvatarErrorBoundary fallback={null}>
-            <Suspense fallback={null}>
-              <Shoes params={avatarParams} />
-            </Suspense>
-          </AvatarErrorBoundary>
-        )}
+        <Look params={avatarParams} pieces={{ top, bottom, accessory, primary }} />
         {!lite && (
           <ContactShadows
             position={[0, 0.005, 0]}
