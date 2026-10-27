@@ -12,6 +12,7 @@ import {
 } from "@/lib/fit-regions";
 import { LOOK_NAME_LIMIT } from "@/lib/looks";
 import type { LookProduct, OpenLook } from "@/lib/look-data";
+import { ColorLabel } from "@/components/product/color-swatch";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
 import { FitPill } from "./fit-indicator";
 
@@ -156,7 +157,7 @@ export function LookBuilder({
                 onClick={() => setAccessoryColor(c)}
                 className={chip(effectiveAccessoryColor === c)}
               >
-                {c}
+                <ColorLabel name={c} />
               </button>
             ))}
           </div>
@@ -316,7 +317,7 @@ export function LookBuilder({
           <div className="flex flex-wrap gap-1.5">
             {product.colors.map((c) => (
               <button key={c} type="button" onClick={() => setColor(c)} className={chip(effectiveColor === c)}>
-                {c}
+                <ColorLabel name={c} />
               </button>
             ))}
           </div>

@@ -21,6 +21,7 @@ import { lookOf } from "@/lib/garment-prints";
 import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
 import { bottomEase, bottomLength } from "@/lib/bottom-fit";
 import type { LookProduct, OpenLook } from "@/lib/look-data";
+import { ColorLabel, LookLegend } from "@/components/product/color-swatch";
 import { TryOnScene, type CameraView, type ScenePiece } from "./tryon-scene";
 import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
 import { LookBuilder, type LookSelection } from "./look-builder";
@@ -616,11 +617,12 @@ export function TryOnExperience({
                         : "border-foreground/20 hover:border-foreground"
                     } ${!enabled ? "cursor-not-allowed opacity-40 line-through" : ""}`}
                   >
-                    {c}
+                    <ColorLabel name={c} />
                   </button>
                 );
               })}
             </div>
+            <LookLegend colors={colors} />
           </div>
         )}
 

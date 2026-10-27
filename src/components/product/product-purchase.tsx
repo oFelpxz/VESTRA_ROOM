@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { addToCartAction, type CartActionState } from "@/lib/cart-actions";
+import { ColorLabel, LookLegend } from "./color-swatch";
 import { useProductColor } from "./product-color";
 
 const initialState: CartActionState = {};
@@ -85,11 +86,12 @@ export function ProductPurchase({
                       : "border-foreground/20 hover:border-foreground"
                   } ${!enabled ? "cursor-not-allowed opacity-40 line-through" : ""}`}
                 >
-                  {c}
+                  <ColorLabel name={c} />
                 </button>
               );
             })}
           </div>
+          <LookLegend colors={colors} />
         </div>
       )}
 

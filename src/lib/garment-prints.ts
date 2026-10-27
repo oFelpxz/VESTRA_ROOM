@@ -13,6 +13,12 @@ import type { LogoKind } from "./brand-logo";
 
 export type GarmentLook = "street" | "sport";
 
+/** O que cada versão tem, para a legenda dos botões de cor. */
+export const LOOK_INFO: Record<GarmentLook, string> = {
+  street: "Street: logo grande nas costas e pequeno no peito",
+  sport: "Sport: logo no peito e faixa lima nas mangas",
+};
+
 export function lookOf(colorName: string | null | undefined): GarmentLook | null {
   const name = colorName?.trim() ?? "";
   if (/\bstreet$/i.test(name)) return "street";
