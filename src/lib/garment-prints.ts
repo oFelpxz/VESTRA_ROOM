@@ -28,19 +28,31 @@ export type PrintSpot = {
 
 // Camiseta: logo grande no meio das costas, abaixo da gola.
 const BACK_TEE: PrintSpot = { kind: "costas", center: [0, 1.22], width: 0.24, side: "costas" };
+// Logo pequeno no peito esquerdo de quem veste (x > 0: a peça olha para +z).
+const CHEST_TEE: PrintSpot = { kind: "peito", center: [0.09, 1.3], width: 0.09, side: "frente" };
 
 /** Por arquivo do modelo (sem a extensão) e versão. */
 const SPOTS: Record<string, Partial<Record<GarmentLook, PrintSpot[]>>> = {
-  boxy_tee_01: { street: [BACK_TEE] },
+  boxy_tee_01: { street: [CHEST_TEE, BACK_TEE] },
   // Mesma malha da boxy.
-  "relugar-t-shirt-v1": { street: [BACK_TEE] },
+  "relugar-t-shirt-v1": { street: [CHEST_TEE, BACK_TEE] },
   // O capuz cai nas costas até ~1,25 m: o logo fica abaixo dele.
   "hoodie-core-v3": {
-    street: [{ kind: "costas", center: [0, 1.14], width: 0.24, side: "costas" }],
+    street: [
+      { kind: "peito", center: [0.1, 1.3], width: 0.09, side: "frente" },
+      { kind: "costas", center: [0, 1.14], width: 0.24, side: "costas" },
+    ],
   },
   // Na placa lisa de cima: mais baixo, o logo cruzava as tiras.
   tech_vest: {
-    street: [{ kind: "costas", center: [0, 1.335], width: 0.18, side: "costas" }],
+    street: [
+      { kind: "peito", center: [0.1, 1.3], width: 0.08, side: "frente" },
+      { kind: "costas", center: [0, 1.335], width: 0.18, side: "costas" },
+    ],
+  },
+  // Linha Sport: só o logo do peito aqui; a faixa das mangas é outra coisa.
+  track_jacket: {
+    sport: [{ kind: "peito", center: [0.1, 1.3], width: 0.09, side: "frente" }],
   },
 };
 

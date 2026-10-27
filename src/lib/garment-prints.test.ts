@@ -14,10 +14,21 @@ describe("estampas por versão da peça", () => {
   });
 
   it("Street põe o logo grande nas costas", () => {
-    const [back] = printSpots("/models/boxy_tee_01.glb", "street");
+    const back = printSpots("/models/boxy_tee_01.glb", "street").find((s) => s.side === "costas")!;
     assert.equal(back.kind, "costas");
-    assert.equal(back.side, "costas");
     assert.equal(back.center[0], 0);
+  });
+
+  it("Street também põe o logo pequeno no peito esquerdo de quem veste", () => {
+    const chest = printSpots("/models/boxy_tee_01.glb", "street").find((s) => s.side === "frente");
+    assert.equal(chest?.kind, "peito");
+    assert.ok(chest!.center[0] > 0);
+  });
+
+  it("track jacket Sport: só o peito, sem logo nas costas", () => {
+    const spots = printSpots("/models/track_jacket.glb", "sport");
+    assert.deepEqual(spots.map((s) => s.kind), ["peito"]);
+    assert.deepEqual(printSpots("/models/track_jacket.glb", "street"), []);
   });
 
   it("acha o arquivo também numa URL completa", () => {
