@@ -11,7 +11,7 @@ import { EDGE_CAP, fabricEdgeAttribute } from "./fabric-edge";
  *   os fios ficam na vertical/horizontal como numa roupa vestida.
  * - Brilho de tecido (sheen): a borda da peça clareia contra a luz, como
  *   algodão de verdade; o reflexo "de plástico" (specular) fica bem fraco,
- *   menos no cetim.
+ *   menos no cetim — lá ele estica atravessado ao fio (anisotropia, lista 12).
  * - Mancha grande e suave na cor e na aspereza, e o avesso (gola, barra,
  *   cava) mais escuro.
  * - Acabamento perto da borda do tecido (`addFabricEdge`): vinco da barra
@@ -51,6 +51,11 @@ type FabricLook = {
   thread?: string;
   /** Força das dobras de caimento (0 = sem). */
   wrinkle: number;
+  /**
+   * Brilho esticado atravessado ao fio (0 = redondo). No cetim o fio corre em
+   * pé e o reflexo vira uma faixa larga e macia, não o ponto duro do látex.
+   */
+  anisotropy?: number;
 };
 
 /**
@@ -64,7 +69,7 @@ export const FABRIC_LOOK: Record<FabricName, FabricLook> = {
   sarja: { tile: 0.028, roughness: 0.88, specular: 0.3, sheen: 0.45, sheenRoughness: 0.7, sheenWhite: 0.3, relief: 0.7, threads: 1, mottle: 0.08, hem: 0.025, stitches: [0.009], wrinkle: 1 },
   denim: { tile: 0.05, roughness: 0.92, specular: 0.25, sheen: 0.5, sheenRoughness: 0.8, sheenWhite: 0.45, relief: 1, threads: 1.3, mottle: 0.22, streak: 6, hem: 0.02, stitches: [0.006, 0.013], thread: "#c8923e", wrinkle: 1.2 },
   trico: { tile: 0.05, roughness: 0.95, specular: 0.2, sheen: 0.9, sheenRoughness: 0.85, sheenWhite: 0.3, relief: 1, threads: 1, mottle: 0.05, hem: 0, stitches: [], wrinkle: 0 },
-  cetim: { tile: 0.06, roughness: 0.3, specular: 0.8, sheen: 0.6, sheenRoughness: 0.3, sheenWhite: 0.6, relief: 0.25, threads: 1, mottle: 0.03, hem: 0.005, stitches: [], wrinkle: 0.5 },
+  cetim: { tile: 0.06, roughness: 0.34, specular: 0.55, sheen: 0.85, sheenRoughness: 0.35, sheenWhite: 0.45, relief: 0.25, threads: 1, mottle: 0.03, hem: 0.005, stitches: [], wrinkle: 0.5, anisotropy: 0.75 },
   moletom: { tile: 0.03, roughness: 0.92, specular: 0.25, sheen: 0.8, sheenRoughness: 0.85, sheenWhite: 0.35, relief: 0.4, threads: 1, mottle: 0.05, hem: 0.02, stitches: [0.009], wrinkle: 1 },
 };
 
@@ -363,6 +368,20 @@ const FRAGMENT_BODY = /* glsl */ `
   if ( ! gl_FrontFacing ) diffuseColor.rgb *= fabricInside;
 }`;
 
+// Direção do brilho do cetim: o fio corre em pé na peça (urdume) e o reflexo
+// estica atravessado a ele. A peça não tem UV, então a direção vem daqui e
+// não da tangente do arquivo.
+const ANISO_BODY = /* glsl */ `
+{
+  vec3 fiber = normalMatrix * vec3( 0.0, 1.0, 0.0 );
+  fiber = fiber - normal * dot( fiber, normal );
+  vec3 across = cross( normal, fiber );
+  if ( dot( across, across ) > 1e-8 ) {
+    material.anisotropyT = normalize( across );
+    material.anisotropyB = cross( normal, material.anisotropyT );
+  }
+}`;
+
 /**
  * Material de tecido na cor escolhida, a partir do material do arquivo.
  * Quem chama libera com `dispose()` (a textura da trama é dividida e fica).
@@ -404,6 +423,8 @@ export function clothMaterial(
   m.sheen = look.sheen;
   m.sheenRoughness = look.sheenRoughness;
   m.sheenColor.copy(m.color).lerp(new THREE.Color(1, 1, 1), look.sheenWhite);
+  m.anisotropy = look.anisotropy ?? 0;
+  m.anisotropyMap = null;
 
   m.onBeforeCompile = (shader) => {
     if (mean != null) applyTint(shader, mean);
@@ -448,6 +469,11 @@ export function clothMaterial(
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>${FRAGMENT_DECL}`)
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>${FRAGMENT_BODY}`);
+    if (m.anisotropy > 0)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <lights_physical_fragment>",
+        `#include <lights_physical_fragment>${ANISO_BODY}`,
+      );
   };
   // O código do shader muda só com o ajuste da cor, o modo leve e ter ou não
   // estampa e faixa; o resto são uniforms.
@@ -456,7 +482,7 @@ export function clothMaterial(
   if (printed) m.defines = { ...m.defines, FABRIC_PRINT: "" };
   if (stripe) m.defines = { ...m.defines, FABRIC_STRIPE: "" };
   m.customProgramCacheKey = () =>
-    `vestra-fabric-${mean != null ? 1 : 0}${lite ? "-lite" : ""}${printed ? "-print" : ""}${stripe ? "-stripe" : ""}`;
+    `vestra-fabric-${mean != null ? 1 : 0}${lite ? "-lite" : ""}${printed ? "-print" : ""}${stripe ? "-stripe" : ""}${m.anisotropy > 0 ? "-aniso" : ""}`;
   return m;
 }
 
