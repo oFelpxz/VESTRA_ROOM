@@ -23,7 +23,8 @@ import { skinTone, type SkinTone } from "@/lib/skin-tones";
  *   malha, calculado por `surfaceCavity`.
  *
  * Lista 12, item 3 — rosto: sobrancelha, cor da boca e linha da pálpebra
- * (atributo `skinFace`, de `faceCoords` em lib/face-marks).
+ * (atributo `skinFace`, de `faceCoords` em lib/face-marks). Item 5 — poros
+ * no relevo da pele (de perto) e a zona T do rosto mais oleosa.
  *
  * Item 5 — cabelo: com `hair`, a pele pinta o couro cabeludo (atributo
  * `hairAbove`, de `hairEdge` em lib/hair) com borda irregular; `HairMaterial`
@@ -61,6 +62,7 @@ uniform vec3 skinWrap;
 uniform vec3 skinBlush;
 uniform vec3 hairColor;
 uniform vec3 skinLip;
+uniform mat3 normalMatrix;
 varying vec3 vSkinPos;
 #ifdef SKIN_FOLDS
 varying float vSkinCavity;
@@ -92,6 +94,12 @@ float skinNoise( vec3 x ) {
 float hairAmount( vec3 root, float above ) {
   float edge = skinNoise( root * 320.0 ) * 0.6 + skinNoise( root * 90.0 ) * 0.4;
   return smoothstep( -0.0012, 0.0012, above + ( edge - 0.5 ) * 0.007 );
+}
+// Poros (lista 12, item 5): covinhas de ~0,3 mm a cada ~0,6 mm sobre um
+// relevo mais fino, em 3D na posição do corpo (não precisa de UV).
+float skinPoreH( vec3 p ) {
+  float pore = smoothstep( 0.66, 0.86, skinNoise( p * 1700.0 ) );
+  return 0.18 * skinNoise( p * 3100.0 ) - pore;
 }
 // Fios: grão fino, mais longo na vertical.
 float hairGrain( vec3 root ) {
@@ -160,10 +168,40 @@ roughnessFactor = mix( roughnessFactor, 1.0, vSkinCavity * 0.7 );
 roughnessFactor = mix( roughnessFactor, 0.85, min( skinHairAmt, 1.0 ) );
 #endif
 #ifdef SKIN_FACE
-// Lábio um pouco úmido, sobrancelha fosca.
+// Lábio um pouco úmido, sobrancelha fosca; testa e nariz (zona T) mais
+// oleosos que a bochecha.
+float skinT = max(
+  ( 1.0 - smoothstep( 0.03, 0.045, skinF.x ) ) * smoothstep( 0.02, 0.03, skinF.y ) * ( 1.0 - smoothstep( 0.045, 0.058, skinF.y ) ),
+  ( 1.0 - smoothstep( 0.012, 0.022, skinF.x ) ) * smoothstep( -0.05, -0.04, skinF.y ) * ( 1.0 - smoothstep( -0.005, 0.01, skinF.y ) ) );
+roughnessFactor = mix( roughnessFactor, 0.5, skinT * 0.8 );
 roughnessFactor = mix( roughnessFactor, 0.5, lipAmt );
 roughnessFactor = mix( roughnessFactor, 0.85, browAmt );
 #endif
+`;
+
+// Relevo dos poros na normal (luz e brilho), pela diferença da altura em 3D.
+// Mais forte no nariz, mais fraco no corpo e quase nada no lábio. De longe,
+// onde um pixel já cobre um poro, some (senão vira chiado).
+const NORMAL_BODY = /* glsl */ `
+float skinPoreFade = 1.0 - smoothstep( 0.25, 0.7, length( fwidth( vSkinPos ) ) * 1700.0 );
+if ( skinPoreFade > 0.0 ) {
+  float skinPoreAmt = 0.6;
+#ifdef SKIN_FACE
+  vec3 skinFn = vSkinFace;
+  float skinNose = ( 1.0 - smoothstep( 0.012, 0.022, skinFn.x ) ) * smoothstep( -0.05, -0.04, skinFn.y ) * ( 1.0 - smoothstep( -0.005, 0.005, skinFn.y ) );
+  skinPoreAmt = mix( 0.6, 1.0, 1.0 - smoothstep( 0.07, 0.075, skinFn.x ) ) + 0.6 * skinNose;
+  skinPoreAmt *= 1.0 - 0.85 * lipAmt;
+#endif
+  const float skinE = 0.00008;
+  float skinH0 = skinPoreH( vSkinPos );
+  vec3 skinG = vec3(
+    skinPoreH( vSkinPos + vec3( skinE, 0.0, 0.0 ) ),
+    skinPoreH( vSkinPos + vec3( 0.0, skinE, 0.0 ) ),
+    skinPoreH( vSkinPos + vec3( 0.0, 0.0, skinE ) ) ) - skinH0;
+  skinG = normalMatrix * ( skinG / skinE );
+  float skinDepth = 0.000028 * skinPoreAmt * skinPoreFade;
+  normal = normalize( normal - skinDepth * ( skinG - normal * dot( skinG, normal ) ) );
+}
 `;
 
 const AO_BODY = /* glsl */ `
@@ -207,6 +245,7 @@ function patchSkin(shader: THREE.WebGLProgramParametersWithUniforms) {
     )
     .replace("#include <color_fragment>", `#include <color_fragment>${COLOR_BODY}`)
     .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>${ROUGHNESS_BODY}`)
+    .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>${NORMAL_BODY}`)
     .replace("#include <aomap_fragment>", `#include <aomap_fragment>${AO_BODY}`);
 }
 
