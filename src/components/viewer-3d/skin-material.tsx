@@ -22,6 +22,9 @@ import { skinTone, type SkinTone } from "@/lib/skin-tones";
  *   luz ambiente, mais vermelho e nenhum brilho — atributo `skinCavity` da
  *   malha, calculado por `surfaceCavity`.
  *
+ * Lista 12, item 3 — rosto: sobrancelha, cor da boca e linha da pálpebra
+ * (atributo `skinFace`, de `faceCoords` em lib/face-marks).
+ *
  * Item 5 — cabelo: com `hair`, a pele pinta o couro cabeludo (atributo
  * `hairMask`, de `hairMask` em lib/hair) com borda irregular; `HairMaterial`
  * é a casca do corte curto, com a mesma borda.
@@ -47,18 +50,26 @@ varying float vSkinCavity;
 attribute float hairMask;
 varying float vHairMask;
 #endif
+#ifdef SKIN_FACE
+attribute vec3 skinFace;
+varying vec3 vSkinFace;
+#endif
 `;
 
 const FRAGMENT_DECL = /* glsl */ `
 uniform vec3 skinWrap;
 uniform vec3 skinBlush;
 uniform vec3 hairColor;
+uniform vec3 skinLip;
 varying vec3 vSkinPos;
 #ifdef SKIN_FOLDS
 varying float vSkinCavity;
 #endif
 #ifdef SKIN_HAIR
 varying float vHairMask;
+#endif
+#ifdef SKIN_FACE
+varying vec3 vSkinFace;
 #endif
 float skinHash( vec3 p ) {
   p = fract( p * 0.3183099 + 0.1 );
@@ -87,6 +98,37 @@ float hairGrain( vec3 root ) {
 }
 `;
 
+// Rosto (lista 12, item 3), em metros a partir dos olhos (`faceCoords`):
+// x = distância do meio do rosto, y = altura acima dos olhos, z = distância
+// até o globo. Sobrancelha em arco ~2 cm acima do olho, mais alta a 2/3 e
+// afinando na ponta, com fios; boca com o lábio de cima mais fino que o de
+// baixo e o arco do cupido; a linha da pálpebra escurece a borda do olho.
+const FACE_COLOR = /* glsl */ `
+vec3 skinF = vSkinFace;
+float browT = ( skinF.x - 0.013 ) / 0.039;
+float browY = 0.0185 + 0.0055 * sin( 3.14159 * clamp( browT * 0.85, 0.0, 1.0 ) ) - 0.003 * smoothstep( 0.7, 1.0, browT );
+float browH = mix( 0.0042, 0.0017, smoothstep( 0.15, 1.0, browT ) );
+float browAmt = ( 1.0 - smoothstep( browH * 0.5, browH, abs( skinF.y - browY ) ) )
+  * smoothstep( -0.06, 0.12, browT ) * ( 1.0 - smoothstep( 0.9, 1.02, browT ) );
+// Fios deitados para fora: grão fino na vertical, longo na horizontal.
+float browHairs = skinNoise( vec3( skinF.x * 380.0, ( skinF.y - skinF.x * 0.25 ) * 2600.0, 3.0 ) );
+browAmt *= 0.55 + 0.45 * browHairs;
+diffuseColor.rgb = mix( diffuseColor.rgb, min( hairColor * 1.6, diffuseColor.rgb * 0.4 ), browAmt * 0.95 );
+float lipDy = skinF.y + 0.0663;
+float lipE = 1.0 - ( skinF.x / 0.0235 ) * ( skinF.x / 0.0235 );
+float lipBow = 0.0012 * ( smoothstep( 0.002, 0.006, skinF.x ) - smoothstep( 0.008, 0.016, skinF.x ) );
+float lipTop = lipE > 0.0 ? 0.0075 * sqrt( lipE ) + lipBow : 0.0;
+float lipBot = lipE > 0.0 ? 0.0125 * sqrt( lipE ) : 0.0;
+float lipAmt = lipDy > 0.0 ? 1.0 - smoothstep( lipTop - 0.0015, lipTop + 0.0004, lipDy )
+                           : 1.0 - smoothstep( lipBot - 0.004, lipBot + 0.0005, -lipDy );
+lipAmt *= smoothstep( -0.05, 0.15, lipE );
+diffuseColor.rgb *= mix( vec3( 1.0 ), skinLip, lipAmt );
+// Fenda da boca: risco escuro de ~1 mm.
+diffuseColor.rgb *= 1.0 - 0.6 * ( 1.0 - smoothstep( 0.0004, 0.0012, abs( lipDy ) ) ) * smoothstep( 0.0, 0.08, lipE );
+float lidAmt = ( 1.0 - smoothstep( 0.0006, 0.0022, skinF.z ) ) * ( 0.35 + 0.65 * smoothstep( -0.006, 0.002, skinF.y ) );
+diffuseColor.rgb = mix( diffuseColor.rgb, min( hairColor * 1.2, diffuseColor.rgb * 0.35 ), lidAmt * 0.75 );
+`;
+
 // Manchas de ~5 cm e ~2 cm, bem fracas: onde escurece, puxa para o vermelho.
 // Maiores que isso viravam uma "assadura" na nuca.
 const COLOR_BODY = /* glsl */ `
@@ -95,6 +137,9 @@ diffuseColor.rgb *= 1.0 + ( skinSpot - 0.5 ) * 0.05;
 diffuseColor.rgb *= mix( vec3( 1.0 ), skinBlush, ( 1.0 - skinSpot ) * 0.08 );
 #ifdef SKIN_FOLDS
 diffuseColor.rgb *= mix( vec3( 1.0 ), skinBlush, vSkinCavity * 0.7 );
+#endif
+#ifdef SKIN_FACE
+${FACE_COLOR}
 #endif
 #ifdef SKIN_HAIR
 // Raspado: a pele aparece entre os fios (SKIN_HAIR < 1).
@@ -112,6 +157,11 @@ roughnessFactor = mix( roughnessFactor, 1.0, vSkinCavity * 0.7 );
 #endif
 #ifdef SKIN_HAIR
 roughnessFactor = mix( roughnessFactor, 0.85, min( skinHairAmt, 1.0 ) );
+#endif
+#ifdef SKIN_FACE
+// Lábio um pouco úmido, sobrancelha fosca.
+roughnessFactor = mix( roughnessFactor, 0.5, lipAmt );
+roughnessFactor = mix( roughnessFactor, 0.85, browAmt );
 #endif
 `;
 
@@ -132,6 +182,8 @@ reflectedLight.directDiffuse += skinLit * directLight.color * BRDF_Lambert( mate
 const WRAP = new THREE.Vector3(0.32, 0.14, 0.07);
 /** Cor que a pele puxa onde tem mais sangue perto (dobras, manchas). */
 const BLUSH = new THREE.Color(1, 0.8, 0.74);
+/** Quanto o lábio escurece e avermelha a pele (multiplica o tom). */
+const LIP = new THREE.Color(0.87, 0.64, 0.62);
 /** Castanho bem escuro, quase preto (linear). */
 const HAIR = new THREE.Color("#1e1712");
 
@@ -139,11 +191,12 @@ function patchSkin(shader: THREE.WebGLProgramParametersWithUniforms) {
   shader.uniforms.skinWrap = { value: WRAP };
   shader.uniforms.skinBlush = { value: BLUSH };
   shader.uniforms.hairColor = { value: HAIR };
+  shader.uniforms.skinLip = { value: LIP };
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", `#include <common>${VERTEX_DECL}`)
     .replace(
       "#include <begin_vertex>",
-      "#include <begin_vertex>\n  vSkinPos = transformed;\n#ifdef SKIN_FOLDS\n  vSkinCavity = skinCavity;\n#endif\n#ifdef SKIN_HAIR\n  vHairMask = hairMask;\n#endif",
+      "#include <begin_vertex>\n  vSkinPos = transformed;\n#ifdef SKIN_FOLDS\n  vSkinCavity = skinCavity;\n#endif\n#ifdef SKIN_HAIR\n  vHairMask = hairMask;\n#endif\n#ifdef SKIN_FACE\n  vSkinFace = skinFace;\n#endif",
     );
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>${FRAGMENT_DECL}`)
@@ -161,15 +214,18 @@ const skinKey = () => "vestra-skin";
 /**
  * `folds`: a malha traz o atributo `skinCavity` (só o corpo do provador).
  * `hair`: a malha traz `hairMask`; quanto o cabelo cobre a pele (1 = tudo).
+ * `face`: a malha traz `skinFace` (sobrancelha, boca e pálpebra).
  */
 export function SkinMaterial({
   color,
   folds = false,
   hair = 0,
+  face = false,
 }: {
   color?: string;
   folds?: boolean;
   hair?: number;
+  face?: boolean;
 }) {
   const mannequin = useContext(MannequinFinish);
   const tone = useContext(SkinToneContext);
@@ -186,6 +242,7 @@ export function SkinMaterial({
   const defines: Record<string, string> = {};
   if (folds) defines.SKIN_FOLDS = "";
   if (hair > 0) defines.SKIN_HAIR = hair.toFixed(2);
+  if (face) defines.SKIN_FACE = "";
   const variant = Object.entries(defines).join(";");
   return (
     <meshPhysicalMaterial

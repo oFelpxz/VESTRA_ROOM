@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { findEyeSockets, placeEyes, type EyeSocket } from "@/lib/eye-sockets";
+import { faceCoords } from "@/lib/face-marks";
 import { hairHeight, hairMask, hairShell } from "@/lib/hair";
 import { surfaceCavity } from "@/lib/skin-cavity";
 import { weldedNormals } from "@/lib/welded-normals";
@@ -10,8 +11,8 @@ import { EyeMaterial, HairMaterial, SkinMaterial } from "./skin-material";
 
 /**
  * Pele do cliente no provador: o corpo com as medidas (sombra nas dobras,
- * lista 11 item 3), os olhos (globo do item 4, íris e córnea da lista 12) e o cabelo
- * (item 5). Normais lisas nas costuras do corpo base (item 6).
+ * lista 11 item 3; sobrancelha, boca e pálpebra, lista 12 item 3), os olhos
+ * (globo do item 4, íris e córnea da lista 12) e o cabelo (item 5). Normais lisas nas costuras do corpo base (item 6).
  */
 
 /** Corte de quem prova (id de `HAIR_STYLES`); "none" com touca e no manequim. */
@@ -20,22 +21,30 @@ export const HairContext = createContext("none");
 /** Quanto o cabelo pintado cobre a pele em cada corte (o curto ganha a casca por cima). */
 const HAIR_COVER: Record<string, number> = { raspado: 0.8, curto: 1 };
 
-/** Cavidades dos olhos do corpo de referência (uma vez por modelo). */
-export function useEyeSockets(base: Float32Array): EyeSocket[] {
-  return useMemo(() => findEyeSockets(base), [base]);
+/** Cavidades dos olhos e marcas do rosto do corpo de referência (uma vez por modelo). */
+export type Face = { sockets: EyeSocket[]; marks: Float32Array | null };
+
+export function useFace(base: Float32Array): Face {
+  return useMemo(() => {
+    const sockets = findEyeSockets(base);
+    const eyes = placeEyes(base, sockets);
+    // Medidas no corpo de referência: com as medidas do cliente, a boca e a
+    // sobrancelha pintadas andam junto com a malha.
+    return { sockets, marks: eyes.length === 2 ? faceCoords(base, eyes) : null };
+  }, [base]);
 }
 
 export function AvatarSkin({
   positions,
   index,
-  sockets,
+  face,
 }: {
   positions: Float32Array;
   index: number[];
-  sockets: EyeSocket[];
+  face: Face;
 }) {
   const style = useContext(HairContext);
-  const eyes = useMemo(() => placeEyes(positions, sockets), [positions, sockets]);
+  const eyes = useMemo(() => placeEyes(positions, face.sockets), [positions, face]);
   // Sem olho achado (outro modelo de corpo), sem referência para o cabelo.
   const cover = eyes.length ? (HAIR_COVER[style] ?? 0) : 0;
   const eyeY = eyes.length ? eyes.reduce((s, e) => s + e.center[1], 0) / eyes.length : 0;
@@ -49,8 +58,9 @@ export function AvatarSkin({
     const cavity = surfaceCavity(positions, index, g.getAttribute("normal").array);
     g.setAttribute("skinCavity", new THREE.BufferAttribute(cavity, 1));
     if (above) g.setAttribute("hairMask", new THREE.BufferAttribute(hairMask(above), 1));
+    if (face.marks) g.setAttribute("skinFace", new THREE.BufferAttribute(face.marks, 3));
     return g;
-  }, [positions, index, above]);
+  }, [positions, index, above, face]);
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   const shell = useMemo(() => {
@@ -69,7 +79,7 @@ export function AvatarSkin({
   return (
     <>
       <mesh geometry={geometry} castShadow receiveShadow>
-        <SkinMaterial folds hair={cover} />
+        <SkinMaterial folds hair={cover} face={face.marks !== null} />
       </mesh>
       {shell && (
         <mesh geometry={shell} receiveShadow>

@@ -9,7 +9,7 @@ import { bindBottom, bottomWrinkle, fitBottom, meshEdges, restOnShoes, type TopH
 import { shapeBody } from "@/lib/garment-dress";
 import { clothMaterial } from "@/lib/fabric";
 import { readMorphBody } from "./avatar";
-import { AvatarSkin, useEyeSockets } from "./avatar-skin";
+import { AvatarSkin, useFace } from "./avatar-skin";
 import { SHOES_URL } from "./avatar-url";
 import { AVATAR_URL, extractGarment } from "./dressed-avatar";
 import { useLite } from "./lite-context";
@@ -54,8 +54,8 @@ function useFittedShoes(params: AvatarParams) {
 /** Avatar sem peça de cima (quando o look só tem a de baixo). */
 export function BareAvatar({ params }: { params: AvatarParams }) {
   const { body, pos } = useClientBody(params);
-  const sockets = useEyeSockets(body.base);
-  return <AvatarSkin positions={pos} index={body.index} sockets={sockets} />;
+  const face = useFace(body.base);
+  return <AvatarSkin positions={pos} index={body.index} face={face} />;
 }
 
 export function BottomGarment({

@@ -21,9 +21,8 @@ import { dropInnerPieces, duplicateLayers, type Skin } from "@/lib/garment-layer
 import { addFabricEdge, addFabricRest, clothMaterial, fabricOf, type PrintDecal } from "@/lib/fabric";
 import type { FabricName } from "@/lib/fabric-weave";
 import type { GarmentLook } from "@/lib/garment-prints";
-import type { EyeSocket } from "@/lib/eye-sockets";
 import { readMorphBody } from "./avatar";
-import { AvatarSkin, useEyeSockets } from "./avatar-skin";
+import { AvatarSkin, useFace, type Face } from "./avatar-skin";
 import { useGarmentPrints } from "./brand-logo-canvas";
 import { AVATAR_URL } from "./avatar-url";
 import { useLite } from "./lite-context";
@@ -167,7 +166,7 @@ export function DressedAvatar({
   );
   const options = useMemo(() => readFitOptions(garment.scene), [garment.scene]);
   const prints = useGarmentPrints(garmentUrl, look, selectedColor);
-  const sockets = useEyeSockets(body.base);
+  const face = useFace(body.base);
   const { morphs, totalHeight, girths } = params;
 
   // Resultado do worker, marcado com as peças para as quais foi calculado.
@@ -206,8 +205,8 @@ export function DressedAvatar({
     fitted &&
     (shown?.fitted !== fitted || shown.selectedColor !== selectedColor || shown.prints !== prints)
   )
-    setShown({ parts, index: body.index, sockets, fitted, selectedColor, prints });
-  const view = fitted ? { parts, index: body.index, sockets, fitted, selectedColor, prints } : shown;
+    setShown({ parts, index: body.index, face, fitted, selectedColor, prints });
+  const view = fitted ? { parts, index: body.index, face, fitted, selectedColor, prints } : shown;
   const hem = view?.fitted.hem ?? null;
   useEffect(() => onHem?.(hem), [onHem, hem]);
   return view ? (
@@ -224,13 +223,13 @@ export function DressedAvatar({
 type Shown = {
   parts: Part[];
   index: number[];
-  sockets: EyeSocket[];
+  face: Face;
   fitted: Fitted;
   selectedColor?: string;
   prints: PrintDecal[];
 };
 
-function FittedAvatar({ parts, index, sockets, fitted, selectedColor, prints }: Shown) {
+function FittedAvatar({ parts, index, face, fitted, selectedColor, prints }: Shown) {
   const lite = useLite();
   const clothGeometries = useMemo(
     () =>
@@ -277,7 +276,7 @@ function FittedAvatar({ parts, index, sockets, fitted, selectedColor, prints }: 
 
   return (
     <group>
-      <AvatarSkin positions={fitted.body} index={index} sockets={sockets} />
+      <AvatarSkin positions={fitted.body} index={index} face={face} />
       {clothGeometries.map((g, i) => (
         <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
       ))}
