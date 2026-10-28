@@ -134,3 +134,7 @@ Itens 1–8 devem caber até ~08/11. Os itens 9 e 10 têm saída: se não ficare
 - IA de provador: [comparação de provadores abertos (FASHN)](https://fashn.ai/blog/comparing-the-top-4-open-source-virtual-try-on-viton-models), [IDM-VTON (licença)](https://huggingface.co/ompatel245/IDM-VTON/blob/main/README.md), [APIs de provador 2026 (fal)](https://fal.ai/learn/tools/best-virtual-try-on-apis-2026), [Google Virtual Try-On](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/imagen/virtual-try-on-001)
 - Avatares e corpo: [licença SMPL-X](https://smpl-x.is.tue.mpg.de/modellicense.html), [licença Character Creator](https://forum.reallusion.com/Topic551927.aspx), [Spark / Gaussian splats](https://sparkjs.dev/docs/overview/), [avatares em splat](https://arxiv.org/html/2510.13978v2)
 - Roupas e tecido: [Marvelous Designer 2026 com glTF](https://www.cgchannel.com/tag/everywear/), [CLO3D → three.js](https://support.clo3d.com/hc/ja/community/posts/4417190359449-CLO3D-Blender-Three-js-workflow), [tecido em WebGPU](https://arxiv.org/html/2507.11794v1)
+
+### Resultado (28/10/2026)
+
+Itens 1–6, 8 e 9 entraram. O item 7 não precisou de mudança. O item 10 ficou de fora: no protótipo (three-gpu-pathtracer 0.0.24, 160 amostras, ~26 s por imagem) o path tracer ignora os shaders próprios dos itens 2–5, e a foto saiu pior que o desenho normal, com o cabelo como uma touca branca, os olhos pretos, a pele lisa e grão no tecido. Refazer cada material numa versão "física" repetiria o trabalho desses itens; o botão "Baixar foto do look" continua com o desenho normal.
