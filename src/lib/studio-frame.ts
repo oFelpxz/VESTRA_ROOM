@@ -4,8 +4,19 @@
  * a lado) a câmera recua até os braços abertos caberem.
  */
 
-/** Abertura vertical da câmera do provador, em graus. */
-export const STUDIO_FOV = 38;
+/**
+ * Abertura vertical da câmera do provador, em graus (lista 12, item 1). Lente
+ * de catálogo (~60 mm): de longe, a cabeça não cresce nem as pernas encurtam,
+ * como na foto de loja. A 38° (~35 mm) o corpo saía com proporção de selfie.
+ */
+export const STUDIO_FOV = 22;
+
+/**
+ * Quanto a câmera recua, em relação a uma lente de 38°, para mostrar o mesmo
+ * tamanho: close do tecido, câmera da touca e limites do zoom foram medidos
+ * nessa lente.
+ */
+export const LENS_STRETCH = Math.tan((38 * Math.PI) / 360) / Math.tan((STUDIO_FOV * Math.PI) / 360);
 
 /** Parte da altura da tela que o corpo ocupa (cabelo e tênis entram na folga). */
 const FILL_HEIGHT = 0.8;

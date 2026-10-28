@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { frameBody, STUDIO_FOV } from "./studio-frame";
+import { frameBody, LENS_STRETCH, STUDIO_FOV } from "./studio-frame";
 
 /** Parte da altura e da largura da tela que o corpo ocupa, vista de frente. */
 function fill(height: number, aspect: number) {
@@ -27,6 +27,14 @@ describe("enquadramento do corpo (lista 11, item 9)", () => {
 
   it("tela larga não afasta a câmera", () => {
     assert.equal(frameBody(1.75, 2.2).dist, frameBody(1.75, 1).dist);
+  });
+
+  it("lente de catálogo (lista 12): mais fechada que 38° e o close mostra a mesma área", () => {
+    assert.ok(STUDIO_FOV >= 18 && STUDIO_FOV <= 26);
+    const seen = (d: number, fov: number) => 2 * d * Math.tan((fov * Math.PI) / 360);
+    assert.ok(Math.abs(seen(0.8 * LENS_STRETCH, STUDIO_FOV) - seen(0.8, 38)) < 1e-9);
+    // O corpo inteiro continua cabendo com a câmera dentro do limite do zoom.
+    assert.ok(frameBody(2.05, 0.35).dist < 8 * LENS_STRETCH);
   });
 
   it("mira no meio do corpo", () => {

@@ -16,7 +16,7 @@ import { MOLDE_GRADE, type Grade } from "@/lib/garment-fit";
 import { tintMaterial } from "@/lib/garment-color";
 import type { GarmentLook } from "@/lib/garment-prints";
 import { CLOSE_DISTANCE, closeUpY, type Box } from "@/lib/close-up";
-import { frameBody, STUDIO_FOV, type Home } from "@/lib/studio-frame";
+import { frameBody, LENS_STRETCH, STUDIO_FOV, type Home } from "@/lib/studio-frame";
 import { liteMode, type LiteMode } from "@/lib/render-quality";
 import { AvatarErrorBoundary } from "./avatar";
 import { AVATAR_URL, DressedAvatar } from "./dressed-avatar";
@@ -398,9 +398,13 @@ const VIEW_ANGLE: Record<"front" | "side" | "back", number> = {
   back: Math.PI,
 };
 
-const MIN_DISTANCE = 1.5;
+const MIN_DISTANCE = 1.5 * LENS_STRETCH;
+/** Close do tecido: a mesma área que a 38°, de mais longe (menos deformação). */
+const CLOSE = CLOSE_DISTANCE * LENS_STRETCH;
+/** Limite do zoom no close e no caminho até ele. */
+const CLOSE_MIN = 0.3 * LENS_STRETCH;
 /** Provador da touca: a câmera abre na cabeça, não no corpo inteiro. */
-const HEAD_DISTANCE = 1.0;
+const HEAD_DISTANCE = 1.0 * LENS_STRETCH;
 
 type Controls = THREE.EventDispatcher<{ start: object }> & {
   target: THREE.Vector3;
@@ -443,7 +447,7 @@ function CameraRig({
   const close = useRef(false);
 
   // Na touca a câmera já começa mais perto que o limite do corpo inteiro.
-  const minDistance = head ? 0.6 : MIN_DISTANCE;
+  const minDistance = head ? 0.6 * LENS_STRETCH : MIN_DISTANCE;
 
   useEffect(() => {
     if (!controls) return;
@@ -462,7 +466,7 @@ function CameraRig({
       // Close da touca: a trama da malha na lateral da cabeça.
       const y = params.anchors.head.y + 0.07;
       const a = 0.6;
-      const d = CLOSE_DISTANCE * 0.6;
+      const d = CLOSE * 0.6;
       goal.current = {
         target: new THREE.Vector3(0, y, 0),
         pos: new THREE.Vector3(Math.sin(a) * d, y + 0.05, Math.cos(a) * d),
@@ -484,7 +488,7 @@ function CameraRig({
       const a = 0.35;
       goal.current = {
         target: new THREE.Vector3(0, y, 0),
-        pos: new THREE.Vector3(Math.sin(a) * CLOSE_DISTANCE, y + 0.08, Math.cos(a) * CLOSE_DISTANCE),
+        pos: new THREE.Vector3(Math.sin(a) * CLOSE, y + 0.08, Math.cos(a) * CLOSE),
         close: true,
       };
     } else {
@@ -502,7 +506,7 @@ function CameraRig({
       };
     }
     // Deixa chegar perto durante o caminho; volta ao limite no fim.
-    setMinDistance(controls, 0.3);
+    setMinDistance(controls, CLOSE_MIN);
   }, [view, camera, controls, scene, params, primary, home, head]);
 
   // Altura do corpo ou formato da tela mudou: reenquadra no mesmo ângulo
@@ -524,7 +528,7 @@ function CameraRig({
       return;
     }
     goal.current = { target, pos, close: false };
-    setMinDistance(controls, 0.3);
+    setMinDistance(controls, CLOSE_MIN);
   }, [home, camera, controls]);
 
   useFrame((_, dt) => {
@@ -538,7 +542,7 @@ function CameraRig({
       camera.position.copy(g.pos);
       controls.target.copy(g.target);
       close.current = g.close;
-      setMinDistance(controls, g.close ? 0.3 : minDistance);
+      setMinDistance(controls, g.close ? CLOSE_MIN : minDistance);
       controls.update();
       goal.current = null;
     }
@@ -697,7 +701,7 @@ export function TryOnScene({
       <OrbitControls
         makeDefault
         target={[0, head ? headY + 0.04 : height * 0.5, 0]}
-        maxDistance={8}
+        maxDistance={8 * LENS_STRETCH}
         maxPolarAngle={Math.PI / 1.8}
         minPolarAngle={Math.PI / 4}
         autoRotate={autoRotate}
