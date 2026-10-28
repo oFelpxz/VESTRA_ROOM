@@ -2,9 +2,8 @@
  * Olhos do avatar (lista 11, item 4). O corpo base (MakeHuman) não tem globo
  * ocular: no lugar do olho fica uma cavidade funda de ~2,5 cm, que no
  * provador virava um buraco escuro. Aqui achamos essa cavidade no corpo de
- * referência e, a cada encaixe, onde vai o globo — uma esfera da cor da pele,
- * como olho de escultura ou de manequim de loja (sem íris, para não virar
- * boneco).
+ * referência e, a cada encaixe, onde vai o globo. A íris, a pupila e a córnea
+ * são desenhadas no shader do globo (lista 12, `EyeMaterial`).
  *
  * As medidas mudam o rosto um pouco: o globo segue o centro dos vértices da
  * cavidade e cresce/encolhe com o espalhamento deles. Regras puras, sem three.

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
 import * as THREE from "three";
 import { skinTone, type SkinTone } from "@/lib/skin-tones";
 
@@ -236,6 +236,81 @@ function patchHair(shader: THREE.WebGLProgramParametersWithUniforms) {
     .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>${HAIR_ROUGHNESS_BODY}`);
 }
 const hairKey = () => "vestra-hair";
+
+const EYE_VERTEX_DECL = /* glsl */ `
+varying vec3 vEyeDir;
+`;
+const EYE_FRAGMENT_DECL = /* glsl */ `
+uniform vec3 irisColor;
+varying vec3 vEyeDir;
+${FRAGMENT_DECL.slice(FRAGMENT_DECL.indexOf("float skinHash"))}
+`;
+// Globo de raio 1 olhando para +z. r = distância do eixo do olhar (0 no
+// centro da pupila, 1 na borda do globo vista de frente).
+const EYE_COLOR_BODY = /* glsl */ `
+vec3 eyeD = normalize( vEyeDir );
+float eyeR = eyeD.z > 0.0 ? length( eyeD.xy ) : 1.0;
+vec2 eyeA = eyeD.xy / max( eyeR, 1e-4 );
+// Fibras da íris: riscos que saem da pupila (mudam rápido com o ângulo, devagar com o raio).
+float eyeFiber = skinNoise( vec3( eyeA * 22.0, eyeR * 7.0 ) ) * 0.65 + skinNoise( vec3( eyeA * 60.0, eyeR * 18.0 ) ) * 0.35;
+vec3 eyeIris = irisColor * ( 0.4 + 0.75 * eyeFiber );
+// Anel claro em volta da pupila e anel escuro na borda (limbo).
+eyeIris *= 1.0 + 0.45 * ( smoothstep( 0.15, 0.2, eyeR ) - smoothstep( 0.22, 0.3, eyeR ) );
+eyeIris *= 1.0 - 0.55 * smoothstep( 0.34, 0.45, eyeR );
+// Branco do olho: nunca branco puro, um pouco rosado nos cantos.
+vec3 eyeSclera = vec3( 0.7, 0.63, 0.56 ) * mix( vec3( 1.0 ), vec3( 1.0, 0.82, 0.78 ), smoothstep( 0.6, 1.0, eyeR ) * 0.6 );
+eyeSclera *= 1.0 + ( skinNoise( eyeD * 40.0 ) - 0.5 ) * 0.06;
+diffuseColor.rgb = mix( eyeSclera, eyeIris, 1.0 - smoothstep( 0.44, 0.47, eyeR ) );
+diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.006 ), 1.0 - smoothstep( 0.135, 0.155, eyeR ) );
+`;
+// Catchlight: o reflexo do softbox perto da câmera, no alto à esquerda, só
+// na córnea. As luzes do estúdio ficam de lado e quase não refletem de frente.
+const EYE_EMISSIVE_BODY = /* glsl */ `
+vec3 eyeRefl = reflect( -normalize( vViewPosition ), normal );
+float eyeCatch = smoothstep( 0.991, 0.997, dot( eyeRefl, normalize( vec3( -0.2, 0.22, 1.0 ) ) ) );
+totalEmissiveRadiance += vec3( 0.85 ) * eyeCatch * ( 1.0 - smoothstep( 0.42, 0.5, eyeR ) );
+`;
+
+function patchEye(shader: THREE.WebGLProgramParametersWithUniforms, iris: THREE.Color) {
+  shader.uniforms.irisColor = { value: iris };
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", `#include <common>${EYE_VERTEX_DECL}`)
+    .replace("#include <begin_vertex>", "#include <begin_vertex>\n  vEyeDir = position;");
+  shader.fragmentShader = shader.fragmentShader
+    .replace("#include <common>", `#include <common>${EYE_FRAGMENT_DECL}`)
+    .replace("#include <color_fragment>", `#include <color_fragment>${EYE_COLOR_BODY}`)
+    .replace("#include <emissivemap_fragment>", `#include <emissivemap_fragment>${EYE_EMISSIVE_BODY}`);
+}
+const eyeKey = () => "vestra-eye";
+
+/**
+ * Olho (lista 12, item 2), tudo no shader do globo (sem textura): branco do
+ * olho levemente rosado, íris castanha com fibras e anel escuro na borda,
+ * pupila, e a córnea molhada (verniz quase espelhado) que reflete as luzes do
+ * estúdio — o brilhinho que faz o olho parecer vivo. A cor da íris vem do tom
+ * de pele. No manequim, continua o globo liso do manequim.
+ */
+export function EyeMaterial() {
+  const mannequin = useContext(MannequinFinish);
+  const tone = useContext(SkinToneContext);
+  const iris = useMemo(() => new THREE.Color(tone.iris), [tone.iris]);
+  const onBeforeCompile = useCallback(
+    (shader: THREE.WebGLProgramParametersWithUniforms) => patchEye(shader, iris),
+    [iris],
+  );
+  if (mannequin) return <SkinMaterial />;
+  return (
+    <meshPhysicalMaterial
+      key={tone.iris}
+      roughness={0.5}
+      specularIntensity={0.3}
+      clearcoat={1}
+      clearcoatRoughness={0.03}
+      onBeforeCompile={onBeforeCompile}
+      customProgramCacheKey={eyeKey}
+    />
+  );
+}
 
 /**
  * Casca do corte curto: fosca, com brilho de borda castanho (fio contra a

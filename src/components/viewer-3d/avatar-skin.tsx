@@ -6,11 +6,11 @@ import { findEyeSockets, placeEyes, type EyeSocket } from "@/lib/eye-sockets";
 import { hairHeight, hairMask, hairShell } from "@/lib/hair";
 import { surfaceCavity } from "@/lib/skin-cavity";
 import { weldedNormals } from "@/lib/welded-normals";
-import { HairMaterial, SkinMaterial } from "./skin-material";
+import { EyeMaterial, HairMaterial, SkinMaterial } from "./skin-material";
 
 /**
  * Pele do cliente no provador: o corpo com as medidas (sombra nas dobras,
- * lista 11 item 3), os globos dos olhos, da cor da pele (item 4), e o cabelo
+ * lista 11 item 3), os olhos (globo do item 4, íris e córnea da lista 12) e o cabelo
  * (item 5). Normais lisas nas costuras do corpo base (item 6).
  */
 
@@ -78,8 +78,8 @@ export function AvatarSkin({
       )}
       {eyes.map((e, i) => (
         <mesh key={i} position={e.center} scale={e.radius} receiveShadow>
-          <sphereGeometry args={[1, 32, 24]} />
-          <SkinMaterial />
+          <sphereGeometry args={[1, 48, 32]} />
+          <EyeMaterial />
         </mesh>
       ))}
     </>
