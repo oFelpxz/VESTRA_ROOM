@@ -4,12 +4,14 @@
  * escolha, curto (careca parecia estranho no estudo do item 1). Com touca o
  * cabelo some — ela cobre a cabeça.
  *
- * Sem UV nem textura, como a pele: `hairMask` diz quanto de cada vértice da
- * cabeça é couro cabeludo (linha do cabelo medida a partir do olho, por
- * ângulo em volta da cabeça); o shader da pele pinta essa área e, no curto,
+ * Sem UV nem textura, como a pele: `hairHeight` diz quanto cada vértice da
+ * cabeça está acima da linha do cabelo (medida a partir do olho, por ângulo
+ * em volta da cabeça); o shader da pele pinta essa área e, no curto,
  * `hairShell` levanta uma casca por cima, mais grossa no alto. Regras puras,
  * sem three.
  */
+
+import { weldedNormals } from "./welded-normals";
 
 export type HairStyle = { id: string; name: string };
 
@@ -46,9 +48,6 @@ const HAIRLINE: [number, number][] = [
   [160, -0.055],
   [180, -0.068],
 ];
-/** Meia largura da passagem pele → cabelo (m). */
-const FEATHER = 0.006;
-
 function hairlineAt(deg: number) {
   for (let i = 1; i < HAIRLINE.length; i++) {
     const [a, ya] = HAIRLINE[i - 1];
@@ -92,9 +91,17 @@ export function hairHeight(positions: ArrayLike<number>, eyeY: number): Float32A
   return above;
 }
 
-/** 0 = pele, 1 = couro cabeludo, por vértice (a partir de `hairHeight`). */
-export function hairMask(above: Float32Array): Float32Array {
-  return above.map((a) => smoothstep(-FEATHER, FEATHER, a));
+/** Até onde, em volta da linha, a altura vai para a placa de vídeo (m; além do degradê). */
+const EDGE_RANGE = 0.05;
+
+/**
+ * Altura acima da linha que vai para o shader, limitada a ±5 cm. A placa
+ * interpola a distância (que muda devagar) e decide pele ou cabelo em cada
+ * pixel — com a máscara 0/1 por vértice, a borda seguia os triângulos e
+ * saía em escada na têmpora (lista 12, item 4).
+ */
+export function hairEdge(above: ArrayLike<number>): Float32Array {
+  return Float32Array.from(above, (a) => Math.min(EDGE_RANGE, Math.max(-EDGE_RANGE, a)));
 }
 
 /** Espessura do curto (m): 0,8 cm no alto, 0,3 cm nas laterais e na nuca. */
@@ -104,11 +111,22 @@ function thickness(dy: number) {
 /** Distância acima da linha em que o curto chega à espessura toda (degradê). */
 const TAPER = 0.035;
 
+/** Triângulos com algum vértice até 1,2 cm abaixo da linha entram na casca (o shader recorta). */
+const NEAR = 0.012;
+/** Redemoinho: atrás do alto da cabeça (m), de onde os fios saem. */
+const CROWN_BACK = 0.03;
+
 export type HairShell = {
   position: Float32Array;
+  normal: Float32Array;
   /** Ponto da pele embaixo de cada vértice (o ruído da borda bate com a pele). */
   root: Float32Array;
-  mask: Float32Array;
+  /** Altura acima da linha do cabelo (`hairEdge`). */
+  above: Float32Array;
+  /** Direção do fio, do redemoinho para fora, na superfície (xyz + 1). */
+  tangent: Float32Array;
+  /** Fio: (seno e cosseno do ângulo em volta do redemoinho, distância dele em m). */
+  flow: Float32Array;
   index: number[];
 };
 
@@ -118,6 +136,12 @@ export type HairShell = {
  * um degradê de barbeiro — sem degrau de capacete na linha do cabelo. A
  * normal é a média dos vértices que caem no mesmo ponto (o corpo tem a costura
  * do meio da cabeça duplicada), senão a casca abre uma fresta ali.
+ *
+ * Lista 12, item 4: cada triângulo vira quatro, com o ponto do meio de cada
+ * aresta empurrado para fora pela curvatura (a cabeça fica redonda, sem os
+ * gomos no contorno), e cada vértice leva a direção do fio — do redemoinho,
+ * atrás do alto da cabeça, para a testa, as laterais e a nuca — para o brilho
+ * esticado de cabelo e o grão dos fios.
  */
 export function hairShell(
   positions: ArrayLike<number>,
@@ -126,13 +150,13 @@ export function hairShell(
   above: Float32Array,
   eyeY: number,
 ): HairShell {
-  const mask = hairMask(above);
-  const remap = new Int32Array(mask.length).fill(-1);
+  const edge = hairEdge(above);
+  const remap = new Int32Array(edge.length).fill(-1);
   const verts: number[] = [];
   const tris: number[] = [];
   for (let t = 0; t + 2 < index.length; t += 3) {
     const tri = [index[t], index[t + 1], index[t + 2]];
-    if (tri.some((v) => mask[v] < 0.01)) continue;
+    if (tri.every((v) => edge[v] < -NEAR)) continue;
     for (const v of tri) {
       if (remap[v] < 0) {
         remap[v] = verts.length;
@@ -141,9 +165,10 @@ export function hairShell(
       tris.push(remap[v]);
     }
   }
-  const position = new Float32Array(verts.length * 3);
-  const root = new Float32Array(verts.length * 3);
-  const shellMask = new Float32Array(verts.length);
+  // Pele (p), normal soldada (n) e altura (a) de cada vértice da casca.
+  const p: number[] = [];
+  const n: number[] = [];
+  const a: number[] = [];
   const key = (v: number) =>
     [0, 1, 2].map((k) => Math.round(positions[v * 3 + k] * 1e5)).join(",");
   const welded = new Map<string, number[]>();
@@ -152,15 +177,76 @@ export function hairShell(
     for (let k = 0; k < 3; k++) sum[k] += normals[v * 3 + k];
     welded.set(key(v), sum);
   }
-  verts.forEach((v, i) => {
-    const n = welded.get(key(v))!;
-    const len = Math.hypot(n[0], n[1], n[2]) || 1;
-    const lift = 0.0006 + thickness(positions[v * 3 + 1] - eyeY) * smoothstep(0, TAPER, above[v]);
+  for (const v of verts) {
+    const w = welded.get(key(v))!;
+    const len = Math.hypot(w[0], w[1], w[2]) || 1;
     for (let k = 0; k < 3; k++) {
-      root[i * 3 + k] = positions[v * 3 + k];
-      position[i * 3 + k] = positions[v * 3 + k] + (n[k] / len) * lift;
+      p.push(positions[v * 3 + k]);
+      n.push(w[k] / len);
     }
-    shellMask[i] = mask[v];
-  });
-  return { position, root, mask: shellMask, index: tris };
+    a.push(edge[v]);
+  }
+
+  // Um nível de subdivisão: meio da aresta na curva que as duas normais pedem.
+  const surface: number[] = [...p];
+  const mids = new Map<string, number>();
+  const mid = (i: number, j: number) => {
+    const id = i < j ? `${i},${j}` : `${j},${i}`;
+    const got = mids.get(id);
+    if (got !== undefined) return got;
+    const m = a.length;
+    const d = [0, 1, 2].map((k) => p[i * 3 + k] - p[j * 3 + k]);
+    const dn = [0, 1, 2].map((k) => n[i * 3 + k] - n[j * 3 + k]);
+    const sag = (d[0] * dn[0] + d[1] * dn[1] + d[2] * dn[2]) / 8;
+    const nm = [0, 1, 2].map((k) => n[i * 3 + k] + n[j * 3 + k]);
+    const len = Math.hypot(nm[0], nm[1], nm[2]) || 1;
+    for (let k = 0; k < 3; k++) {
+      p.push((p[i * 3 + k] + p[j * 3 + k]) / 2);
+      n.push(nm[k] / len);
+      surface.push((p[i * 3 + k] + p[j * 3 + k]) / 2 + (nm[k] / len) * sag);
+    }
+    a.push((a[i] + a[j]) / 2);
+    mids.set(id, m);
+    return m;
+  };
+  const fine: number[] = [];
+  for (let t = 0; t < tris.length; t += 3) {
+    const [i, j, k] = [tris[t], tris[t + 1], tris[t + 2]];
+    const [ij, jk, ki] = [mid(i, j), mid(j, k), mid(k, i)];
+    fine.push(i, ij, ki, ij, j, jk, ki, jk, k, ij, jk, ki);
+  }
+
+  const count = a.length;
+  const position = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const lift = 0.0006 + thickness(p[i * 3 + 1] - eyeY) * smoothstep(0, TAPER, a[i]);
+    for (let k = 0; k < 3; k++) position[i * 3 + k] = surface[i * 3 + k] + n[i * 3 + k] * lift;
+  }
+  const normal = weldedNormals(position, fine);
+
+  // Redemoinho: o ponto mais alto da pele, um pouco para trás.
+  let top = 0;
+  for (let i = 1; i < count; i++) if (p[i * 3 + 1] > p[top * 3 + 1]) top = i;
+  const crown = [p[top * 3], p[top * 3 + 1], p[top * 3 + 2] - CROWN_BACK];
+  const tangent = new Float32Array(count * 4);
+  const flow = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const d = [0, 1, 2].map((k) => p[i * 3 + k] - crown[k]);
+    const nn = [normal[i * 3], normal[i * 3 + 1], normal[i * 3 + 2]];
+    // Para fora do redemoinho, na superfície; no próprio redemoinho, para a testa.
+    let dot = d[0] * nn[0] + d[1] * nn[1] + d[2] * nn[2];
+    let s = d.map((v, k) => v - nn[k] * dot);
+    if (Math.hypot(s[0], s[1], s[2]) < 1e-4) {
+      dot = nn[2];
+      s = [0, 0, 1].map((v, k) => v - nn[k] * dot);
+    }
+    const len = Math.hypot(s[0], s[1], s[2]) || 1;
+    for (let k = 0; k < 3; k++) tangent[i * 4 + k] = s[k] / len;
+    tangent[i * 4 + 3] = 1;
+    const az = Math.atan2(d[0], d[2]);
+    flow[i * 3] = Math.sin(az);
+    flow[i * 3 + 1] = Math.cos(az);
+    flow[i * 3 + 2] = Math.hypot(d[0], d[1], d[2]);
+  }
+  return { position, normal, root: Float32Array.from(p), above: Float32Array.from(a), tangent, flow, index: fine };
 }

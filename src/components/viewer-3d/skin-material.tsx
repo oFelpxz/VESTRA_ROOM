@@ -26,7 +26,7 @@ import { skinTone, type SkinTone } from "@/lib/skin-tones";
  * (atributo `skinFace`, de `faceCoords` em lib/face-marks).
  *
  * Item 5 — cabelo: com `hair`, a pele pinta o couro cabeludo (atributo
- * `hairMask`, de `hairMask` em lib/hair) com borda irregular; `HairMaterial`
+ * `hairAbove`, de `hairEdge` em lib/hair) com borda irregular; `HairMaterial`
  * é a casca do corte curto, com a mesma borda.
  */
 
@@ -47,8 +47,8 @@ attribute float skinCavity;
 varying float vSkinCavity;
 #endif
 #ifdef SKIN_HAIR
-attribute float hairMask;
-varying float vHairMask;
+attribute float hairAbove;
+varying float vHairAbove;
 #endif
 #ifdef SKIN_FACE
 attribute vec3 skinFace;
@@ -66,7 +66,7 @@ varying vec3 vSkinPos;
 varying float vSkinCavity;
 #endif
 #ifdef SKIN_HAIR
-varying float vHairMask;
+varying float vHairAbove;
 #endif
 #ifdef SKIN_FACE
 varying vec3 vSkinFace;
@@ -87,10 +87,11 @@ float skinNoise( vec3 x ) {
          mix( skinHash( i + vec3( 0, 1, 1 ) ), skinHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ),
     f.z );
 }
-// Quanto do ponto é cabelo: a borda ganha bicos de ~3 mm, não segue os triângulos.
-float hairAmount( vec3 root, float mask ) {
+// Quanto do ponto é cabelo, pela altura acima da linha (m, hairEdge): a
+// borda ganha bicos de ~3 mm e tufos de ~1 cm, não segue os triângulos.
+float hairAmount( vec3 root, float above ) {
   float edge = skinNoise( root * 320.0 ) * 0.6 + skinNoise( root * 90.0 ) * 0.4;
-  return smoothstep( 0.42, 0.58, mask + ( edge - 0.5 ) * 0.45 );
+  return smoothstep( -0.0012, 0.0012, above + ( edge - 0.5 ) * 0.007 );
 }
 // Fios: grão fino, mais longo na vertical.
 float hairGrain( vec3 root ) {
@@ -143,7 +144,7 @@ ${FACE_COLOR}
 #endif
 #ifdef SKIN_HAIR
 // Raspado: a pele aparece entre os fios (SKIN_HAIR < 1).
-float skinHairAmt = hairAmount( vSkinPos, vHairMask ) * SKIN_HAIR * ( 0.8 + 0.4 * hairGrain( vSkinPos ) );
+float skinHairAmt = hairAmount( vSkinPos, vHairAbove ) * SKIN_HAIR * ( 0.8 + 0.4 * hairGrain( vSkinPos ) );
 diffuseColor.rgb = mix( diffuseColor.rgb, hairColor, min( skinHairAmt, 1.0 ) );
 #endif
 `;
@@ -196,7 +197,7 @@ function patchSkin(shader: THREE.WebGLProgramParametersWithUniforms) {
     .replace("#include <common>", `#include <common>${VERTEX_DECL}`)
     .replace(
       "#include <begin_vertex>",
-      "#include <begin_vertex>\n  vSkinPos = transformed;\n#ifdef SKIN_FOLDS\n  vSkinCavity = skinCavity;\n#endif\n#ifdef SKIN_HAIR\n  vHairMask = hairMask;\n#endif\n#ifdef SKIN_FACE\n  vSkinFace = skinFace;\n#endif",
+      "#include <begin_vertex>\n  vSkinPos = transformed;\n#ifdef SKIN_FOLDS\n  vSkinCavity = skinCavity;\n#endif\n#ifdef SKIN_HAIR\n  vHairAbove = hairAbove;\n#endif\n#ifdef SKIN_FACE\n  vSkinFace = skinFace;\n#endif",
     );
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>${FRAGMENT_DECL}`)
@@ -213,7 +214,7 @@ const skinKey = () => "vestra-skin";
 
 /**
  * `folds`: a malha traz o atributo `skinCavity` (só o corpo do provador).
- * `hair`: a malha traz `hairMask`; quanto o cabelo cobre a pele (1 = tudo).
+ * `hair`: a malha traz `hairAbove`; quanto o cabelo cobre a pele (1 = tudo).
  * `face`: a malha traz `skinFace` (sobrancelha, boca e pálpebra).
  */
 export function SkinMaterial({
@@ -262,31 +263,41 @@ export function SkinMaterial({
 
 const HAIR_VERTEX_DECL = /* glsl */ `
 attribute vec3 hairRoot;
-attribute float hairMask;
+attribute float hairAbove;
+attribute vec3 hairFlow;
 varying vec3 vHairRoot;
-varying float vHairMask;
+varying float vHairAbove;
+varying vec3 vHairFlow;
 `;
 const HAIR_FRAGMENT_DECL = /* glsl */ `
 uniform vec3 hairColor;
 varying vec3 vHairRoot;
-varying float vHairMask;
+varying float vHairAbove;
+varying vec3 vHairFlow;
 ${FRAGMENT_DECL.slice(FRAGMENT_DECL.indexOf("float skinHash"))}
 `;
 // Some onde a pele já mostra a pele (mesma borda irregular da pintura).
 const HAIR_COLOR_BODY = /* glsl */ `
-if ( hairAmount( vHairRoot, vHairMask ) < 0.5 ) discard;
-float grain = hairGrain( vHairRoot );
-diffuseColor.rgb = hairColor * ( 0.8 + 0.9 * grain );
+if ( hairAmount( vHairRoot, vHairAbove ) < 0.5 ) discard;
+// Fios (lista 12, item 4): ruído fino em volta do redemoinho e longo ao longo
+// do fio (hairFlow), mais tufos largos. De longe o fino some (sem chiado).
+vec3 flowP = vec3( vHairFlow.xy * 230.0, vHairFlow.z * 220.0 );
+float fineW = 1.0 - smoothstep( 0.4, 1.2, length( fwidth( flowP ) ) );
+float grain = mix( 0.5, skinNoise( flowP ), fineW ) * 0.6 + skinNoise( flowP * vec3( 0.22, 0.22, 0.15 ) ) * 0.4;
+diffuseColor.rgb = hairColor * ( 0.7 + 0.9 * grain );
 `;
 const HAIR_ROUGHNESS_BODY = /* glsl */ `
-roughnessFactor = clamp( roughnessFactor + ( grain - 0.5 ) * 0.3, 0.35, 1.0 );
+roughnessFactor = clamp( roughnessFactor + ( grain - 0.5 ) * 0.25, 0.25, 1.0 );
 `;
 
 function patchHair(shader: THREE.WebGLProgramParametersWithUniforms) {
   shader.uniforms.hairColor = { value: HAIR };
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", `#include <common>${HAIR_VERTEX_DECL}`)
-    .replace("#include <begin_vertex>", "#include <begin_vertex>\n  vHairRoot = hairRoot;\n  vHairMask = hairMask;");
+    .replace(
+      "#include <begin_vertex>",
+      "#include <begin_vertex>\n  vHairRoot = hairRoot;\n  vHairAbove = hairAbove;\n  vHairFlow = hairFlow;",
+    );
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>${HAIR_FRAGMENT_DECL}`)
     .replace("#include <color_fragment>", `#include <color_fragment>${HAIR_COLOR_BODY}`)
@@ -370,14 +381,18 @@ export function EyeMaterial() {
 }
 
 /**
- * Casca do corte curto: fosca, com brilho de borda castanho (fio contra a
- * luz). A malha traz `hairRoot` (pele embaixo) e `hairMask`.
+ * Casca do corte curto: brilho de borda castanho (fio contra a luz) e, na
+ * lista 12 (item 4), o brilho esticado de cabelo — uma faixa que corre de
+ * lado, atravessando os fios, como na foto. A malha traz `hairRoot` (pele
+ * embaixo), `hairAbove`, `hairFlow` e a direção do fio em `tangent`.
  */
 export function HairMaterial() {
   return (
     <meshPhysicalMaterial
-      roughness={0.6}
-      specularIntensity={0.3}
+      roughness={0.5}
+      specularIntensity={0.45}
+      anisotropy={0.8}
+      anisotropyRotation={Math.PI / 2}
       sheen={0.7}
       sheenRoughness={0.45}
       sheenColor="#6a5040"
