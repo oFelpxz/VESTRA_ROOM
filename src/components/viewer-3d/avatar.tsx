@@ -134,7 +134,10 @@ export function readMorphBody(scene: THREE.Object3D) {
   const index = geo.index
     ? Array.from(geo.index.array)
     : Array.from({ length: base.length / 3 }, (_, i) => i);
-  return { base, deltas, keys, index };
+  // peso de braço de cada vértice (pose relaxada, ver `relaxArms`)
+  const armAttr = geo.getAttribute("_braco");
+  const arm = armAttr ? Float32Array.from({ length: armAttr.count }, (_, i) => armAttr.getX(i)) : null;
+  return { base, deltas, keys, index, arm };
 }
 
 function GltfAvatar({

@@ -32,9 +32,12 @@ mb avatar_medidas.py -- avatar_g.glb avatar_v2.glb
 mb avatar_pose.py -- avatar_v2.glb avatar_v3.glb pesos.npz
 # altura, entrepernas, braço e ombros em cm; imprime CALIBRACAO lengths
 mb avatar_comprimentos.py -- avatar_v3.glb
+# peso de braço `_BRACO` para a pose relaxada do provador (lista 12, item 9;
+# src/lib/arm-pose.ts); só acrescenta o atributo, não exporta de novo
+mb avatar_braco.py -- avatar_v3.glb avatar_v4.glb
 ```
 
-`avatar_v3.glb` → `public/models/avatar_base.glb`. Se as CALIBRACAO lengths
+`avatar_v4.glb` → `public/models/avatar_base.glb`. Se as CALIBRACAO lengths
 mudarem, atualizar `AVATAR_CALIBRATION.lengths` em `src/lib/avatar-builder.ts`.
 
 Peito, cintura e quadril (lista 11, item 7) são medidos no próprio

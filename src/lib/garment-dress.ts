@@ -1,4 +1,5 @@
-import { MathUtils, Vector3 } from "three";
+import { MathUtils, Quaternion, Vector3 } from "three";
+import { relaxArms, SHOULDER, WRIST } from "@/lib/arm-pose";
 import { clampGirth, girthStep, GIRTHS, type AvatarParams } from "@/lib/avatar-builder";
 import { makeTape, tapeGirths, type BodyTape } from "@/lib/body-tape";
 import {
@@ -26,11 +27,9 @@ const NECK = new Vector3(0, 1.42, 0.025);
 // muda menos que a do peito (fração da mudança do peito).
 const COLLAR_SHARE = 0.25;
 const SLEEVE_WIDTH_SHARE = 0.6;
-// Ombro e pulso do lado +X do corpo de referência na pose padrão (m; o lado
-// -X é espelhado), de scripts/molde/pose_lib.py. A manga cresce/encolhe em
-// volta do eixo ombro → pulso, para continuar em volta do braço.
-export const SHOULDER = new Vector3(0.18, 1.33, 0.02);
-export const WRIST = new Vector3(0.415, 0.869, 0.088);
+// Ombro e pulso da pose padrão (ver `arm-pose.ts`). A manga cresce/encolhe
+// em volta do eixo ombro → pulso, para continuar em volta do braço.
+export { SHOULDER, WRIST };
 // Altura da axila do corpo de referência (m): o caimento do tronco começa aqui.
 const ARMPIT_Y = 1.24;
 // Gancho: o ponto mais baixo do tronco no meio do corpo (x = 0), procurado
@@ -100,6 +99,12 @@ export type FitBody = {
   shoulders: number[];
   /** Vértices em volta do ombro e do pulso de cada lado (+1 / -1). */
   arms: { side: number; shoulder: number[]; wrist: number[] }[];
+  /**
+   * Quanto cada vértice é braço (0 a 1), com o sinal do lado: atributo
+   * `_BRACO` do avatar (scripts/molde/avatar_braco.py). Com ele, os braços
+   * descem para a pose relaxada (`relaxArms`).
+   */
+  arm?: Float32Array | null;
 };
 
 export type FitPart = {
@@ -185,7 +190,7 @@ const tapes = new WeakMap<Float32Array, BodyTape>();
  * usados e quanto o corpo subiu (`lift`) para isso.
  */
 export function shapeBody(
-  body: Pick<FitBody, "base" | "deltas" | "keys" | "index">,
+  body: Pick<FitBody, "base" | "deltas" | "keys" | "index" | "arm">,
   morphs: AvatarParams["morphs"],
   totalHeight: number,
   girths?: AvatarParams["girths"],
@@ -232,6 +237,8 @@ export function shapeBody(
   let minY = Infinity;
   for (let i = 1; i < pos.length; i += 3) minY = Math.min(minY, pos[i]);
   for (let i = 1; i < pos.length; i += 3) pos[i] -= minY;
+  // braços da pose padrão para a relaxada (lista 12, item 9)
+  if (body.arm) relaxArms(pos, body.base, body.arm);
   return { pos, weights, lift: -minY };
 }
 
@@ -291,10 +298,10 @@ export function dress(
       const w0 = mirror(WRIST, a.side);
       const s1 = track(a.shoulder, s0);
       const w1 = track(a.wrist, w0);
-      return [
-        a.side,
-        { s0, d0: w0.sub(s0).normalize(), s1, d1: w1.sub(s1).normalize() },
-      ];
+      const d0 = w0.sub(s0).normalize();
+      const d1 = w1.sub(s1).normalize();
+      // o braço do cliente desceu (pose relaxada): a manga gira junto
+      return [a.side, { s0, d0, s1, d1, turn: new Quaternion().setFromUnitVectors(d0, d1) }];
     }),
   );
 
@@ -353,7 +360,7 @@ export function dress(
       }
       p0.fromArray(p.base, i).sub(arm.s0);
       const t = p0.dot(arm.d0);
-      radial.copy(p0).addScaledVector(arm.d0, -t).multiplyScalar(sleeveWidth);
+      radial.copy(p0).addScaledVector(arm.d0, -t).multiplyScalar(sleeveWidth).applyQuaternion(arm.turn);
       const q = radial.add(arm.s1).addScaledVector(arm.d1, t * sleeveLen);
       const w = Math.min(1, Math.abs(a));
       cloth[off + i] = x + (q.x - x) * w;

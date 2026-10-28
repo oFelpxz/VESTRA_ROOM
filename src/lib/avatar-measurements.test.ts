@@ -62,7 +62,9 @@ describe("o corpo do avatar bate com as medidas (erro < 1 cm)", () => {
   for (const [name, m, kind] of BODIES)
     it(name, () => {
       const params = buildAvatarParams(m, kind);
-      const { pos } = shapeBody(body, params.morphs, params.totalHeight, params.girths);
+      // Medido na pose do molde: na relaxada (lista 12, item 9) a axila desce
+      // junto com o braço e a fita do peito passa por ela.
+      const { pos } = shapeBody({ ...body, arm: null }, params.morphs, params.totalHeight, params.girths);
       const got = { ...tapeGirths(makeTape(body.base, body.index), pos), ...lengths(pos) };
       const want = {
         chest: m.chestCm,

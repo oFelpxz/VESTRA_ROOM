@@ -51,7 +51,7 @@ export type Part = FitPart & {
 function extractBody(scene: THREE.Object3D): FitBody {
   const found = readMorphBody(scene);
   if (!found) throw new Error("avatar sem morph targets");
-  const { base, deltas, keys, index } = found;
+  const { base, deltas, keys, index, arm } = found;
   const v = new THREE.Vector3();
 
   // Topo dos ombros (|x| 9–13 cm, no meio da profundidade): a peça segue a
@@ -81,7 +81,7 @@ function extractBody(scene: THREE.Object3D): FitBody {
     wrist: near(mirror(WRIST, side)),
   }));
 
-  return { base, deltas, keys, index, shoulders, arms };
+  return { base, deltas, keys, index, shoulders, arms, arm };
 }
 
 /**

@@ -35,5 +35,7 @@ export async function readAvatarGlb(path: string) {
   const deltas = prim.listTargets().map((t) => each(t.getAttribute("POSITION")!.getArray()!, linear));
   const keys = names.map((n) => (KEYS as string[]).includes(n) ? (n as MorphKey) : null);
   const index = Array.from(prim.getIndices()!.getArray()!);
-  return { base, deltas, keys, index };
+  const braco = prim.getAttribute("_BRACO")?.getArray();
+  const arm = braco ? Float32Array.from(braco) : null;
+  return { base, deltas, keys, index, arm };
 }
