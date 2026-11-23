@@ -1,59 +1,18 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { syncOrderPayment } from "@/lib/payments";
 
 /**
- * Webhook simulado: aguarda alguns segundos e marca pagamento como PAID.
- * Em produção, isso seria substituído por um webhook real de Mercado Pago/Stripe.
+ * Status do pagamento para a página de sucesso, consultado a cada 2 s.
  *
- * Body: { orderId: string }
- */
-export async function POST(request: Request) {
-  let body: { orderId?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
-  }
-
-  const orderId = body.orderId?.trim();
-  if (!orderId) {
-    return NextResponse.json({ error: "orderId obrigatório." }, { status: 400 });
-  }
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: { payment: true },
-  });
-  if (!order || !order.payment) {
-    return NextResponse.json({ error: "Pedido não encontrado." }, { status: 404 });
-  }
-  if (order.payment.status !== "PENDING") {
-    return NextResponse.json({ ok: true, alreadyProcessed: true });
-  }
-
-  // Espera 3s para simular processamento do gateway
-  await new Promise((resolve) => setTimeout(resolve, 3000));
-
-  await prisma.$transaction([
-    prisma.payment.update({
-      where: { id: order.payment.id },
-      data: {
-        status: "PAID",
-        paidAt: new Date(),
-        externalPaymentId: `SIM-${Math.random().toString(36).slice(2, 10).toUpperCase()}`,
-      },
-    }),
-    prisma.order.update({
-      where: { id: orderId },
-      data: { status: "PAID" },
-    }),
-  ]);
-
-  return NextResponse.json({ ok: true });
-}
-
-/**
- * Permite que a página de sucesso consulte o status atual do pagamento via polling.
+ * A consulta também faz a reconciliação (`syncOrderPayment`): o pagamento
+ * simulado (PIX, ou a loja sem chave do Stripe) é aprovado depois de 3 s, e o
+ * do Stripe ainda pendente é conferido no próprio Stripe (no máximo a cada
+ * 10 s por pedido). Pagamento do Stripe só é confirmado pelo Stripe.
+ *
+ * Antes havia aqui um POST, sem login, que marcava como pago qualquer pedido
+ * simulado; ele saiu junto com a chamada "solta" que o checkout fazia.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -61,6 +20,17 @@ export async function GET(request: Request) {
   if (!orderId) {
     return NextResponse.json({ error: "orderId obrigatório." }, { status: 400 });
   }
+
+  const session = await auth();
+  const owner = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { userId: true },
+  });
+  if (!owner || !session?.user?.id || owner.userId !== session.user.id) {
+    return NextResponse.json({ error: "Pedido não encontrado." }, { status: 404 });
+  }
+
+  await syncOrderPayment(orderId);
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },

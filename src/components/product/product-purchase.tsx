@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { addToCartAction, type CartActionState } from "@/lib/cart-actions";
+import { ColorLabel, LookLegend } from "./color-swatch";
+import { useProductColor } from "./product-color";
 
 const initialState: CartActionState = {};
 
@@ -24,7 +26,7 @@ export function ProductPurchase({
   sizes: string[];
   isLoggedIn: boolean;
 }) {
-  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useProductColor();
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(
     addToCartAction,
@@ -37,6 +39,10 @@ export function ProductPurchase({
       v.size === selectedSize &&
       v.stockQuantity > 0,
   );
+
+  // Nenhuma variação com estoque: avisa que esgotou em vez de pedir uma
+  // escolha impossível.
+  const soldOut = !variants.some((v) => v.stockQuantity > 0);
 
   const colorAvailable = (color: string) =>
     variants.some((v) => v.color === color && v.stockQuantity > 0);
@@ -80,11 +86,12 @@ export function ProductPurchase({
                       : "border-foreground/20 hover:border-foreground"
                   } ${!enabled ? "cursor-not-allowed opacity-40 line-through" : ""}`}
                 >
-                  {c}
+                  <ColorLabel name={c} />
                 </button>
               );
             })}
           </div>
+          <LookLegend colors={colors} />
         </div>
       )}
 
@@ -144,7 +151,15 @@ export function ProductPurchase({
         </p>
       )}
 
-      {isLoggedIn ? (
+      {soldOut ? (
+        <button
+          type="button"
+          disabled
+          className="inline-flex h-12 items-center justify-center rounded-sm bg-foreground px-8 text-xs font-semibold uppercase tracking-[0.15em] text-background disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Esgotado
+        </button>
+      ) : isLoggedIn ? (
         <button
           type="submit"
           disabled={!selectedVariant || pending}

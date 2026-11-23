@@ -1,3 +1,5 @@
+export const metadata = { title: "Sobre" };
+
 export default function SobrePage() {
   return (
     <section className="mx-auto max-w-3xl px-4 py-24 md:px-6">

@@ -3,6 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  ADMIN_CANCELABLE,
+  cancelOrderInTx,
+  shouldRestock,
+} from "@/lib/order-cancel";
+import { afterOrderCanceled, refundOrderPayment } from "@/lib/payments";
+import { notifyInTx } from "@/lib/notifications";
+import { shortOrderCode } from "@/lib/payment-rules";
 
 export type LogisticsState = { error?: string; success?: boolean };
 
@@ -15,11 +23,14 @@ type OrderStatus =
   | "CANCELED"
   | "REFUNDED";
 
-// Transições permitidas (não pula etapas)
+// Transições permitidas (não pula etapas). Cancelar não entra aqui: é só
+// do Admin, em cancelOrderByAdminAction (item 19). PENDING_PAYMENT → PAID
+// também não: só a confirmação do pagamento marca o pedido como pago, senão
+// o pedido ficaria pago com o Payment ainda PENDING.
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING_PAYMENT: ["PAID", "CANCELED"],
-  PAID: ["PREPARING", "CANCELED"],
-  PREPARING: ["SHIPPED", "CANCELED"],
+  PENDING_PAYMENT: [],
+  PAID: ["PREPARING"],
+  PREPARING: ["SHIPPED"],
   SHIPPED: ["DELIVERED"],
   DELIVERED: [],
   CANCELED: [],
@@ -63,7 +74,7 @@ export async function advanceOrderStatusAction(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { status: true, trackingCode: true, items: true, payment: true },
+    select: { status: true, trackingCode: true, userId: true },
   });
   if (!order) return { error: "Pedido não encontrado." };
 
@@ -85,38 +96,37 @@ export async function advanceOrderStatusAction(
     }
   }
 
-  if (next === "CANCELED") {
-    // Cancelamento via operador também devolve estoque (espelha cancelOrderAction)
-    await prisma.$transaction(async (tx) => {
-      for (const i of order.items) {
-        if (i.productVariantId) {
-          await tx.productVariant.update({
-            where: { id: i.productVariantId },
-            data: { stockQuantity: { increment: i.quantity } },
-          });
-        }
-      }
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: "CANCELED" },
-      });
-      if (order.payment) {
-        await tx.payment.update({
-          where: { id: order.payment.id },
-          data: {
-            status: order.payment.status === "PAID" ? "REFUNDED" : "FAILED",
-          },
-        });
-      }
-    });
-  } else {
-    await prisma.order.update({
-      where: { id: orderId },
+  // Condicionado ao status lido: se o pedido foi cancelado nesse meio-tempo,
+  // não volta a andar.
+  const moved = await prisma.$transaction(async (tx) => {
+    const r = await tx.order.updateMany({
+      where: { id: orderId, status: current },
       data: {
         status: next,
         ...(trackingCode ? { trackingCode } : {}),
+        // Item 21: os prazos de troca contam a partir da entrega.
+        ...(next === "DELIVERED" ? { deliveredAt: new Date() } : {}),
       },
     });
+    // Item 20: o aviso de pagamento promete avisar quando o pedido sair.
+    if (r.count > 0 && (next === "SHIPPED" || next === "DELIVERED")) {
+      const code = shortOrderCode(orderId);
+      const tracking = trackingCode ?? order.trackingCode;
+      await notifyInTx(tx, {
+        userId: order.userId,
+        title:
+          next === "SHIPPED" ? `Pedido enviado · Pedido #${code}` : `Pedido entregue · Pedido #${code}`,
+        body:
+          next === "SHIPPED"
+            ? `Seu pedido saiu para entrega. Código de rastreio: ${tracking}.`
+            : "Esperamos que goste! Se algo não serviu, a troca ou devolução é pela página do pedido.",
+        href: `/perfil/pedidos/${orderId}`,
+      });
+    }
+    return r;
+  });
+  if (moved.count === 0) {
+    return { error: "O pedido mudou de status. Atualize a página." };
   }
 
   revalidatePath("/admin/pedidos");
@@ -124,6 +134,99 @@ export async function advanceOrderStatusAction(
   revalidatePath(`/perfil/pedidos/${orderId}`);
   revalidatePath("/perfil/pedidos");
   return { success: true };
+}
+
+/**
+ * Cancelamento pelo Admin (item 19): a qualquer momento, inclusive depois
+ * de enviado ou entregue (só não cancela o que já foi cancelado ou
+ * reembolsado). Até a separação o estoque sempre volta; depois do envio,
+ * só se o Admin marcar que a peça retornou ao depósito.
+ */
+export async function cancelOrderByAdminAction(
+  _prev: LogisticsState,
+  formData: FormData,
+): Promise<LogisticsState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { error: "Só o Administrador pode cancelar pedidos." };
+  }
+
+  const orderId = str(formData.get("orderId"));
+  if (!orderId) return { error: "Pedido inválido." };
+  const returnedToStock = formData.get("returnedToStock") === "on";
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      status: true,
+      items: { select: { productVariantId: true, quantity: true } },
+      payment: { select: { id: true } },
+      couponId: true,
+    },
+  });
+  if (!order) return { error: "Pedido não encontrado." };
+
+  // Item 22: com troca ou devolução em andamento, o reembolso do
+  // cancelamento somaria com o da devolução. Encerre a troca antes.
+  const activeReturns = await prisma.returnRequest.count({
+    where: { orderId, status: { in: ["OPEN", "APPROVED", "RECEIVED"] } },
+  });
+  if (activeReturns > 0) {
+    return {
+      error: "Este pedido tem troca ou devolução em andamento. Resolva em Trocas antes de cancelar.",
+    };
+  }
+
+  const canceled = await prisma.$transaction((tx) =>
+    cancelOrderInTx(tx, order, {
+      allowedFrom: ADMIN_CANCELABLE,
+      restock: shouldRestock(order.status, returnedToStock),
+    }),
+  );
+  if (!canceled) {
+    return {
+      error: "O pedido mudou de status ou já está encerrado. Atualize a página.",
+    };
+  }
+
+  // Estorno no gateway (item 20). Se falhar, o cancelamento continua valendo
+  // e a página do pedido mostra o botão para tentar o estorno de novo.
+  await afterOrderCanceled(orderId, "admin");
+
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${orderId}`);
+  revalidatePath("/admin/estoque");
+  revalidatePath(`/perfil/pedidos/${orderId}`);
+  revalidatePath("/perfil/pedidos");
+  return { success: true };
+}
+
+/**
+ * Estorno de pedido cancelado que ainda consta como pago (item 20): nova
+ * tentativa depois de uma falha no gateway, ou — com `manual` — registro de
+ * um reembolso feito fora do gateway (boleto pago não tem estorno no Stripe).
+ */
+export async function refundOrderAction(
+  _prev: LogisticsState,
+  formData: FormData,
+): Promise<LogisticsState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") {
+    return { error: "Só o Administrador pode reembolsar pedidos." };
+  }
+
+  const orderId = str(formData.get("orderId"));
+  if (!orderId) return { error: "Pedido inválido." };
+  const manual = formData.get("manual") === "on";
+
+  const result = await refundOrderPayment(orderId, { manual });
+
+  revalidatePath("/admin/pedidos");
+  revalidatePath(`/admin/pedidos/${orderId}`);
+  revalidatePath(`/perfil/pedidos/${orderId}`);
+  revalidatePath("/perfil/pedidos");
+  return result.ok ? { success: true } : { error: result.error };
 }
 
 /**

@@ -7,22 +7,62 @@ import {
   Html,
   Center,
   Bounds,
+  useBounds,
+  ContactShadows,
 } from "@react-three/drei";
 import {
+  lazy,
   Suspense,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type RefObject,
 } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { isFittedToMannequin } from "./mannequin-mark";
+import { StudioAO } from "./studio-ao";
+import { STUDIO_TONE_MAPPING, StudioLights } from "./studio-lights";
+import type { GarmentLook } from "@/lib/garment-prints";
+import { useGarmentPrints } from "./brand-logo-canvas";
+import { useTintedScene } from "./tinted-scene";
 
-function Model({ url }: { url: string }) {
+// Carregado só quando o cliente escolhe "Manequim": quem só olha a peça não
+// baixa o manequim.
+const Mannequin = lazy(() => import("./mannequin"));
+
+type DisplayMode = "piece" | "mannequin";
+
+function Model({
+  url,
+  color,
+  look,
+  onFitted,
+}: {
+  url: string;
+  /** Cor escolhida pelo cliente (hex); sem ela, a do arquivo. */
+  color?: string;
+  /** Versão com estampa (Street/Sport), lida do nome da cor. */
+  look?: GarmentLook | null;
+  /** Avisa se a peça foi ajustada ao manequim no Blender. */
+  onFitted?: (fitted: boolean) => void;
+}) {
   const { scene } = useGLTF(url);
-  const model = useMemo(() => scene.clone(true), [scene]);
+  const prints = useGarmentPrints(url, look, color);
+  const model = useTintedScene(scene, color, prints);
+  useEffect(() => {
+    onFitted?.(isFittedToMannequin(scene));
+  }, [scene, onFitted]);
   return <primitive object={model} />;
+}
+
+/** Reenquadra a câmera quando a cena troca entre peça e manequim. */
+function Refit({ mode }: { mode: DisplayMode }) {
+  const bounds = useBounds();
+  useEffect(() => {
+    bounds.refresh().clip().fit();
+  }, [bounds, mode]);
+  return null;
 }
 
 function Loader() {
@@ -44,7 +84,12 @@ const AZIMUTH: Record<ViewPreset, number> = {
   back: Math.PI,
 };
 
-/** Reposiciona a câmera num ângulo predefinido, preservando distância/elevação atuais. */
+/**
+ * Reposiciona a câmera num ângulo predefinido, preservando distância/elevação
+ * atuais. Fica dentro do <Bounds> e move a câmera pela API dele: o `observe`
+ * do Bounds reenquadra a cada novo render do Canvas e, se a câmera fosse
+ * movida por fora, a animação dele a devolvia para o ângulo anterior.
+ */
 function CameraPreset({
   view,
   controlsRef,
@@ -53,6 +98,7 @@ function CameraPreset({
   controlsRef: RefObject<OrbitControlsImpl | null>;
 }) {
   const { camera } = useThree();
+  const bounds = useBounds();
 
   useEffect(() => {
     const controls = controlsRef.current;
@@ -70,10 +116,10 @@ function CameraPreset({
       AZIMUTH[view],
     );
 
-    camera.position.copy(target).add(newOffset);
-    camera.lookAt(target);
-    controls.update();
-  }, [view, camera, controlsRef]);
+    bounds
+      .moveTo(target.clone().add(newOffset))
+      .lookAt({ target: target.clone() });
+  }, [view, camera, controlsRef, bounds]);
 
   return null;
 }
@@ -90,16 +136,28 @@ export function Viewer3D({
   autoRotate = false,
   /** Mostra a barra de controles (iluminação, tela cheia, vistas). */
   controls = false,
+  /** Oferece a peça vestida no manequim padrão (item 3D-04). */
+  mannequin = false,
+  /** Cor da peça (hex), a escolhida na compra. */
+  color,
+  /** Versão com estampa (Street/Sport) da cor escolhida. */
+  look,
 }: {
   modelUrl?: string;
   interactive?: boolean;
   autoRotate?: boolean;
   controls?: boolean;
+  mannequin?: boolean;
+  color?: string;
+  look?: GarmentLook | null;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const orbitRef = useRef<OrbitControlsImpl | null>(null);
   const [bg, setBg] = useState<"light" | "dark">("light");
   const [view, setView] = useState<ViewPreset | null>(null);
+  const [mode, setMode] = useState<DisplayMode>("piece");
+  // O seletor só aparece para peças ajustadas ao manequim no Blender.
+  const [fitted, setFitted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -132,28 +190,43 @@ export function Viewer3D({
       ref={wrapperRef}
       className={`relative h-full w-full ${isFullscreen ? "bg-background" : ""}`}
     >
-      <Canvas camera={{ position: [3, 2, 5], fov: 50 }}>
+      <Canvas
+        shadows
+        dpr={[1.5, 2]}
+        camera={{ position: [3, 2, 5], fov: 50 }}
+        gl={{ toneMapping: STUDIO_TONE_MAPPING }}
+      >
         {/* fundo de estúdio — independente do CSS, funciona em tela cheia */}
         <color attach="background" args={[bgColor]} />
 
-        {/* iluminação de estúdio — ajustada por tema claro/escuro */}
-        <hemisphereLight
-          intensity={bg === "light" ? 0.7 : 0.4}
-          groundColor={bg === "light" ? "#cfcabd" : "#1a1a1a"}
-        />
-        <ambientLight intensity={bg === "light" ? 0.45 : 0.25} />
-        <directionalLight position={[5, 6, 5]} intensity={bg === "light" ? 1.4 : 1.7} />
-        <directionalLight position={[-5, 2, -3]} intensity={0.6} />
+        {/* Mesma luz e tom do provador: o padrão (ACES) estourava a camiseta branca. */}
+        <StudioLights />
 
         <Suspense fallback={<Loader />}>
           <Bounds fit clip observe margin={1.2}>
-            <Center>
-              <Model url={modelUrl} />
-            </Center>
+            <Refit mode={mode} />
+            <CameraPreset view={view} controlsRef={orbitRef} />
+            {mode === "mannequin" ? (
+              // O avatar já fica de pé na origem; o Center o deslocaria
+              // pelas partes que carregam primeiro (o tênis).
+              <Mannequin garmentUrl={modelUrl} color={color} look={look} />
+            ) : (
+              <Center>
+                <Model url={modelUrl} color={color} look={look} onFitted={setFitted} />
+              </Center>
+            )}
           </Bounds>
+          {/* Fora do Bounds: o chão de 4 m afastava a câmera. */}
+          {mode === "mannequin" && (
+            <ContactShadows
+              position={[0, 0.005, 0]}
+              opacity={0.45}
+              scale={4}
+              blur={2.4}
+              far={2}
+            />
+          )}
         </Suspense>
-
-        <CameraPreset view={view} controlsRef={orbitRef} />
 
         <OrbitControls
           ref={orbitRef}
@@ -164,7 +237,31 @@ export function Viewer3D({
           enableRotate={interactive}
           enableZoom={interactive}
         />
+        <StudioAO />
       </Canvas>
+
+      {mannequin && fitted && (
+        <div
+          role="group"
+          aria-label="Modo de visualização"
+          className="absolute right-3 top-3 flex items-center gap-1 rounded-sm bg-background/85 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] backdrop-blur"
+        >
+          {(["piece", "mannequin"] as DisplayMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              onClick={() => {
+                setMode(m);
+                setView(null);
+              }}
+              className={`rounded-sm px-2 py-1 ${mode === m ? "bg-foreground text-background" : "text-foreground/60 hover:text-foreground"}`}
+            >
+              {m === "piece" ? "Peça" : "Manequim"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {controls && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-3">

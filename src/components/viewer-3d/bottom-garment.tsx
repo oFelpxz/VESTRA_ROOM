@@ -1,0 +1,193 @@
+"use client";
+
+import { useEffect, useMemo } from "react";
+import { useGLTF } from "@react-three/drei";
+import * as THREE from "three";
+import { toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import type { AvatarParams } from "@/lib/avatar-builder";
+import { bindBottom, bottomWrinkle, fitBottom, meshEdges, restOnShoes, type TopHem } from "@/lib/bottom-fit";
+import { shapeBody } from "@/lib/garment-dress";
+import { clothMaterial } from "@/lib/fabric";
+import { readMorphBody } from "./avatar";
+import { AvatarSkin, useFace } from "./avatar-skin";
+import { SHOES_URL } from "./avatar-url";
+import { AVATAR_URL, extractGarment } from "./dressed-avatar";
+import { useLite } from "./lite-context";
+
+const CREASE_ANGLE = (30 * Math.PI) / 180;
+
+/**
+ * Peças de baixo (marca `vestra_peca = "baixo"`) e o corpo sem peça de cima.
+ * A peça acompanha a pele do corpo do cliente (ver `src/lib/bottom-fit.ts`);
+ * a conta é rápida e roda aqui mesmo, sem Web Worker.
+ */
+
+/** Corpo do cliente (medidas aplicadas, pés no chão), lido do avatar. */
+function useClientBody(params: AvatarParams) {
+  const avatar = useGLTF(AVATAR_URL);
+  const body = useMemo(() => {
+    const found = readMorphBody(avatar.scene);
+    if (!found) throw new Error("avatar sem morph targets");
+    return found;
+  }, [avatar.scene]);
+  const { morphs, totalHeight, girths } = params;
+  const pos = useMemo(
+    () => shapeBody(body, morphs, totalHeight, girths).pos,
+    [body, morphs, totalHeight, girths],
+  );
+  return { body, pos };
+}
+
+/** Tênis vestido no corpo do cliente: as partes e a posição de cada uma. */
+function useFittedShoes(params: AvatarParams) {
+  const shoes = useGLTF(SHOES_URL);
+  const { body, pos } = useClientBody(params);
+  const parts = useMemo(() => extractGarment(shoes.scene), [shoes.scene]);
+  const bindings = useMemo(
+    () => parts.map((p) => bindBottom(p.base, body.base, body.index)),
+    [parts, body.base, body.index],
+  );
+  const positions = useMemo(() => bindings.map((b) => fitBottom(b, pos, 0)), [bindings, pos]);
+  return { parts, positions };
+}
+
+/** Avatar sem peça de cima (quando o look só tem a de baixo). */
+export function BareAvatar({ params }: { params: AvatarParams }) {
+  const { body, pos } = useClientBody(params);
+  const face = useFace(body.base);
+  return <AvatarSkin positions={pos} index={body.index} face={face} />;
+}
+
+export function BottomGarment({
+  url,
+  params,
+  ease,
+  length = 0,
+  tuck = null,
+  selectedColor,
+}: {
+  url: string;
+  params: AvatarParams;
+  /** Folga do tamanho escolhido em relação ao molde (m, ver `bottomEase`). */
+  ease: number;
+  /** Quanto a peça é mais longa que a perna (m, ver `bottomLength`). */
+  length?: number;
+  /**
+   * Barra da peça de cima, vestida (`TopHem`) ou no molde (m): acima dela a
+   * peça fica por dentro.
+   */
+  tuck?: TopHem | number | null;
+  selectedColor?: string;
+}) {
+  const garment = useGLTF(url);
+  const { body, pos } = useClientBody(params);
+  const parts = useMemo(() => extractGarment(garment.scene), [garment.scene]);
+  const lite = useLite();
+  const bindings = useMemo(
+    () => parts.map((p) => bindBottom(p.base, body.base, body.index)),
+    [parts, body.base, body.index],
+  );
+  const edges = useMemo(
+    () => parts.map((p) => meshEdges(p.geometry.index?.array ?? [])),
+    [parts],
+  );
+  // O avatar está sempre de tênis (ver `Shoes`): a barra pousa em cima dele.
+  const shoes = useFittedShoes(params).positions;
+
+  const geometries = useMemo(
+    () =>
+      parts.map((p, i) => {
+        const g = p.geometry.clone();
+        const fitted = fitBottom(bindings[i], pos, ease, tuck, length);
+        g.setAttribute("position", new THREE.BufferAttribute(restOnShoes(fitted, edges[i], shoes), 3));
+        // Prega, cós e lapela de bolso com quina: acima de 30° entre as faces a
+        // luz não é mais alisada (sem isso a saia vira um cone ondulado).
+        return toCreasedNormals(g, CREASE_ANGLE);
+      }),
+    [parts, bindings, edges, shoes, pos, ease, tuck, length],
+  );
+
+  const materials = useMemo(
+    () =>
+      parts.map((p) => {
+        const m = clothMaterial(p.material, selectedColor, p.fabric, bottomWrinkle(p.base), lite);
+        // Onde encosta na peça de cima, a de cima aparece por fora.
+        m.polygonOffset = true;
+        m.polygonOffsetFactor = 1;
+        m.polygonOffsetUnits = 1;
+        return m;
+      }),
+    [parts, selectedColor, lite],
+  );
+
+  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
+  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      console.info(
+        `[VESTRA FIT] peça de baixo · folga ${(ease * 100).toFixed(1)} cm` +
+          (length !== 0 ? ` · ${(length * 100).toFixed(1)} cm ${length > 0 ? "mais longa" : "mais curta"}` : "") +
+          (typeof tuck === "number"
+            ? ` · por dentro acima de ${tuck.toFixed(2)} m (molde)`
+            : tuck
+              ? ` · por dentro acima da barra vestida (${Math.min(...tuck.y).toFixed(2)}–${Math.max(...tuck.y).toFixed(2)} m)`
+              : ""),
+      );
+    }
+  }, [ease, length, tuck]);
+
+  return (
+    <group>
+      {geometries.map((g, i) => (
+        <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
+      ))}
+    </group>
+  );
+}
+
+/**
+ * Tênis do avatar: preso à pele dos pés como as peças de baixo (sem folga de
+ * tamanho). Cabedal de lona (tecido, com pesponto nas bordas), sola e
+ * biqueira de borracha lisa e cadarço (sem pesponto).
+ */
+export function Shoes({ params }: { params: AvatarParams }) {
+  const { parts, positions } = useFittedShoes(params);
+  const lite = useLite();
+  const geometries = useMemo(
+    () =>
+      parts.map((p, i) => {
+        const g = p.geometry.clone();
+        g.setAttribute("position", new THREE.BufferAttribute(positions[i], 3));
+        g.computeVertexNormals();
+        return g;
+      }),
+    [parts, positions],
+  );
+  const materials = useMemo(
+    () =>
+      parts.map((p): THREE.Material =>
+        p.material.name === "Sola" || p.material.name === "Cadarco"
+          ? new THREE.MeshStandardMaterial({
+              color: (p.material as THREE.MeshStandardMaterial).color,
+              roughness: p.material.name === "Sola" ? 0.65 : 0.85,
+            })
+          : clothMaterial(p.material, undefined, p.fabric, null, lite),
+      ),
+    [parts, lite],
+  );
+  useEffect(() => () => geometries.forEach((g) => g.dispose()), [geometries]);
+  useEffect(() => () => materials.forEach((m) => m.dispose()), [materials]);
+  return (
+    <group>
+      {geometries.map((g, i) => (
+        <mesh key={i} geometry={g} material={materials[i]} castShadow receiveShadow />
+      ))}
+    </group>
+  );
+}
+
+/** Altura (m, no molde) da barra de uma peça de cima ajustada ao manequim. */
+export function hemHeight(scene: THREE.Object3D) {
+  return new THREE.Box3().setFromObject(scene).min.y;
+}

@@ -1,5 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Lookbook3D } from "@/components/look/lookbook-3d";
+import { getBrandLooks } from "@/lib/look-data";
+
+export const metadata = { title: "Lookbook" };
 
 const looks = [
   {
@@ -22,7 +26,8 @@ const looks = [
   },
 ];
 
-export default function LookbookPage() {
+export default async function LookbookPage() {
+  const brandLooks = await getBrandLooks();
   return (
     <>
       {/* header minimalista */}
@@ -36,6 +41,18 @@ export default function LookbookPage() {
           </span>
         </div>
       </section>
+
+      {/* looks prontos da marca no manequim 3D (lista 10, item 6) */}
+      {brandLooks.length > 0 && (
+        <section className="pb-24 md:pb-40">
+          <Lookbook3D looks={brandLooks} />
+        </section>
+      )}
+
+      {/* editorial: as fotos da coleção, embaixo do 3D */}
+      <p className="mx-auto mb-10 max-w-7xl px-4 text-[10px] font-medium uppercase tracking-[0.3em] text-muted-foreground md:px-8">
+        Editorial
+      </p>
 
       {/* spreads — imagem domina, legenda sussurra (Zara) */}
       <div className="flex flex-col gap-24 md:gap-40">

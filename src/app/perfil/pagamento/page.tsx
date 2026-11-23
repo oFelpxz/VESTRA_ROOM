@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PaymentMethodList } from "@/components/profile/payment-method-list";
 
-export const metadata = { title: "Formas de pagamento | VESTRA ROOM" };
+export const metadata = { title: "Formas de pagamento" };
 
 export default async function PagamentoPage() {
   const session = await auth();

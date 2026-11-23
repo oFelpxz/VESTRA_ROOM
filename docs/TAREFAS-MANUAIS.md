@@ -9,7 +9,7 @@ durante a implementação.
 ## Infraestrutura / Ambiente
 
 ### [ ] Definir NEXT_PUBLIC_BASE_URL no .env (opcional)
-- **Por quê**: o checkout dispara o webhook simulado em `${BASE_URL}/api/payments/simulate`. Em dev, default `http://localhost:3000` já funciona.
+- **Por quê**: só é usado como reserva para o endereço de volta do Stripe, quando o pedido não traz o host. Desde a Sprint 5 o pagamento simulado não depende mais dele. Em dev, default `http://localhost:3000` já funciona.
 - **Quando**: antes de subir para staging/produção
 - **Exemplo**: `NEXT_PUBLIC_BASE_URL=https://vestraroom.com`
 

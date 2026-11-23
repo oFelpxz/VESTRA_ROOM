@@ -51,7 +51,7 @@ function StockRow({ variant }: { variant: Variant }) {
             <p className="font-medium">{variant.productName}</p>
             {lowStock && (
               <span className="rounded-sm bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-destructive">
-                Baixo
+                {variant.stockQuantity <= 0 ? "Esgotado" : "Baixo"}
               </span>
             )}
           </div>

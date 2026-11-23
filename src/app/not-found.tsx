@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+export const metadata = { title: "Página não encontrada" };
+
 export default function NotFound() {
   return (
     <section className="mx-auto flex min-h-[calc(100vh-12rem)] max-w-2xl flex-col items-center justify-center px-4 py-24 text-center">

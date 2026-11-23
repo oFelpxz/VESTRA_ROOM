@@ -3,6 +3,9 @@
 import React from "react";
 import { Viewer3D } from "@/components/viewer-3d/viewer";
 import { ProductPlaceholder } from "@/components/product/product-placeholder";
+import { useProductColor } from "@/components/product/product-color";
+import { colorToHex } from "@/lib/color-names";
+import { lookOf } from "@/lib/garment-prints";
 
 class ViewerErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -30,12 +33,16 @@ export function ProductViewer({
   interactive,
   autoRotate,
   controls,
+  mannequin,
 }: {
   modelUrl?: string;
   interactive?: boolean;
   autoRotate?: boolean;
   controls?: boolean;
+  mannequin?: boolean;
 }) {
+  // Na página do produto, a peça aparece na cor escolhida na compra.
+  const [selectedColor] = useProductColor();
   return (
     <ViewerErrorBoundary>
       <Viewer3D
@@ -43,6 +50,9 @@ export function ProductViewer({
         interactive={interactive}
         autoRotate={autoRotate}
         controls={controls}
+        mannequin={mannequin}
+        color={selectedColor ? colorToHex(selectedColor) : undefined}
+        look={lookOf(selectedColor)}
       />
     </ViewerErrorBoundary>
   );

@@ -36,6 +36,12 @@ export function ProductForm({
 }) {
   const action = mode === "create" ? createProductAction : updateProductAction;
   const [state, formAction, pending] = useActionState(action, initialState);
+  // Depois de um erro, o formulário mostra o que foi digitado, não o salvo.
+  const v = state.values;
+  const categoryId = v ? v.categoryId : (defaults?.categoryId ?? "");
+  const tryOn = v
+    ? v.availableForVirtualTryOn === "on"
+    : (defaults?.availableForVirtualTryOn ?? false);
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -50,7 +56,7 @@ export function ProductForm({
             id="name"
             name="name"
             required
-            defaultValue={defaults?.name ?? ""}
+            defaultValue={v ? v.name : (defaults?.name ?? "")}
             placeholder="Ex: Hoodie Black Essential"
           />
         </div>
@@ -61,7 +67,8 @@ export function ProductForm({
             id="categoryId"
             name="categoryId"
             required
-            defaultValue={defaults?.categoryId ?? ""}
+            key={categoryId}
+            defaultValue={categoryId}
             className="h-9 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
           >
             <option value="" disabled>
@@ -80,7 +87,7 @@ export function ProductForm({
           <Input
             id="brand"
             name="brand"
-            defaultValue={defaults?.brand ?? ""}
+            defaultValue={v ? v.brand : (defaults?.brand ?? "")}
             placeholder="Opcional"
           />
         </div>
@@ -94,7 +101,9 @@ export function ProductForm({
             step="0.01"
             min="0"
             required
-            defaultValue={defaults?.basePrice?.toString() ?? ""}
+            defaultValue={
+              v ? v.basePrice : (defaults?.basePrice?.toString() ?? "")
+            }
             placeholder="199.90"
           />
         </div>
@@ -107,7 +116,11 @@ export function ProductForm({
             type="number"
             step="0.01"
             min="0"
-            defaultValue={defaults?.promotionalPrice?.toString() ?? ""}
+            defaultValue={
+              v
+                ? v.promotionalPrice
+                : (defaults?.promotionalPrice?.toString() ?? "")
+            }
             placeholder="Opcional"
           />
         </div>
@@ -118,7 +131,7 @@ export function ProductForm({
             id="description"
             name="description"
             rows={4}
-            defaultValue={defaults?.description ?? ""}
+            defaultValue={v ? v.description : (defaults?.description ?? "")}
             placeholder="Descreva o produto, caimento, materiais..."
             className="rounded-sm border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring"
           />
@@ -129,7 +142,8 @@ export function ProductForm({
             <input
               type="checkbox"
               name="availableForVirtualTryOn"
-              defaultChecked={defaults?.availableForVirtualTryOn ?? false}
+              key={String(tryOn)}
+              defaultChecked={tryOn}
               className="size-4 accent-foreground"
             />
             <div>
@@ -137,8 +151,8 @@ export function ProductForm({
                 Disponível para provador virtual
               </p>
               <p className="text-xs text-muted-foreground">
-                Exibe o botão de experimentar em 3D na página do produto
-                (requer modelo 3D validado).
+                Exibe o botão de experimentar em 3D na página do produto (requer
+                modelo 3D validado).
               </p>
             </div>
           </label>

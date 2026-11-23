@@ -9,10 +9,10 @@
 src/app/produto/[slug]/provador/page.tsx   # Tela cheia com avatar + roupa
 src/components/viewer-3d/
   avatar.tsx                   # Componente do avatar (base genérico parametrizado)
-  fit-indicator.tsx            # Badge de caimento (Justo / Ideal / Folgado)
+  fit-indicator.tsx            # Caimento por região (5 classes), sugestão de tamanho e comparação
   tryon-controls.tsx           # Variante (cor/tamanho), girar, zoom, add ao carrinho
 src/lib/
-  fit-calculator.ts            # Calcula caimento comparando medidas do user × SizeChart
+  fit-regions.ts               # Caimento por região e tamanho sugerido (substituiu o fit-calculator.ts)
   avatar-builder.ts            # Constrói parâmetros do avatar a partir do MeasurementProfile
 public/models/
   avatar_base_male.glb         # (precisa adquirir/gerar)
@@ -29,7 +29,11 @@ Para MVP, escolher uma das opções:
 
 Recomendação MVP: **Opção A** com escala por eixo (Y=altura, X/Z=largura proporcional ao peso).
 
-### 2. Cálculo de caimento (`src/lib/fit-calculator.ts`)
+### 2. Cálculo de caimento (`src/lib/fit-regions.ts`)
+
+> **Sprint 5:** o desenho abaixo era o plano original. O cálculo de verdade
+> está em `src/lib/fit-regions.ts` e as regras estão em
+> `docs/SPRINT5-DECISOES.md`, seção "Provador e looks".
 
 ```ts
 type FitResult = { label: 'JUSTO' | 'IDEAL' | 'FOLGADO' | 'NAO_SERVE', score: number, details: string[] };

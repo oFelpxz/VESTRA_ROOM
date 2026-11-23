@@ -75,6 +75,10 @@ SUPABASE_MODELS_BUCKET="models-3d"              # bucket privado
 **Caso A — usando o mesmo Supabase da máquina principal (mais comum):**
 O banco já está migrado e populado. **Não precisa rodar migration nem seed.** Pule para o passo 5.
 
+> Se `npx prisma migrate status` apontar uma migration pendente, ela precisa ser aplicada **uma única vez** por alguém do grupo, com `npx prisma migrate deploy` — o banco é compartilhado. **Nunca use `migrate dev` nesse banco**: ao detectar divergência, ele oferece apagar o banco inteiro.
+>
+> **Não rode `npm run db:seed` no banco compartilhado**: ele sobrescreve estoque, preços e modelos 3D alterados pelo admin. Para os cupons de exemplo da Sprint 3, use `npm run db:seed:sprint3`, que só cria o que falta.
+
 **Caso B — banco Supabase novo/vazio:**
 
 ```bash
@@ -129,6 +133,21 @@ Todos os três perfis de staff acessam `/admin`, mas cada um só enxerga (e só 
 | Operador de Estoque | ✅ | – | – | – | ✅ | ✅ | – |
 | Modelador 3D | ✅ | – | – | ✅ | – | – | – |
 
+Avaliações, Cupons e Clientes são exclusivos do Admin.
+
+## Cupons de teste (Sprint 3)
+
+Criados por `npm run db:seed:sprint3` (e pelo seed completo, num banco novo). Os `DEMO…` existem para demonstrar cada mensagem de erro do carrinho.
+
+| Código | Regra | Para demonstrar |
+|---|---|---|
+| `BEMVINDO10` | 10%, sem mínimo | Uso normal |
+| `VESTRA20` | R$ 20, mínimo R$ 150, até 100 usos | "Faltam R$ X para usar este cupom" |
+| `DEMOEXPIRADO` | 15%, venceu em 31/01/2026 | "Este cupom expirou." |
+| `DEMOESGOTADO` | 10%, limite de 1 uso já atingido | "Este cupom esgotou." |
+| `DEMODESATIVADO` | 10%, desativado | "Cupom inválido." |
+| `LIMITE1` | 5%, limite de 1 uso | Dois pedidos: o segundo é recusado |
+
 ---
 
 ## Comandos úteis
@@ -139,9 +158,10 @@ Todos os três perfis de staff acessam `/admin`, mas cada um só enxerga (e só 
 | `npm run build` | Build de produção |
 | `npm start` | Roda o build de produção |
 | `npm run lint` | ESLint |
-| `npm run db:seed` | Popula o banco (categorias, produtos, usuários) |
+| `npm run db:seed` | Popula um banco **novo** (categorias, produtos, usuários, cupons). ⚠️ Não usar no banco compartilhado |
+| `npm run db:seed:sprint3` | Só cria os cupons de exemplo que faltam — seguro no banco compartilhado |
 | `npx prisma generate` | Regenera o Prisma Client |
-| `npx prisma migrate deploy` | Aplica migrations num banco novo |
+| `npx prisma migrate deploy` | Aplica migrations pendentes (nunca apaga dados) |
 | `npx prisma migrate dev --name X` | Cria nova migration (após mudar o schema) |
 | `npx prisma studio` | GUI do banco (no Prisma 7 pode ter instabilidade; use o Table Editor do Supabase como alternativa) |
 

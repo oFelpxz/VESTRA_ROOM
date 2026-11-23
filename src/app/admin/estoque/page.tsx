@@ -5,12 +5,18 @@ import { StockEditor } from "@/components/admin/stock-editor";
 export default async function AdminEstoquePage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string; baixo?: string; produto?: string }>;
+  searchParams: Promise<{
+    categoria?: string | string[];
+    baixo?: string | string[];
+    produto?: string | string[];
+  }>;
 }) {
   const sp = await searchParams;
-  const categoryId = sp.categoria;
+  // Parâmetro repetido na URL (?produto=a&produto=b) chega como lista — só
+  // texto vale; lista iria direto para a consulta e derrubaria a página.
+  const categoryId = typeof sp.categoria === "string" ? sp.categoria : undefined;
   const onlyLow = sp.baixo === "1";
-  const productId = sp.produto;
+  const productId = typeof sp.produto === "string" ? sp.produto : undefined;
 
   const [allVariants, categories, products, allActiveForCount] =
     await Promise.all([

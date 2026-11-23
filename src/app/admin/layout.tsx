@@ -3,6 +3,9 @@ import { auth } from "@/auth";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { isStaffRole } from "@/lib/admin-access";
 
+// Páginas do admin sem título próprio aparecem como "Admin | VESTRA ROOM".
+export const metadata = { title: "Admin" };
+
 export default async function AdminLayout({
   children,
 }: {
@@ -20,7 +23,7 @@ export default async function AdminLayout({
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* sidebar unificada */}
-      <aside className="flex shrink-0 flex-col gap-8 bg-foreground px-6 py-7 text-background lg:sticky lg:top-0 lg:h-screen lg:w-64">
+      <aside className="flex shrink-0 flex-col gap-8 bg-foreground px-6 py-7 text-background lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:overflow-y-auto">
         <div>
           <p className="font-heading text-base font-bold uppercase tracking-[0.2em]">
             VESTRA ROOM

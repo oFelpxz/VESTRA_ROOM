@@ -1,15 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { addToCartAction, type CartActionState } from "@/lib/cart-actions";
 import {
-  calculateFit,
+  overallFit,
+  recommendSize,
+  regionFits,
+  type BodyMeasures,
   type FitPreference,
-} from "@/lib/fit-calculator";
-import { buildAvatarParams } from "@/lib/avatar-builder";
-import { TryOnScene } from "./tryon-scene";
-import { FitIndicator } from "./fit-indicator";
+  type GarmentKind,
+} from "@/lib/fit-regions";
+import {
+  buildAvatarParams,
+  predictAvatarMeasurements,
+  type AvatarBody,
+} from "@/lib/avatar-builder";
+import { colorToHex } from "@/lib/color-names";
+import { SKIN_TONES, skinTone } from "@/lib/skin-tones";
+import { HAIR_STYLES, hairStyle } from "@/lib/hair";
+import { saveHairStyleAction, saveSkinToneAction } from "@/lib/measurement-actions";
+import { lookOf } from "@/lib/garment-prints";
+import { MOLDE_SIZE, sizeGrade, type Grade } from "@/lib/garment-fit";
+import { bottomEase, bottomLength } from "@/lib/bottom-fit";
+import type { LookProduct, OpenLook } from "@/lib/look-data";
+import { ColorLabel, LookLegend } from "@/components/product/color-swatch";
+import { TryOnScene, type CameraView, type LookShots, type ScenePiece } from "./tryon-scene";
+import { composeLookPhoto } from "@/components/look/look-photo-canvas";
+import { FitCompare, FitIndicator, FitPill, SizeSuggestion } from "./fit-indicator";
+import { LookBuilder, type LookSelection } from "./look-builder";
+import type { BrandLookStart } from "@/lib/brand-looks";
+import { BuyLook, type BuyLookPiece } from "@/components/look/buy-look";
 
 const initialState: CartActionState = {};
 
@@ -44,55 +65,107 @@ type UserProfile = {
   armLengthCm: number | null;
   legLengthCm: number | null;
   fitPreference: FitPreference;
+  /** Tom de pele salvo (id de `SKIN_TONES`); null = o padrão. */
+  skinTone: string | null;
+  /** Corte de cabelo salvo (id de `HAIR_STYLES`); null = o padrão. */
+  hairStyle: string | null;
 };
 
-// Pequena paleta para "cor visual" — mapeia nome → hex aproximado
-const COLOR_HEX: Record<string, string> = {
-  preto: "#1a1a1a",
-  branco: "#f4f1ea",
-  cinza: "#9c9c9c",
-  azul: "#2a4a8a",
-  vermelho: "#a02a2a",
-  verde: "#2a7a3a",
-  bege: "#d4c4a8",
-  marrom: "#5a3a26",
-  rosa: "#d48aa8",
-  amarelo: "#e0b840",
-};
+// Só em desenvolvimento: simular outros corpos sem mexer no perfil salvo.
+const SIMULATE = process.env.NODE_ENV !== "production";
+type SimKey =
+  | "heightCm"
+  | "weightKg"
+  | "chestCm"
+  | "waistCm"
+  | "hipCm"
+  | "shoulderCm"
+  | "armLengthCm"
+  | "legLengthCm";
+const SIM_FIELDS: { key: SimKey; label: string; min: number; max: number }[] = [
+  { key: "heightCm", label: "Altura (cm)", min: 150, max: 200 },
+  { key: "weightKg", label: "Peso (kg)", min: 45, max: 130 },
+  { key: "chestCm", label: "Peito (cm)", min: 78, max: 125 },
+  { key: "waistCm", label: "Cintura (cm)", min: 60, max: 120 },
+  { key: "hipCm", label: "Quadril (cm)", min: 80, max: 130 },
+  { key: "shoulderCm", label: "Ombros (cm)", min: 36, max: 56 },
+  { key: "armLengthCm", label: "Braço (cm)", min: 45, max: 72 },
+  { key: "legLengthCm", label: "Perna (cm)", min: 62, max: 95 },
+];
 
-function colorToHex(name: string): string {
-  const key = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  return COLOR_HEX[key] ?? "#3a3a3a";
+/** Caimento por região de um tamanho e o resumo dele. */
+function sizeFit(
+  size: string | null,
+  body: BodyMeasures,
+  chart: SizeRow[],
+  kind: GarmentKind,
+  toleranceCm: number,
+) {
+  const row = chart.find((r) => r.size === size);
+  const regions = row ? regionFits(body, row, chart, kind, toleranceCm) : [];
+  return { regions, overall: overallFit(regions) };
 }
 
 export function TryOnExperience({
   productName,
   productId: _productId,
+  priceValue,
   variants,
   colors,
   sizes,
   garmentUrl,
   profile,
   sizeChart,
+  kind,
+  toleranceCm,
+  companions,
+  accessories,
+  isAccessory,
+  openLook,
+  brandLook = null,
 }: {
   productName: string;
   productId: string;
+  /** Preço cobrado (promocional, se houver), para somar o look. */
+  priceValue: number;
   variants: Variant[];
   colors: string[];
   sizes: string[];
   garmentUrl: string | null;
   profile: UserProfile;
   sizeChart: SizeRow[];
+  /** Tipo de peça, pela categoria (decide as regiões do caimento). */
+  kind: GarmentKind;
+  /** Folga do indicador de caimento (configurações da loja, 25.8). */
+  toleranceCm: number;
+  /** Peças que completam um look (item 15). */
+  companions: LookProduct[];
+  /** Acessórios (touca) que podem entrar no look como terceira peça. */
+  accessories: LookProduct[];
+  /** O produto do provador é um acessório (a touca). */
+  isAccessory: boolean;
+  /** Look aberto pelo `?look=`. */
+  openLook: OpenLook | null;
+  /** Look da marca aberto pelo `?marca=` (cores do look, tamanhos pela medida). */
+  brandLook?: BrandLookStart | null;
 }) {
+  const lookVariant = variants.find((v) => v.id === openLook?.ownVariantId);
+  const brandColor = brandLook && colors.includes(brandLook.ownColor) ? brandLook.ownColor : null;
   const [selectedColor, setSelectedColor] = useState<string | null>(
-    colors[0] ?? null,
+    lookVariant?.color ?? brandColor ?? colors[0] ?? null,
   );
-  const [selectedSize, setSelectedSize] = useState<string | null>(
-    sizes[Math.floor(sizes.length / 2)] ?? null,
-  );
+  // Começa no look aberto, senão no tamanho sugerido, senão no molde (M) ou
+  // no do meio.
+  const [selectedSize, setSelectedSize] = useState<string | null>(() => {
+    if (lookVariant) return lookVariant.size;
+    const rec = recommendSize(profile, sizeChart, sizes, kind, profile.fitPreference, toleranceCm);
+    if (rec) return rec.size;
+    return sizes.includes(MOLDE_SIZE)
+      ? MOLDE_SIZE
+      : (sizes[Math.floor(sizes.length / 2)] ?? null);
+  });
+  // 3D-07: segundo tamanho, lado a lado
+  const [compareSize, setCompareSize] = useState<string | null>(null);
   const [preference, setPreference] = useState<FitPreference>(
     profile.fitPreference,
   );
@@ -100,50 +173,182 @@ export function TryOnExperience({
     addToCartAction,
     initialState,
   );
+  // Corpo do avatar: começa no unissex; não é salvo no perfil
+  const [bodyType, setBodyType] = useState<AvatarBody>("neutral");
+  const [sim, setSim] = useState<Partial<Record<SimKey, number>>>({});
+  // Tom de pele: muda na hora e fica salvo no perfil para o próximo provador.
+  const [skin, setSkin] = useState(() => skinTone(profile.skinTone).id);
+  const [savingSkin, startSavingSkin] = useTransition();
+  function chooseSkin(id: string) {
+    setSkin(id);
+    startSavingSkin(async () => {
+      await saveSkinToneAction(id);
+    });
+  }
+  // Cabelo: igual ao tom de pele.
+  const [hair, setHair] = useState(() => hairStyle(profile.hairStyle).id);
+  const [savingHair, startSavingHair] = useTransition();
+  function chooseHair(id: string) {
+    setHair(id);
+    startSavingHair(async () => {
+      await saveHairStyleAction(id);
+    });
+  }
+  const body = useMemo(() => ({ ...profile, ...sim }), [profile, sim]);
 
-  // Parâmetros do avatar — fixos pelas medidas do usuário
+  // Parâmetros do avatar — medidas do usuário (ou as simuladas, em dev)
   const avatarParams = useMemo(
     () =>
-      buildAvatarParams({
-        heightCm: profile.heightCm,
-        weightKg: profile.weightKg,
-        chestCm: profile.chestCm,
-        waistCm: profile.waistCm,
-        hipCm: profile.hipCm,
-        shoulderCm: profile.shoulderCm,
-        armLengthCm: profile.armLengthCm,
-        legLengthCm: profile.legLengthCm,
-      }),
-    [profile],
+      buildAvatarParams(
+        {
+          heightCm: body.heightCm,
+          weightKg: body.weightKg,
+          chestCm: body.chestCm,
+          waistCm: body.waistCm,
+          hipCm: body.hipCm,
+          shoulderCm: body.shoulderCm,
+          armLengthCm: body.armLengthCm,
+          legLengthCm: body.legLengthCm,
+        },
+        bodyType,
+      ),
+    [body, bodyType],
   );
 
-  // Linha da SizeChart correspondente ao tamanho selecionado
-  const currentSizeRow = useMemo(
-    () => sizeChart.find((r) => r.size === selectedSize),
-    [sizeChart, selectedSize],
+  // Perna (entrepernas) do avatar, em cm: a barra da calça depende dela.
+  const avatarLegCm = useMemo(
+    () => predictAvatarMeasurements(avatarParams.morphs).inseam,
+    [avatarParams],
   );
 
-  // Cálculo do caimento
-  const fitResult = useMemo(() => {
-    if (!currentSizeRow) {
-      return {
-        label: "IDEAL" as const,
-        score: 0,
-        details: [],
-      };
-    }
-    return calculateFit(
-      {
-        chestCm: profile.chestCm,
-        waistCm: profile.waistCm,
-        hipCm: profile.hipCm,
-        armLengthCm: profile.armLengthCm,
-        legLengthCm: profile.legLengthCm,
-      },
-      currentSizeRow,
-      preference,
+  // A peça tem a forma do tamanho escolhido — não acompanha o corpo.
+  const garmentGrade = useMemo(
+    () => sizeGrade(selectedSize, sizeChart),
+    [selectedSize, sizeChart],
+  );
+
+  const compareGrade = useMemo(
+    () => sizeGrade(compareSize, sizeChart),
+    [compareSize, sizeChart],
+  );
+
+  // Item 15: a peça escolhida em "Montar look" veste junto no avatar.
+  const [companionSel, setCompanionSel] = useState<LookSelection | null>(null);
+  const onCompanionChange = useCallback((sel: LookSelection | null) => setCompanionSel(sel), []);
+  const [accessorySel, setAccessorySel] = useState<LookSelection | null>(null);
+  const onAccessoryChange = useCallback((sel: LookSelection | null) => setAccessorySel(sel), []);
+  // O vestido veste como as peças de baixo (segue a pele) e não tem outra peça.
+  const ownRole = kind === "bottom" || kind === "dress" ? "bottom" : "top";
+
+  // Peça do provador num tamanho: a de cima pela graduação, a de baixo pela folga.
+  const ownPiece = useCallback(
+    (size: string | null, grade: Grade): ScenePiece | null =>
+      garmentUrl
+        ? {
+            url: garmentUrl,
+            color: selectedColor ? colorToHex(selectedColor) : undefined,
+            look: lookOf(selectedColor),
+            grade,
+            ease: bottomEase(size, sizeChart, body.hipCm),
+            length: bottomLength(size, sizeChart, avatarLegCm),
+          }
+        : null,
+    [garmentUrl, selectedColor, sizeChart, body.hipCm, avatarLegCm],
+  );
+  const companionPiece = useMemo((): ScenePiece | null => {
+    const p = companionSel?.product;
+    if (!companionSel || !p?.modelUrl) return null;
+    return {
+      url: p.modelUrl,
+      color: companionSel.color ? colorToHex(companionSel.color) : undefined,
+      look: lookOf(companionSel.color),
+      grade: sizeGrade(companionSel.size, p.sizeChart),
+      ease: bottomEase(companionSel.size, p.sizeChart, body.hipCm),
+      length: bottomLength(companionSel.size, p.sizeChart, avatarLegCm),
+    };
+  }, [companionSel, body.hipCm, avatarLegCm]);
+
+  // Acessório: tamanho único, segue a pele da cabeça (só a cor muda).
+  const accessoryPiece = useMemo((): ScenePiece | null => {
+    const p = accessorySel?.product;
+    if (!accessorySel || !p?.modelUrl) return null;
+    return {
+      url: p.modelUrl,
+      color: accessorySel.color ? colorToHex(accessorySel.color) : undefined,
+    };
+  }, [accessorySel]);
+
+  // Vista da câmera, giro automático e foto do look
+  const [view, setView] = useState<{ name: CameraView; n: number } | null>(null);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const sceneRef = useRef<HTMLDivElement>(null);
+  // Item 9 (lista 10): frente + costas, logo A1 e a lista de peças numa foto.
+  const shotsRef = useRef<LookShots | null>(null);
+  const onShots = useCallback((take: LookShots) => {
+    shotsRef.current = take;
+  }, []);
+  async function downloadPhoto() {
+    const canvas = sceneRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const shots = shotsRef.current?.();
+    const a = document.createElement("a");
+    a.href = shots ? await composeLookPhoto(shots, lookPieces) : canvas.toDataURL("image/png");
+    const name = [productName, companionSel?.product.name, accessorySel?.product.name]
+      .filter(Boolean)
+      .join(" + ");
+    a.download = `VESTRA look - ${name}.png`;
+    a.click();
+  }
+  // Foto pequena para "Meus looks": o meio da cena em retrato (3:4), JPEG 240x320.
+  const takeLookPhoto = useCallback(() => {
+    const canvas = sceneRef.current?.querySelector("canvas");
+    if (!canvas || canvas.width === 0) return null;
+    const width = 240;
+    const height = 320;
+    const cropH = Math.min(canvas.height, (canvas.width * height) / width);
+    const cropW = (cropH * width) / height;
+    const thumb = document.createElement("canvas");
+    thumb.width = width;
+    thumb.height = height;
+    const ctx = thumb.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#f2f0ec";
+    ctx.fillStyle = getComputedStyle(sceneRef.current!).backgroundColor;
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(
+      canvas,
+      (canvas.width - cropW) / 2,
+      (canvas.height - cropH) / 2,
+      cropW,
+      cropH,
+      0,
+      0,
+      width,
+      height,
     );
-  }, [profile, currentSizeRow, preference]);
+    return thumb.toDataURL("image/jpeg", 0.8);
+  }, []);
+
+  // 3D-06: caimento por região
+  const fit = useMemo(
+    () => sizeFit(selectedSize, body, sizeChart, kind, toleranceCm),
+    [body, selectedSize, sizeChart, kind, toleranceCm],
+  );
+  const compareFit = useMemo(
+    () => (compareSize ? sizeFit(compareSize, body, sizeChart, kind, toleranceCm) : null),
+    [body, compareSize, sizeChart, kind, toleranceCm],
+  );
+
+  // 3D-08: tamanho sugerido (estimativa), pela preferência desta tentativa
+  const recommendation = useMemo(
+    () => recommendSize(body, sizeChart, sizes, kind, preference, toleranceCm),
+    [body, sizeChart, sizes, kind, preference, toleranceCm],
+  );
+
+  // Variante da cor + tamanho escolhidos, mesmo sem estoque (para o look)
+  const lookOwnVariant = variants.find(
+    (v) => v.color === selectedColor && v.size === selectedSize,
+  );
 
   const selectedVariant = variants.find(
     (v) =>
@@ -151,6 +356,30 @@ export function TryOnExperience({
       v.size === selectedSize &&
       v.stockQuantity > 0,
   );
+
+  // Item 8 (lista 10): o look vestido no avatar vai inteiro para a sacola.
+  const lookPiece = (sel: LookSelection | null): BuyLookPiece[] => {
+    if (!sel) return [];
+    const v = sel.product.variants.find((x) => x.color === sel.color && x.size === sel.size);
+    return [
+      {
+        variantId: v?.id ?? null,
+        label: `${sel.product.name} (${[sel.color, sel.size].filter(Boolean).join(", ")})`,
+        price: sel.product.priceValue,
+        stockQuantity: v?.stockQuantity ?? 0,
+      },
+    ];
+  };
+  const lookPieces: BuyLookPiece[] = [
+    {
+      variantId: lookOwnVariant?.id ?? null,
+      label: `${productName} (${[selectedColor, selectedSize].filter(Boolean).join(", ")})`,
+      price: priceValue,
+      stockQuantity: lookOwnVariant?.stockQuantity ?? 0,
+    },
+    ...lookPiece(companionSel),
+    ...lookPiece(accessorySel),
+  ];
 
   const colorAvailable = (color: string) =>
     variants.some((v) => v.color === color && v.stockQuantity > 0);
@@ -166,26 +395,131 @@ export function TryOnExperience({
         );
 
   return (
-    <div className="grid h-[calc(100vh-4rem)] grid-cols-1 lg:grid-cols-[1fr_360px]">
+    <div className="grid grid-cols-1 lg:h-[calc(100vh-4rem)] lg:grid-cols-[1fr_360px]">
       {/* Cena 3D */}
-      <div className="relative bg-muted">
-        <TryOnScene
-          avatarParams={avatarParams}
-          garmentUrl={garmentUrl}
-          selectedColor={selectedColor ? colorToHex(selectedColor) : undefined}
-        />
+      <div
+        ref={sceneRef}
+        className={`relative grid bg-muted lg:h-auto ${
+          compareSize
+            ? // No celular, um embaixo do outro (lado a lado ficava estreito demais).
+              "h-[110svh] grid-rows-2 divide-y divide-border md:h-[65vh] md:grid-cols-2 md:grid-rows-1 md:divide-x md:divide-y-0"
+            : "h-[65vh]"
+        }`}
+      >
+        {[
+          { size: selectedSize, grade: garmentGrade, overall: fit.overall },
+          ...(compareSize && compareFit
+            ? [{ size: compareSize, grade: compareGrade, overall: compareFit.overall }]
+            : []),
+        ].map((scene, i) => {
+          const own = ownPiece(scene.size, scene.grade);
+          return (
+          <div key={i} className="relative min-h-0">
+            <TryOnScene
+              avatarParams={avatarParams}
+              top={ownRole === "top" ? own : companionPiece}
+              bottom={ownRole === "bottom" ? own : companionPiece}
+              accessory={accessoryPiece}
+              primary={ownRole}
+              view={view}
+              autoRotate={autoRotate}
+              focus={isAccessory ? "head" : "body"}
+              skin={skin}
+              hair={hair}
+              onShots={i === 0 ? onShots : undefined}
+            />
+            {compareSize && (
+              <div className={`pointer-events-none absolute left-1/2 flex ${i === 0 ? "top-12" : "top-3 md:top-12"} -translate-x-1/2 items-center gap-2 rounded-sm bg-background/80 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.15em]`}>
+                Tam {scene.size}
+                {scene.overall && <FitPill fit={scene.overall} />}
+              </div>
+            )}
+          </div>
+          );
+        })}
+
+        {/* Vistas, giro automático e foto */}
+        <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-auto">
+          {(
+            [
+              ["front", "Frente"],
+              ["side", "Lado"],
+              ["back", "Costas"],
+            ] as const
+          ).map(([name, label]) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => {
+                setAutoRotate(false);
+                setView((v) => ({ name, n: (v?.n ?? 0) + 1 }));
+              }}
+              className="rounded-sm border border-foreground/20 bg-background/80 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors hover:border-foreground"
+            >
+              {label}
+            </button>
+          ))}
+          {/* Tecido de perto: peito → barra → volta */}
+          {(() => {
+            // Touca não tem barra: do close volta direto.
+            const [next, label] =
+              view?.name === "chest"
+                ? isAccessory
+                  ? (["front", "Voltar"] as const)
+                  : (["hem", "Ver a barra"] as const)
+                : view?.name === "hem"
+                  ? (["front", "Voltar"] as const)
+                  : (["chest", "Tecido de perto"] as const);
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoRotate(false);
+                  setView((v) => ({ name: next, n: (v?.n ?? 0) + 1 }));
+                }}
+                className={`rounded-sm border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+                  next !== "chest"
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-foreground/20 bg-background/80 hover:border-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })()}
+          <button
+            type="button"
+            aria-pressed={autoRotate}
+            onClick={() => setAutoRotate((r) => !r)}
+            className={`rounded-sm border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+              autoRotate
+                ? "border-foreground bg-foreground text-background"
+                : "border-foreground/20 bg-background/80 hover:border-foreground"
+            }`}
+          >
+            Girar<span className="hidden sm:inline"> sozinho</span>
+          </button>
+          <button
+            type="button"
+            onClick={downloadPhoto}
+            className="rounded-sm border border-foreground/20 bg-background/80 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors hover:border-foreground"
+          >
+            <span className="hidden sm:inline">Baixar foto do look</span>
+            <span className="sm:hidden">Foto</span>
+          </button>
+        </div>
 
         <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.25em] text-foreground/60">
           <span className="inline-block size-1.5 rounded-full bg-acid" />
           VESTRA FIT · Provador
         </div>
-        <div className="pointer-events-none absolute bottom-4 right-4 text-[10px] uppercase tracking-[0.2em] text-foreground/50">
+        <div className="pointer-events-none absolute bottom-4 right-4 hidden text-[10px] uppercase tracking-[0.2em] text-foreground/50 xl:block">
           arraste para girar · scroll para zoom
         </div>
       </div>
 
       {/* Painel lateral */}
-      <aside className="flex flex-col gap-6 overflow-y-auto border-t border-border bg-background px-5 py-6 md:px-6 lg:border-l lg:border-t-0">
+      <aside className="flex flex-col gap-6 border-t border-border bg-background px-5 py-6 md:px-6 lg:overflow-y-auto lg:border-l lg:border-t-0">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.25em] text-muted-foreground">
             Experimentando
@@ -196,7 +530,163 @@ export function TryOnExperience({
         </div>
 
         {/* Caimento */}
-        <FitIndicator result={fitResult} />
+        <SizeSuggestion
+          recommendation={recommendation}
+          selectedSize={selectedSize}
+          onUse={(s) => {
+            setSelectedSize(s);
+            if (compareSize === s) setCompareSize(null);
+          }}
+        />
+        {compareSize && compareFit && selectedSize ? (
+          <FitCompare
+            a={{ size: selectedSize, regions: fit.regions }}
+            b={{ size: compareSize, regions: compareFit.regions }}
+          />
+        ) : isAccessory ? (
+          // Tamanho único: a touca segue a cabeça, não há medida para comparar.
+          <p className="rounded-sm border border-border p-4 text-xs text-muted-foreground">
+            Tamanho único: a peça acompanha o formato da cabeça do avatar.
+          </p>
+        ) : (
+          <FitIndicator
+            size={selectedSize}
+            overall={fit.overall}
+            regions={fit.regions}
+            kind={kind}
+          />
+        )}
+
+        {SIMULATE && (
+          <details className="rounded-sm border border-dashed border-border p-3 text-xs">
+            <summary className="cursor-pointer font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              Simular corpo (dev)
+            </summary>
+            <div className="mt-3 flex flex-col gap-2">
+              {SIM_FIELDS.map((f) => {
+                const value = body[f.key] ?? Math.round((f.min + f.max) / 2);
+                return (
+                  <label key={f.key} className="flex items-center gap-2">
+                    <span className="w-24 shrink-0">{f.label}</span>
+                    <input
+                      type="range"
+                      min={f.min}
+                      max={f.max}
+                      value={value}
+                      onChange={(e) =>
+                        setSim((s) => ({ ...s, [f.key]: Number(e.target.value) }))
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-8 text-right tabular-nums">{value}</span>
+                  </label>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setSim({})}
+                className="self-start text-[10px] font-semibold uppercase tracking-[0.15em] underline"
+              >
+                Voltar às minhas medidas
+              </button>
+            </div>
+          </details>
+        )}
+
+        {/* Corpo do avatar */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Corpo
+          </p>
+          <div className="mt-3 flex gap-1.5">
+            {(["male", "female"] as const).map((b) => {
+              const active = bodyType === b;
+              return (
+                <button
+                  key={b}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setBodyType(active ? "neutral" : b)}
+                  className={`flex-1 rounded-sm border px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+                    active
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border text-muted-foreground hover:border-foreground hover:text-foreground"
+                  }`}
+                >
+                  {b === "male" ? "Homem" : "Mulher"}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            {bodyType === "neutral"
+              ? "Corpo unissex"
+              : "Não salva no perfil — só nesta tentativa"}
+          </p>
+        </div>
+
+        {/* Tom de pele (lista 11) */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Tom de pele
+          </p>
+          <div className="mt-3 flex gap-2" role="radiogroup" aria-label="Tom de pele">
+            {SKIN_TONES.map((t) => {
+              const active = skin === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={t.name}
+                  title={t.name}
+                  onClick={() => chooseSkin(t.id)}
+                  style={{ backgroundColor: t.color }}
+                  className={`h-8 flex-1 rounded-sm border transition-shadow ${
+                    active
+                      ? "border-foreground ring-2 ring-foreground ring-offset-2 ring-offset-background"
+                      : "border-border hover:border-foreground"
+                  }`}
+                />
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground" aria-live="polite">
+            {savingSkin ? "Salvando…" : "Fica salvo no seu perfil"}
+          </p>
+        </div>
+
+        {/* Cabelo (lista 11) */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Cabelo
+          </p>
+          <div className="mt-3 flex gap-2" role="radiogroup" aria-label="Cabelo">
+            {HAIR_STYLES.map((h) => {
+              const active = hair === h.id;
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => chooseHair(h.id)}
+                  className={`h-8 flex-1 rounded-sm border text-[11px] font-semibold uppercase tracking-[0.1em] transition-colors ${
+                    active
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border hover:border-foreground"
+                  }`}
+                >
+                  {h.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.15em] text-muted-foreground" aria-live="polite">
+            {savingHair ? "Salvando…" : accessoryPiece ? "Fica escondido pela touca" : "Fica salvo no seu perfil"}
+          </p>
+        </div>
 
         {/* Preferência de caimento */}
         <div>
@@ -258,11 +748,12 @@ export function TryOnExperience({
                         : "border-foreground/20 hover:border-foreground"
                     } ${!enabled ? "cursor-not-allowed opacity-40 line-through" : ""}`}
                   >
-                    {c}
+                    <ColorLabel name={c} />
                   </button>
                 );
               })}
             </div>
+            <LookLegend colors={colors} />
           </div>
         )}
 
@@ -285,7 +776,10 @@ export function TryOnExperience({
                   <button
                     key={s}
                     type="button"
-                    onClick={() => setSelectedSize(active ? null : s)}
+                    onClick={() => {
+                      setSelectedSize(active ? null : s);
+                      if (compareSize === s) setCompareSize(null);
+                    }}
                     disabled={!enabled}
                     className={`flex h-11 min-w-11 items-center justify-center rounded-sm border px-3 text-sm transition-colors ${
                       active
@@ -298,6 +792,46 @@ export function TryOnExperience({
                 );
               })}
             </div>
+
+            {/* 3D-07: comparar com outro tamanho (provar não depende de estoque) */}
+            {selectedSize && sizes.length > 1 && (
+              <div className="mt-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                  Comparar<span className="hidden md:inline"> lado a lado</span> com
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {sizes
+                    .filter((s) => s !== selectedSize)
+                    .map((s) => {
+                      const active = compareSize === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setCompareSize(active ? null : s)}
+                          className={`flex h-9 min-w-9 items-center justify-center rounded-sm border px-2.5 text-xs transition-colors ${
+                            active
+                              ? "border-foreground bg-foreground text-background"
+                              : "border-dashed border-foreground/30 hover:border-foreground"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  {compareSize && (
+                    <button
+                      type="button"
+                      onClick={() => setCompareSize(null)}
+                      className="px-2 text-[10px] font-semibold uppercase tracking-[0.15em] underline underline-offset-4"
+                    >
+                      Sair da comparação
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -336,6 +870,36 @@ export function TryOnExperience({
                 : "Selecione cor e tamanho"}
           </button>
         </form>
+
+        {/* Item 15: look com uma peça de cima e uma de baixo (ou um vestido) */}
+        {(kind === "top" || kind === "bottom" || kind === "dress") && (
+          <LookBuilder
+            role={kind}
+            ownVariantId={lookOwnVariant?.id ?? null}
+            ownLabel={
+              selectedColor && selectedSize
+                ? `${productName} (${selectedColor}, ${selectedSize})`
+                : productName
+            }
+            companions={companions}
+            accessories={accessories}
+            body={body}
+            preference={preference}
+            toleranceCm={toleranceCm}
+            openLook={openLook}
+            brandLook={brandLook}
+            onChange={onCompanionChange}
+            onAccessoryChange={onAccessoryChange}
+            takePhoto={takeLookPhoto}
+          />
+        )}
+        {!isAccessory && lookPieces.length > 1 && <BuyLook pieces={lookPieces} />}
+        {isAccessory && (
+          <p className="rounded-sm border border-dashed border-border p-4 text-xs text-muted-foreground">
+            Para montar um look com esta peça, abra o provador de uma peça de cima, de baixo ou de
+            um vestido e escolha ela em &quot;Acessório&quot;.
+          </p>
+        )}
       </aside>
     </div>
   );

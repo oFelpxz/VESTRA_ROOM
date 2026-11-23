@@ -10,6 +10,8 @@ import {
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarParams } from "@/lib/avatar-builder";
+import { shapeBody } from "@/lib/garment-dress";
+import { SkinMaterial } from "./skin-material";
 
 /**
  * Avatar do VESTRA FIT.
@@ -82,10 +84,60 @@ const MORPH_ALIASES: Record<string, MorphKey> = {
   legs: "legLength",
   perna: "legLength",
   inseam: "legLength",
+  male: "male",
+  masculino: "male",
+  female: "female",
+  feminino: "female",
 };
 
-function canonicalMorph(name: string): MorphKey | null {
+export function canonicalMorph(name: string): MorphKey | null {
   return MORPH_ALIASES[name.toLowerCase().replace(/[^a-z]/g, "")] ?? null;
+}
+
+/**
+ * Posições e shape keys do primeiro mesh com morph targets, em coordenadas da
+ * cena (as da raiz `scene`). Sem mesh com morph targets, devolve null.
+ */
+export function readMorphBody(scene: THREE.Object3D) {
+  scene.updateMatrixWorld(true);
+  let found: THREE.Mesh | null = null;
+  scene.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!found && m.isMesh && m.geometry.morphAttributes.position) found = m;
+  });
+  const mesh = found as THREE.Mesh | null;
+  if (!mesh) return null;
+  const geo = mesh.geometry;
+  const matrix = mesh.matrixWorld;
+  // deltas são vetores: só a parte linear (giro/escala), sem translação
+  const linear = new THREE.Matrix3().setFromMatrix4(matrix);
+  const v = new THREE.Vector3();
+
+  const base = new Float32Array(geo.attributes.position.count * 3);
+  for (let i = 0; i < geo.attributes.position.count; i++) {
+    v.fromBufferAttribute(geo.attributes.position, i).applyMatrix4(matrix);
+    v.toArray(base, i * 3);
+  }
+  const deltas: Float32Array[] = [];
+  const keys: (MorphKey | null)[] = [];
+  const morphPositions = geo.morphAttributes.position ?? [];
+  for (const [name, idx] of Object.entries(mesh.morphTargetDictionary ?? {})) {
+    const attr = morphPositions[idx];
+    const d = new Float32Array(attr.count * 3);
+    for (let i = 0; i < attr.count; i++) {
+      v.fromBufferAttribute(attr, i).applyMatrix3(linear);
+      v.toArray(d, i * 3);
+    }
+    deltas.push(d);
+    keys.push(canonicalMorph(name));
+  }
+  const index = geo.index
+    ? Array.from(geo.index.array)
+    : Array.from({ length: base.length / 3 }, (_, i) => i);
+  // peso de braço de cada vértice (pose relaxada, ver `relaxArms`)
+  const armAttr = geo.getAttribute("_braco");
+  const arm = armAttr ? Float32Array.from({ length: armAttr.count }, (_, i) => armAttr.getX(i)) : null;
+  return { base, deltas, keys, index, arm };
 }
 
 function GltfAvatar({
@@ -99,26 +151,46 @@ function GltfAvatar({
   const model = useMemo(() => scene.clone(true), [scene]);
   const rootRef = useRef<THREE.Group>(null);
 
-  // Escala para a altura real do usuário, com os pés em y = 0.
+  // Altura do usuário: pela shape key de altura, resolvida em cm como no
+  // provador (ver `shapeBody`), com os pés em y = 0. Escalar o modelo inteiro
+  // e ainda aplicar a shape key contava a altura duas vezes. Sem shape keys,
+  // o modelo é escalado para a altura.
+  const body = useMemo(() => readMorphBody(model), [model]);
   const transform = useMemo(() => {
+    if (body) {
+      const { weights, lift } = shapeBody(body, params.morphs, params.totalHeight, params.girths);
+      const fitted = (k: MorphKey) => {
+        const i = body.keys.indexOf(k);
+        return i >= 0 ? weights[i] : params.morphs[k];
+      };
+      return {
+        scale: 1,
+        y: lift,
+        height: fitted("height"),
+        chest: fitted("chest"),
+        waist: fitted("waist"),
+        hip: fitted("hip"),
+      };
+    }
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3();
     box.getSize(size);
     const scale = size.y > 0 ? params.totalHeight / size.y : 1;
-    return { scale, y: -box.min.y * scale };
-  }, [model, params.totalHeight]);
+    const { chest, waist, hip } = params.morphs;
+    return { scale, y: -box.min.y * scale, height: 0, chest, waist, hip };
+  }, [model, body, params.morphs, params.totalHeight, params.girths]);
 
   // Aplica os pesos das medidas nas influências dos morph targets.
   // Percorre a árvore renderizada (via ref) a cada mudança de medida.
+  // altura, peito, cintura e quadril: os pesos que `shapeBody` acertou na malha
+  const { height, chest, waist, hip } = transform;
   const {
-    height,
     weight,
-    chest,
-    waist,
-    hip,
     shoulder,
     armLength,
     legLength,
+    male,
+    female,
   } = params.morphs;
   useEffect(() => {
     const root = rootRef.current;
@@ -132,6 +204,8 @@ function GltfAvatar({
       shoulder,
       armLength,
       legLength,
+      male,
+      female,
     };
     let matched = 0;
     root.traverse((obj) => {
@@ -164,6 +238,8 @@ function GltfAvatar({
     shoulder,
     armLength,
     legLength,
+    male,
+    female,
   ]);
 
   return (
@@ -181,7 +257,7 @@ function GltfAvatar({
 /* Error boundary — volta para o avatar de primitivas se o GLB falhar         */
 /* -------------------------------------------------------------------------- */
 
-class AvatarErrorBoundary extends Component<
+export class AvatarErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
   { failed: boolean }
 > {
@@ -209,7 +285,6 @@ class AvatarErrorBoundary extends Component<
 
 function PrimitiveAvatar({ params }: { params: AvatarParams }) {
   const a = params.anchors;
-  const skinColor = "#d6c6b3";
   const accentColor = "#b9a78f";
 
   // Comprimentos derivados
@@ -246,13 +321,13 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
       {/* Cabeça */}
       <mesh position={[0, headY, 0]} castShadow>
         <sphereGeometry args={[headRadius, 32, 32]} />
-        <meshStandardMaterial color={skinColor} roughness={0.85} />
+        <SkinMaterial />
       </mesh>
 
       {/* Pescoço */}
       <mesh position={[0, neckY, 0]} castShadow>
         <cylinderGeometry args={[neckRadius, neckRadius * 1.1, neckHeight, 16]} />
-        <meshStandardMaterial color={skinColor} roughness={0.9} />
+        <SkinMaterial />
       </mesh>
 
       {/* Torso (elipsoide aproximado por sphere escalado) */}
@@ -311,7 +386,7 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
             <cylinderGeometry
               args={[armRadius, armRadius * 0.85, armLength, 16]}
             />
-            <meshStandardMaterial color={skinColor} roughness={0.9} />
+            <SkinMaterial />
           </mesh>
           {/* Mão */}
           <mesh
@@ -319,7 +394,7 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
             castShadow
           >
             <sphereGeometry args={[armRadius * 0.95, 16, 16]} />
-            <meshStandardMaterial color={skinColor} roughness={0.9} />
+            <SkinMaterial />
           </mesh>
         </group>
       ))}
@@ -331,7 +406,7 @@ function PrimitiveAvatar({ params }: { params: AvatarParams }) {
             <cylinderGeometry
               args={[legRadius, legRadius * 0.7, legLength, 16]}
             />
-            <meshStandardMaterial color={skinColor} roughness={0.9} />
+            <SkinMaterial />
           </mesh>
           {/* Pé */}
           <mesh position={[side * legOffsetX, 0.03, 0.06]} castShadow>

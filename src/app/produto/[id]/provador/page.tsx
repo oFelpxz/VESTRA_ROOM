@@ -3,20 +3,30 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getProductDetail } from "@/lib/products";
+import { getStoreSettings } from "@/lib/store-settings-db";
+import { garmentKind } from "@/lib/fit-regions";
+import { ACCESSORY_CATEGORY, companionKind } from "@/lib/looks";
+import { getLookAccessories, getLookCompanions, getOpenLook } from "@/lib/look-data";
+import { brandLookBySlug, brandLookStart } from "@/lib/brand-looks";
 import { TryOnExperience } from "@/components/viewer-3d/tryon-experience";
 
 export const metadata = { title: "Provador virtual | VESTRA FIT" };
 
 export default async function ProvadorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ look?: string | string[]; marca?: string | string[] }>;
 }) {
   const { id } = await params;
+  const { look, marca } = await searchParams;
   const session = await auth();
 
   if (!session?.user?.id) {
-    redirect(`/login?next=/produto/${id}/provador`);
+    const query = typeof look === "string" ? `?look=${look}` : typeof marca === "string" ? `?marca=${marca}` : "";
+    const back = `/produto/${id}/provador${query}`;
+    redirect(`/login?next=${encodeURIComponent(back)}`);
   }
 
   const userId = session.user.id;
@@ -52,11 +62,25 @@ export default async function ProvadorPage({
   }
 
   const sizeRows = product.sizeChart?.rows ?? [];
+  const kind = garmentKind(product.categorySlug);
+  const companion = companionKind(kind);
+  const inLook = kind === "top" || kind === "bottom" || kind === "dress";
+  const [settings, companions, accessories, openLook] = await Promise.all([
+    getStoreSettings(),
+    companion ? getLookCompanions(companion) : [],
+    inLook ? getLookAccessories() : [],
+    typeof look === "string" ? getOpenLook(look, userId, product.id) : null,
+  ]);
+  // Look da marca (lista 10): o provador já abre vestido com ele. Um look
+  // salvo (`?look=`) tem a preferência.
+  const brand = typeof marca === "string" && !openLook ? brandLookBySlug(marca) : null;
+  const brandStart = brand ? brandLookStart(brand, product.slug, [...companions, ...accessories]) : null;
 
   return (
     <TryOnExperience
       productId={product.id}
       productName={product.name}
+      priceValue={product.promotionalPriceNumber ?? product.priceNumber}
       variants={product.variants}
       colors={product.colors}
       sizes={product.sizes}
@@ -71,8 +95,17 @@ export default async function ProvadorPage({
         armLengthCm: profile.armLengthCm,
         legLengthCm: profile.legLengthCm,
         fitPreference: profile.fitPreference,
+        skinTone: profile.skinTone,
+        hairStyle: profile.hairStyle,
       }}
       sizeChart={sizeRows}
+      kind={kind}
+      toleranceCm={settings.fitToleranceCm}
+      companions={companions}
+      accessories={accessories}
+      isAccessory={product.categorySlug === ACCESSORY_CATEGORY}
+      openLook={openLook}
+      brandLook={brandStart}
     />
   );
 }

@@ -13,6 +13,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+export const metadata = { title: "Minha conta" };
+
 export default async function PerfilPage() {
   const session = await auth();
 
@@ -22,7 +24,7 @@ export default async function PerfilPage() {
 
   const user = session.user;
 
-  const [profile, ordersCount, addressesCount, paymentMethodsCount] =
+  const [profile, ordersCount, addressesCount, paymentMethodsCount, openReturns, looksCount] =
     await Promise.all([
       prisma.measurementProfile.findUnique({
         where: { userId: user.id },
@@ -31,6 +33,10 @@ export default async function PerfilPage() {
       prisma.order.count({ where: { userId: user.id } }),
       prisma.address.count({ where: { userId: user.id } }),
       prisma.savedPaymentMethod.count({ where: { userId: user.id } }),
+      prisma.returnRequest.count({
+        where: { userId: user.id, status: { in: ["OPEN", "APPROVED", "RECEIVED"] } },
+      }),
+      prisma.savedLook.count({ where: { userId: user.id } }),
     ]);
   const hasMeasurements = Boolean(profile);
 
@@ -144,6 +150,65 @@ export default async function PerfilPage() {
             </CardContent>
           </Card>
         </Link>
+
+        <Link href="/perfil/trocas" className="block">
+          <Card className="h-full transition-shadow hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Trocas e devoluções</CardTitle>
+              <CardDescription>Acompanhe seus pedidos de troca</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {openReturns > 0 ? (
+                <span className="font-medium text-foreground">
+                  {openReturns} em andamento — ver →
+                </span>
+              ) : (
+                <span>Para trocar, abra o pedido entregue.</span>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/perfil/looks" className="block">
+          <Card className="h-full transition-shadow hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Looks salvos</CardTitle>
+              <CardDescription>Combinações montadas no provador</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {looksCount > 0 ? (
+                <span className="font-medium text-foreground">
+                  {looksCount} {looksCount === 1 ? "look" : "looks"} — ver →
+                </span>
+              ) : (
+                <span>Monte um look no provador de uma peça de cima.</span>
+              )}
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      <div className="mt-10 flex flex-col gap-3 rounded-sm border border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Seus dados
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Baixe uma cópia de tudo que a loja guarda sobre você (arquivo JSON). Veja a{" "}
+            <Link href="/privacidade" className="underline hover:text-foreground">
+              política de privacidade
+            </Link>
+            .
+          </p>
+        </div>
+        {/* Link comum: o navegador baixa o arquivo da rota. */}
+        <a
+          href="/api/perfil/dados"
+          download
+          className="shrink-0 rounded-sm border border-foreground/15 px-4 py-2 text-xs font-medium uppercase tracking-wide transition-colors hover:border-foreground"
+        >
+          Baixar meus dados
+        </a>
       </div>
 
       {user.email && <DeleteAccountSection userEmail={user.email} />}

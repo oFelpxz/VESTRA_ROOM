@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { registerModel3DAction } from "@/lib/model-3d-actions";
 import { Button } from "@/components/ui/button";
+import { FABRICS, FABRIC_LABEL, isFabricName, type FabricName } from "@/lib/fabric-weave";
 
 type UploadInfo = {
   fileSizeMb: number;
@@ -11,6 +12,7 @@ type UploadInfo = {
   optimizedPct: number;
   wasOptimized: boolean;
   storage: "cloud" | "local";
+  fabric: FabricName | null;
 };
 
 export function Model3DUploader({
@@ -25,6 +27,7 @@ export function Model3DUploader({
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<UploadInfo | null>(null);
+  const [fabric, setFabric] = useState<FabricName | "">("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -57,6 +60,7 @@ export function Model3DUploader({
         optimizedPct: number;
         wasOptimized: boolean;
         storage: "cloud" | "local";
+        fabric: FabricName | null;
         format: string;
       };
       error?: string;
@@ -65,6 +69,7 @@ export function Model3DUploader({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("productId", productId);
+      formData.append("fabric", fabric);
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
@@ -115,6 +120,7 @@ export function Model3DUploader({
         optimizedPct: result.data!.optimizedPct,
         wasOptimized: result.data!.wasOptimized,
         storage: result.data!.storage,
+        fabric: result.data!.fabric,
       });
       router.refresh();
     });
@@ -127,6 +133,28 @@ export function Model3DUploader({
 
   return (
     <div className="flex flex-col gap-3">
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          Tecido no provador
+        </span>
+        <select
+          value={fabric}
+          onChange={(e) => setFabric(isFabricName(e.target.value) ? e.target.value : "")}
+          className="h-9 max-w-xs rounded-sm border border-border bg-background px-2 text-sm"
+        >
+          <option value="">Automático (pelo nome do material)</option>
+          {FABRICS.map((f) => (
+            <option key={f} value={f}>
+              {FABRIC_LABEL[f]}
+            </option>
+          ))}
+        </select>
+        <span className="text-[11px] text-muted-foreground">
+          Trama, brilho, barra e pesponto da peça. Gravado no arquivo .glb ao
+          enviar; num .glb que já tem tecido, &quot;Automático&quot; mantém o dele.
+        </span>
+      </label>
+
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -218,6 +246,11 @@ export function Model3DUploader({
               </>
             )}
           </p>
+          {info.fabric && (
+            <p className="mt-1 text-foreground/80">
+              Tecido: <strong>{FABRIC_LABEL[info.fabric]}</strong>
+            </p>
+          )}
         </div>
       )}
     </div>

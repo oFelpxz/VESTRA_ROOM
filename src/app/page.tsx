@@ -63,6 +63,12 @@ export default async function Home() {
             {isLoggedIn ? (
               <>
                 <Link
+                  href="/favoritos"
+                  className="transition-colors hover:text-white"
+                >
+                  Favoritos
+                </Link>
+                <Link
                   href="/perfil"
                   className="transition-colors hover:text-white"
                 >

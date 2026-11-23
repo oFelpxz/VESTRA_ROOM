@@ -61,7 +61,14 @@ export function Footer() {
                 ["Perfil", "/perfil"],
               ]}
             />
-            <FooterCol title="Marca" links={[["Sobre", "/sobre"]]} />
+            <FooterCol
+              title="Marca"
+              links={[
+                ["Sobre", "/sobre"],
+                ["Trocas e devoluções", "/trocas"],
+                ["Privacidade", "/privacidade"],
+              ]}
+            />
           </div>
         </div>
 

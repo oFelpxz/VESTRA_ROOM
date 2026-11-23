@@ -8,6 +8,7 @@ export async function getActiveCartWithItems(userId: string) {
   return prisma.cart.findFirst({
     where: { userId, status: "ACTIVE" },
     include: {
+      coupon: true,
       items: {
         orderBy: { createdAt: "asc" },
         include: {

@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { measurementError } from "@/lib/measurement-limits";
+import { isSkinTone } from "@/lib/skin-tones";
+import { isHairStyle } from "@/lib/hair";
 
 export type MeasurementFormState = {
   error?: string;
@@ -11,12 +14,12 @@ export type MeasurementFormState = {
 
 type Fit = "SLIM" | "REGULAR" | "OVERSIZED";
 
+/** Vazio = não informado (null). Texto inválido vira NaN e é recusado depois. */
 function parseNum(value: FormDataEntryValue | null): number | null {
   if (value === null) return null;
   const s = String(value).trim().replace(",", ".");
   if (s === "") return null;
-  const n = Number(s);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  return Number(s);
 }
 
 export async function saveMeasurementsAction(
@@ -54,6 +57,11 @@ export async function saveMeasurementsAction(
     acceptedTerms: true,
   };
 
+  // Antes, qualquer número passava (ex.: 1,75 em vez de 175) e o avatar saía
+  // deformado sem aviso.
+  const invalid = measurementError(data);
+  if (invalid) return { error: invalid };
+
   await prisma.measurementProfile.upsert({
     where: { userId: session.user.id },
     update: data,
@@ -90,4 +98,29 @@ export async function deleteMeasurementsAction(
   revalidatePath("/teste-3d");
 
   return { success: true };
+}
+
+/**
+ * Tom de pele escolhido no provador (lista 11): fica no perfil de medidas e
+ * volta no próximo provador. Sem perfil não há provador, então só atualiza.
+ */
+export async function saveSkinToneAction(tone: string): Promise<{ ok: boolean }> {
+  const session = await auth();
+  if (!session?.user?.id || !isSkinTone(tone)) return { ok: false };
+  const { count } = await prisma.measurementProfile.updateMany({
+    where: { userId: session.user.id },
+    data: { skinTone: tone },
+  });
+  return { ok: count > 0 };
+}
+
+/** Corte de cabelo escolhido no provador (lista 11), salvo como o tom de pele. */
+export async function saveHairStyleAction(style: string): Promise<{ ok: boolean }> {
+  const session = await auth();
+  if (!session?.user?.id || !isHairStyle(style)) return { ok: false };
+  const { count } = await prisma.measurementProfile.updateMany({
+    where: { userId: session.user.id },
+    data: { hairStyle: style },
+  });
+  return { ok: count > 0 };
 }

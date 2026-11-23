@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { AddressList } from "@/components/profile/address-list";
 
-export const metadata = { title: "Endereços | VESTRA ROOM" };
+export const metadata = { title: "Endereços" };
 
 export default async function EnderecosPage() {
   const session = await auth();

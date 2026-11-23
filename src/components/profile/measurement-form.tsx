@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   saveMeasurementsAction,
@@ -10,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MEASUREMENT_LIMITS } from "@/lib/measurement-limits";
 
 export type MeasurementInitial = {
   heightCm: number | null;
@@ -24,16 +26,16 @@ export type MeasurementInitial = {
   acceptedTerms: boolean;
 } | null;
 
-const fields: { name: keyof NonNullable<MeasurementInitial>; label: string }[] =
+const fields: { name: keyof typeof MEASUREMENT_LIMITS; label: string }[] =
   [
     { name: "heightCm", label: "Altura (cm)" },
     { name: "weightKg", label: "Peso aproximado (kg)" },
     { name: "chestCm", label: "Tórax / Busto (cm)" },
     { name: "waistCm", label: "Cintura (cm)" },
     { name: "hipCm", label: "Quadril (cm)" },
-    { name: "shoulderCm", label: "Ombros (cm)" },
-    { name: "armLengthCm", label: "Comprimento do braço (cm)" },
-    { name: "legLengthCm", label: "Comprimento da perna (cm)" },
+    { name: "shoulderCm", label: "Ombros — de ombro a ombro (cm)" },
+    { name: "armLengthCm", label: "Braço — do ombro ao pulso (cm)" },
+    { name: "legLengthCm", label: "Perna — entrepernas até o chão (cm)" },
   ];
 
 const initialState: MeasurementFormState = {};
@@ -60,7 +62,8 @@ export function MeasurementForm({
               name={f.name}
               type="number"
               step="0.1"
-              min="0"
+              min={MEASUREMENT_LIMITS[f.name].min}
+              max={MEASUREMENT_LIMITS[f.name].max}
               inputMode="decimal"
               defaultValue={
                 initial && initial[f.name] != null
@@ -96,7 +99,11 @@ export function MeasurementForm({
         <span>
           Autorizo o uso das minhas medidas corporais exclusivamente para
           recomendação de tamanho e para o provador virtual VESTRA FIT. Posso
-          editar ou excluir esses dados a qualquer momento.
+          editar ou excluir esses dados a qualquer momento. Veja a{" "}
+          <Link href="/privacidade" target="_blank" className="underline hover:text-foreground">
+            política de privacidade
+          </Link>
+          .
         </span>
       </label>
 
